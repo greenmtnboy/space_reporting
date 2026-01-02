@@ -9,13 +9,15 @@ const YEAR_START = new Date('2025-01-01').getTime()
 const YEAR_END = new Date('2025-12-31T23:59:59').getTime()
 const YEAR_DURATION = YEAR_END - YEAR_START
 
-// Map configuration - fixed size for consistent display
-// Zoom 3 = 2048px world width (8 tiles), height = 8 tiles * 256 = 2048px max
-const MAP_ZOOM = 3
-const TILE_SIZE = 256
-const MAP_WIDTH = 2048 // Full world width at zoom 3 (8 tiles)
-const MAP_HEIGHT = 256*4 // 4 tiles high to show more latitude
-const MAP_CENTER = { lat: 0, lng: 10 } // Shifted south to show Scandinavia
+// Map configuration
+const MAP_ZOOM = ref(3)
+const TILE_SIZE = ref(256)
+const MAP_CENTER = { lat: 0, lng: 10 }
+
+// Reactive dimensions for responsiveness
+const mapContainer = ref<HTMLElement | null>(null)
+const mapWidth = ref(2048)
+const mapHeight = ref(1024)
 
 // State
 const isPlaying = ref(false)
@@ -39,31 +41,26 @@ const launches = computed(() => {
 
 // Active launches (visible on map with expand/shrink animation)
 const activeLaunches = computed(() => {
-  const visibleWindow = YEAR_DURATION / 30 // Each launch visible for animation cycle
-  const expandDuration = 0.15 // First 15% is expansion
-  const holdDuration = 0.25 // Hold at full size until 25%
+  const visibleWindow = YEAR_DURATION / 30
+  const expandDuration = 0.15
+  const holdDuration = 0.25
 
   return launches.value.filter(l => {
     return l.timestamp <= currentTime.value &&
-           l.timestamp > currentTime.value - visibleWindow
+      l.timestamp > currentTime.value - visibleWindow
   }).map(l => {
     const age = currentTime.value - l.timestamp
-    const progress = age / visibleWindow // 0 to 1
+    const progress = age / visibleWindow
 
-    // Scale animation: expand quickly, then shrink
     let scale: number
     if (progress < expandDuration) {
-      // Expanding phase (0 -> 1)
       scale = progress / expandDuration
     } else if (progress < holdDuration) {
-      // Hold at full size
       scale = 1
     } else {
-      // Shrinking phase (1 -> 0)
       scale = 1 - ((progress - holdDuration) / (1 - holdDuration))
     }
 
-    // Opacity fades after hold
     const opacity = progress < holdDuration ? 1 : Math.max(0, 1 - ((progress - holdDuration) / (1 - holdDuration)) * 0.7)
 
     return { ...l, scale: Math.max(0, scale), opacity }
@@ -166,63 +163,50 @@ function shortenOrgName(name: string): string {
 
 // Convert lat/lng to pixel coordinates using Web Mercator projection
 function latLngToPixel(lat: number, lng: number): { x: number; y: number } {
-  // Web Mercator projection matching tile coordinates
-  const numTiles = Math.pow(2, MAP_ZOOM)
-  const worldSize = TILE_SIZE * numTiles
+  const numTiles = Math.pow(2, MAP_ZOOM.value)
+  const worldSize = TILE_SIZE.value * numTiles
 
-  // Convert lng to x (0 to worldSize)
   const worldX = ((lng + 180) / 360) * worldSize
-
-  // Convert lat to y using Mercator projection
   const latRad = lat * Math.PI / 180
   const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2))
   const worldY = (worldSize / 2) - (worldSize * mercN / (2 * Math.PI))
 
-  // Calculate center point in world coordinates
   const centerWorldX = ((MAP_CENTER.lng + 180) / 360) * worldSize
   const centerLatRad = MAP_CENTER.lat * Math.PI / 180
   const centerMercN = Math.log(Math.tan(Math.PI / 4 + centerLatRad / 2))
   const centerWorldY = (worldSize / 2) - (worldSize * centerMercN / (2 * Math.PI))
 
-  // Convert to screen coordinates relative to center
-  const x = MAP_WIDTH / 2 + (worldX - centerWorldX)
-  const y = MAP_HEIGHT / 2 + (worldY - centerWorldY)
+  const x = mapWidth.value / 2 + (worldX - centerWorldX)
+  const y = mapHeight.value / 2 + (worldY - centerWorldY)
 
   return { x, y }
 }
 
-// Calculate dot size based on payload (halved from original)
 function getDotSize(payload: number): number {
-  // Scale from 2px (no payload) to 12px (max ~18 tons) - half of original
   const minSize = 2
   const maxSize = 12
   const maxPayload = 18
   return minSize + (Math.min(payload, maxPayload) / maxPayload) * (maxSize - minSize)
 }
 
-// Get tile URLs for map background
 function getTileUrls(): { url: string; x: number; y: number }[] {
   const tiles: { url: string; x: number; y: number }[] = []
-  const numTiles = Math.pow(2, MAP_ZOOM)
-  const worldSize = TILE_SIZE * numTiles
+  const numTiles = Math.pow(2, MAP_ZOOM.value)
+  const worldSize = TILE_SIZE.value * numTiles
 
-  // Calculate center in world coordinates
   const centerWorldX = ((MAP_CENTER.lng + 180) / 360) * worldSize
   const centerLatRad = MAP_CENTER.lat * Math.PI / 180
   const centerMercN = Math.log(Math.tan(Math.PI / 4 + centerLatRad / 2))
   const centerWorldY = (worldSize / 2) - (worldSize * centerMercN / (2 * Math.PI))
 
-  // Calculate center tile
-  const centerTileX = Math.floor(centerWorldX / TILE_SIZE)
-  const centerTileY = Math.floor(centerWorldY / TILE_SIZE)
+  const centerTileX = Math.floor(centerWorldX / TILE_SIZE.value)
+  const centerTileY = Math.floor(centerWorldY / TILE_SIZE.value)
 
-  // Offset within center tile
-  const offsetX = centerWorldX - centerTileX * TILE_SIZE
-  const offsetY = centerWorldY - centerTileY * TILE_SIZE
+  const offsetX = centerWorldX - centerTileX * TILE_SIZE.value
+  const offsetY = centerWorldY - centerTileY * TILE_SIZE.value
 
-  // Calculate how many tiles we need (add 1 to ensure full coverage)
-  const tilesX = Math.ceil(MAP_WIDTH / TILE_SIZE) + 1
-  const tilesY = Math.ceil(MAP_HEIGHT / TILE_SIZE) + 1
+  const tilesX = Math.ceil(mapWidth.value / TILE_SIZE.value) + 1
+  const tilesY = Math.ceil(mapHeight.value / TILE_SIZE.value) + 1
 
   const halfTilesX = Math.ceil(tilesX / 2)
   const halfTilesY = Math.ceil(tilesY / 2)
@@ -234,9 +218,9 @@ function getTileUrls(): { url: string; x: number; y: number }[] {
 
       if (tileY >= 0 && tileY < numTiles) {
         tiles.push({
-          url: `https://a.basemaps.cartocdn.com/light_all/${MAP_ZOOM}/${tileX}/${tileY}.png`,
-          x: MAP_WIDTH / 2 + i * TILE_SIZE - offsetX,
-          y: MAP_HEIGHT / 2 + j * TILE_SIZE - offsetY
+          url: `https://a.basemaps.cartocdn.com/light_all/${MAP_ZOOM.value}/${tileX}/${tileY}.png`,
+          x: mapWidth.value / 2 + i * TILE_SIZE.value - offsetX,
+          y: mapHeight.value / 2 + j * TILE_SIZE.value - offsetY
         })
       }
     }
@@ -266,7 +250,6 @@ function animate(timestamp: number) {
 
 function startAnimation() {
   if (isComplete.value) {
-    // Reset for new loop
     currentTime.value = YEAR_START
     pausedElapsed.value = 0
     isComplete.value = false
@@ -317,14 +300,48 @@ function resetAnimation() {
   }
 }
 
-onMounted(() => {
-  // No dynamic sizing needed - using fixed dimensions
-})
+let resizeObserver: ResizeObserver | null = null
 
+onMounted(() => {
+  if (!mapContainer.value) return
+
+  resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect
+      const targetAspect = 2 // width / height
+
+      if (width / height > targetAspect) {
+        // Height is the constraint
+        mapHeight.value = height
+        mapWidth.value = height * targetAspect
+      } else {
+        // Width is the constraint
+        mapWidth.value = width
+        mapHeight.value = width / targetAspect
+      }
+      let minDim = Math.min(mapWidth.value, mapHeight.value * 2)
+      if (minDim < 2000) {
+        MAP_ZOOM.value = 2
+        TILE_SIZE.value = 256
+      }
+      else if (minDim < 1000) {
+        MAP_ZOOM.value = 1
+        TILE_SIZE.value = 256
+      }
+      else {
+        MAP_ZOOM.value = 3
+        TILE_SIZE.value = 256
+      }
+    }
+  })
+
+  resizeObserver.observe(mapContainer.value)
+})
 onUnmounted(() => {
   if (animationFrameId.value) {
     cancelAnimationFrame(animationFrameId.value)
   }
+  resizeObserver?.disconnect()
 })
 </script>
 
@@ -337,52 +354,35 @@ onUnmounted(() => {
 
     <main class="main-content">
       <div class="map-section">
-        <div class="map-container" :style="{ width: MAP_WIDTH + 'px', height: MAP_HEIGHT + 'px' }">
-          <!-- Map tiles -->
-          <div class="map-tiles">
-            <img
-              v-for="(tile, index) in tileUrls"
-              :key="index"
-              :src="tile.url"
-              :style="{
-                left: tile.x + 'px',
-                top: tile.y + 'px'
-              }"
-              class="map-tile"
-            />
+        <div ref="mapContainer" class="map-container"
+          style="width: 100%; height: 100%; position: relative; overflow: hidden;">
+          <div class="map-tiles" :style="{ width: mapWidth + 'px', height: mapHeight + 'px' }">
+            <img v-for="(tile, index) in tileUrls" :key="index" :src="tile.url" :style="{
+              left: tile.x + 'px',
+              top: tile.y + 'px'
+            }" class="map-tile" />
           </div>
 
-          <!-- Launch dots -->
-          <svg class="launch-layer" :viewBox="`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`" :style="{ width: MAP_WIDTH + 'px', height: MAP_HEIGHT + 'px' }">
+          <svg class="launch-layer" :viewBox="`0 0 ${mapWidth} ${mapHeight}`"
+            :style="{ width: mapWidth + 'px', height: mapHeight + 'px' }">
             <g v-for="launch in activeLaunches" :key="launch.launch_tag">
-              <!-- Success: expanding/shrinking circle -->
               <template v-if="!launch.isFailed">
-                <circle
-                  :cx="latLngToPixel(launch.site_latitude, launch.site_longitude).x"
+                <circle :cx="latLngToPixel(launch.site_latitude, launch.site_longitude).x"
                   :cy="latLngToPixel(launch.site_latitude, launch.site_longitude).y"
-                  :r="getDotSize(launch.orb_pay) * launch.scale"
-                  class="launch-dot success"
-                  :style="{ opacity: launch.opacity }"
-                />
+                  :r="getDotSize(launch.orb_pay) * launch.scale" class="launch-dot success"
+                  :style="{ opacity: launch.opacity }" />
               </template>
 
-              <!-- Failure: explosion -->
               <template v-else>
-                <g
-                  :transform="`translate(${latLngToPixel(launch.site_latitude, launch.site_longitude).x}, ${latLngToPixel(launch.site_latitude, launch.site_longitude).y}) scale(${launch.scale})`"
-                  class="explosion"
-                  :style="{ opacity: launch.opacity }"
-                >
-                  <!-- Explosion center -->
+                <g :transform="`translate(${latLngToPixel(launch.site_latitude, launch.site_longitude).x}, ${latLngToPixel(launch.site_latitude, launch.site_longitude).y}) scale(${launch.scale})`"
+                  class="explosion" :style="{ opacity: launch.opacity }">
                   <circle r="3" class="explosion-center" />
-                  <!-- Explosion rays -->
                   <line x1="0" y1="-4" x2="0" y2="-10" class="explosion-ray" />
                   <line x1="3.5" y1="-2" x2="8.7" y2="-5" class="explosion-ray" />
                   <line x1="3.5" y1="2" x2="8.7" y2="5" class="explosion-ray" />
                   <line x1="0" y1="4" x2="0" y2="10" class="explosion-ray" />
                   <line x1="-3.5" y1="2" x2="-8.7" y2="5" class="explosion-ray" />
                   <line x1="-3.5" y1="-2" x2="-8.7" y2="-5" class="explosion-ray" />
-                  <!-- Debris particles -->
                   <circle cx="6" cy="-6" r="1.5" class="explosion-particle" />
                   <circle cx="-6" cy="-4" r="1" class="explosion-particle" />
                   <circle cx="4" cy="6" r="1" class="explosion-particle" />
@@ -393,7 +393,6 @@ onUnmounted(() => {
           </svg>
         </div>
 
-        <!-- Progress bar -->
         <div class="progress-container">
           <div class="progress-bar">
             <div class="progress-fill" :style="{ width: progress + '%' }"></div>
@@ -404,7 +403,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Controls -->
         <div class="controls">
           <button @click="togglePlayPause" class="control-btn primary">
             {{ !isPlaying || isComplete ? 'Play' : (isPaused ? 'Resume' : 'Pause') }}
@@ -412,7 +410,6 @@ onUnmounted(() => {
           <button @click="resetAnimation" class="control-btn">Reset</button>
         </div>
 
-        <!-- Completion modal -->
         <div v-if="isComplete" class="completion-modal">
           <div class="modal-content">
             <h2>That's a wrap!</h2>
@@ -422,28 +419,17 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Charts section -->
       <aside class="chart-section">
         <div class="chart-block">
           <h2>Launches by Provider</h2>
           <div class="bar-chart">
-            <div
-              v-for="org in orgStats"
-              :key="org.name"
-              class="bar-row"
-            >
+            <div v-for="org in orgStats" :key="org.name" class="bar-row">
               <div class="bar-label">{{ org.name }}</div>
               <div class="bar-container">
-                <div
-                  class="bar-success"
-                  :style="{ width: (org.successes / maxOrgTotal) * 100 + '%' }"
-                >
+                <div class="bar-success" :style="{ width: (org.successes / maxOrgTotal) * 100 + '%' }">
                   <span v-if="org.successes > 0" class="bar-value">{{ org.successes }}</span>
                 </div>
-                <div
-                  class="bar-failure"
-                  :style="{ width: (org.failures / maxOrgTotal) * 100 + '%' }"
-                >
+                <div class="bar-failure" :style="{ width: (org.failures / maxOrgTotal) * 100 + '%' }">
                   <span v-if="org.failures > 0" class="bar-value">{{ org.failures }}</span>
                 </div>
               </div>
@@ -455,23 +441,13 @@ onUnmounted(() => {
         <div class="chart-block">
           <h2>Launches by Vehicle</h2>
           <div class="bar-chart">
-            <div
-              v-for="vehicle in vehicleStats"
-              :key="vehicle.name"
-              class="bar-row"
-            >
+            <div v-for="vehicle in vehicleStats" :key="vehicle.name" class="bar-row">
               <div class="bar-label">{{ vehicle.name }}</div>
               <div class="bar-container">
-                <div
-                  class="bar-success"
-                  :style="{ width: (vehicle.successes / maxVehicleTotal) * 100 + '%' }"
-                >
+                <div class="bar-success" :style="{ width: (vehicle.successes / maxVehicleTotal) * 100 + '%' }">
                   <span v-if="vehicle.successes > 0" class="bar-value">{{ vehicle.successes }}</span>
                 </div>
-                <div
-                  class="bar-failure"
-                  :style="{ width: (vehicle.failures / maxVehicleTotal) * 100 + '%' }"
-                >
+                <div class="bar-failure" :style="{ width: (vehicle.failures / maxVehicleTotal) * 100 + '%' }">
                   <span v-if="vehicle.failures > 0" class="bar-value">{{ vehicle.failures }}</span>
                 </div>
               </div>

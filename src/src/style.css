@@ -113,8 +113,6 @@ html, body {
 
 .map-tile {
   position: absolute;
-  width: 256px;
-  height: 256px;
   pointer-events: none;
   filter: brightness(0.3) saturate(0.25) contrast(1.15);
 }
@@ -157,6 +155,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  width: 100%;
 }
 
 .progress-bar {
