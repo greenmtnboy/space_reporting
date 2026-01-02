@@ -1,0 +1,14 @@
+import raw.launch;
+
+
+copy into json `raw_data.json` from  where launch_date.year = 2025
+select
+    flight_id,
+    launch_tag,
+    success_flag,
+    launch_date,
+    site.latitude,
+    site.longitude,
+    coalesce(CASE WHEN org.e_name = '-' then NULL else org.e_name end, org.u_name) as launch_org,
+    orb_pay
+;

@@ -1,0 +1,10 @@
+[engine]
+# Default dialect for execution
+dialect = "duck_db"
+
+# Parallelism level for directory execution
+# parallelism = 2
+
+[engine.config]
+enable_gcs = true
+enable_python_datasources = true

@@ -1,0 +1,79 @@
+import std.geography;
+import etl;
+
+key code string;
+property code.u_code string;
+property code.state_code string::country_code;
+property code.type string;
+property code.class string;
+property code.t_start string;
+property code.t_stop string;
+property code.short_name string;
+property code.name string;
+property code.location string;
+# these are all null
+# excluding from model for the moment
+# property code.longitude float::longitude;
+# property code.latitude float::latitude;
+property code.error float;
+property code.parent string;
+property code.short_e_name string;
+property code.e_name string;
+property code.v_class string;
+property code.v_class_id string;
+property code.v_id string;
+property code.u_name string;
+
+
+root datasource platform_info_raw (
+    Code: code,
+    UCode: u_code,
+    StateCode: state_code,
+    Type: type,
+    Class: class,
+    TStart: t_start,
+    TStop: t_stop,
+    ShortName: short_name,
+    Name: name,
+    Location: location,
+    # Longitude: longitude,
+    # Latitude: latitude,
+    Error: ?error,
+    Parent: parent,
+    ShortEName: short_e_name,
+    EName: e_name,
+    VClass: v_class,
+    VClassID: v_class_id,
+    VID: v_id,
+    UName: u_name,
+    data_update_date: data_updated_through
+    )
+grain (code)
+file `ingest_platform.py`
+freshness by data_updated_through;
+
+
+datasource platform_info (
+    code,
+    u_code,
+    state_code,
+    type,
+    class,
+    t_start,
+    t_stop,
+    short_name,
+    name,
+    location,
+    ?error,
+    parent,
+    short_e_name,
+    e_name,
+    v_class,
+    v_class_id,
+    v_id,
+    u_name,
+    data_updated_through
+    )
+grain (code)
+file `gcs://trilogy_public_models/duckdb/launch_report/platform_info.parquet`
+freshness by data_updated_through;
