@@ -353,7 +353,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Launch dots -->
-          <svg class="launch-layer" :viewBox="`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`">
+          <svg class="launch-layer" :viewBox="`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`" :style="{ width: MAP_WIDTH + 'px', height: MAP_HEIGHT + 'px' }">
             <g v-for="launch in activeLaunches" :key="launch.launch_tag">
               <!-- Success: expanding/shrinking circle -->
               <template v-if="!launch.isFailed">
