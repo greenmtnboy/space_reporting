@@ -3,3 +3,6 @@ __pycache__/
 .venv
 .tmp
 .claude
+node_modules/
+
+dist/

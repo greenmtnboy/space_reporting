@@ -10,5 +10,6 @@ select
     site.latitude,
     site.longitude,
     coalesce(CASE WHEN org.e_name = '-' then NULL else org.e_name end, org.u_name) as launch_org,
-    orb_pay
+    orb_pay,
+    vehicle.name
 ;
