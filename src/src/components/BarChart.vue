@@ -43,7 +43,7 @@ defineProps<{
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 12px;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .bar-chart {
@@ -65,7 +65,7 @@ defineProps<{
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #1f2937;
+  color: var(--color-text-secondary);
 }
 
 .bar-container {
@@ -105,6 +105,6 @@ defineProps<{
   font-size: 12px;
   font-weight: 600;
   text-align: right;
-  color: #111827;
+  color: var(--color-text);
 }
 </style>
