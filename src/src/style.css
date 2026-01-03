@@ -98,7 +98,7 @@ html, body {
 
 .map-container {
   position: relative;
-  background-color: var(--color-bg-tertiary);
+  background-color: #1a1c22;
   overflow: hidden;
   border: 1px solid var(--color-border);
 }
@@ -115,6 +115,7 @@ html, body {
   position: absolute;
   pointer-events: none;
   filter: brightness(0.3) saturate(0.25) contrast(1.15);
+  transition: left 0.1s ease-out, top 0.1s ease-out, width 0.1s ease-out, height 0.1s ease-out;
 }
 
 .launch-layer {
@@ -124,6 +125,7 @@ html, body {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 100;
 }
 
 /* Launch dots */
@@ -236,8 +238,14 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(3, 3, 5, 0.95);
-  backdrop-filter: blur(8px);
+  background-color: rgba(3, 3, 5, 0.6);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.completion-modal .modal-content {
+  pointer-events: auto;
 }
 
 .modal-content {
@@ -410,6 +418,49 @@ html, body {
 .legend-color.failure {
   background: var(--color-failure);
   box-shadow: 0 0 4px var(--color-failure);
+}
+
+/* Launch tooltip */
+.launch-marker {
+  cursor: pointer;
+}
+
+.launch-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%) translateY(-12px);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem;
+  pointer-events: none;
+  z-index: 200;
+  max-width: 280px;
+  white-space: nowrap;
+}
+
+.tooltip-site {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 0.25rem;
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.tooltip-details {
+  display: flex;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  color: var(--color-text-muted);
+}
+
+.tooltip-id {
+  color: var(--color-accent-bright);
+}
+
+.tooltip-vehicle {
+  color: var(--color-text-muted);
 }
 
 /* Footer */

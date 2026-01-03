@@ -3,6 +3,7 @@ export interface Launch {
   launch_tag: string
   success_flag: string
   launch_date: string
+  site_name: string
   site_latitude: number
   site_longitude: number
   launch_org: string

@@ -21,8 +21,8 @@ const camera = ref({
 })
 
 // Camera constraints
-const MIN_ZOOM = 1
-const MAX_ZOOM = 5
+const MIN_ZOOM = 2
+const MAX_ZOOM = 20
 const ZOOM_SPEED = 0.002  // Zoom sensitivity for wheel
 const PAN_SPEED = 20      // Pixels per keypress
 
@@ -39,6 +39,10 @@ const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 const dragStartCenter = ref({ lat: 0, lng: 0 })
 
+// Tile cache - tracks which zoom levels have been loaded
+const loadedTileZooms = ref(new Set<number>())
+const lastLoadedZoom = ref(3) // Start with initial zoom
+
 // State
 const isPlaying = ref(false)
 const isPaused = ref(false)
@@ -47,6 +51,9 @@ const currentTime = ref(YEAR_START)
 const animationStartTime = ref(0)
 const pausedElapsed = ref(0)
 const animationFrameId = ref<number | null>(null)
+
+// Hover state for launch tooltips
+const hoveredLaunch = ref<{ launch: Launch & { timestamp: number; isFailed: boolean }; x: number; y: number } | null>(null)
 
 // Process and sort launches by date
 const launches = computed(() => {
@@ -61,6 +68,11 @@ const launches = computed(() => {
 
 // Active launches (visible on map with expand/shrink animation)
 const activeLaunches = computed(() => {
+  // When complete, show all launches at full opacity
+  if (isComplete.value) {
+    return launches.value.map(l => ({ ...l, scale: 1, opacity: 0.8 }))
+  }
+
   const visibleWindow = YEAR_DURATION / 30
   const expandDuration = 0.15
   const holdDuration = 0.25
@@ -210,16 +222,10 @@ function getDotSize(payload: number): number {
   return minSize + (Math.min(payload, maxPayload) / maxPayload) * (maxSize - minSize)
 }
 
-function getTileUrls(): { url: string; x: number; y: number; scale: number }[] {
-  const tiles: { url: string; x: number; y: number; scale: number }[] = []
+function getTilesForZoom(targetZoom: number, scale: number): { url: string; x: number; y: number; scale: number; zIndex: number }[] {
+  const tiles: { url: string; x: number; y: number; scale: number; zIndex: number }[] = []
 
-  // Use integer zoom for tile fetching, but apply scale for smooth zoom
-  const continuousZoom = camera.value.zoom
-  const tileZoom = Math.floor(continuousZoom)
-  const zoomFraction = continuousZoom - tileZoom
-  const tileScale = Math.pow(2, zoomFraction)
-
-  const numTiles = Math.pow(2, tileZoom)
+  const numTiles = Math.pow(2, targetZoom)
   const worldSize = TILE_SIZE * numTiles
 
   const centerWorldX = ((camera.value.centerLng + 180) / 360) * worldSize
@@ -233,35 +239,67 @@ function getTileUrls(): { url: string; x: number; y: number; scale: number }[] {
   const offsetX = centerWorldX - centerTileX * TILE_SIZE
   const offsetY = centerWorldY - centerTileY * TILE_SIZE
 
-  // Need more tiles when scaled up
-  const scaledTileSize = TILE_SIZE * tileScale
-  const tilesX = Math.ceil(mapWidth.value / scaledTileSize) + 2
-  const tilesY = Math.ceil(mapHeight.value / scaledTileSize) + 2
+  // Need more tiles when scaled up - add extra buffer for low zoom levels
+  const scaledTileSize = TILE_SIZE * scale
+  const tilesX = Math.ceil(mapWidth.value / scaledTileSize) + 4
+  const tilesY = Math.ceil(mapHeight.value / scaledTileSize) + 4
 
   const halfTilesX = Math.ceil(tilesX / 2)
   const halfTilesY = Math.ceil(tilesY / 2)
-
   for (let i = -halfTilesX; i <= halfTilesX; i++) {
     for (let j = -halfTilesY; j <= halfTilesY; j++) {
       const tileX = ((centerTileX + i) % numTiles + numTiles) % numTiles
       const tileY = centerTileY + j
 
       if (tileY >= 0 && tileY < numTiles) {
-        // Position tiles with scale applied
-        const x = mapWidth.value / 2 + (i * TILE_SIZE - offsetX) * tileScale
-        const y = mapHeight.value / 2 + (j * TILE_SIZE - offsetY) * tileScale
+        const x = mapWidth.value / 2 + (i * TILE_SIZE - offsetX) * scale
+        const y = mapHeight.value / 2 + (j * TILE_SIZE - offsetY) * scale
 
         tiles.push({
-          url: `https://a.basemaps.cartocdn.com/light_all/${tileZoom}/${tileX}/${tileY}.png`,
+          url: `https://a.basemaps.cartocdn.com/light_all/${targetZoom}/${tileX}/${tileY}.png`,
           x,
           y,
-          scale: tileScale
+          scale,
+          zIndex: targetZoom
         })
       }
     }
   }
 
   return tiles
+}
+
+function getTileUrls(): { url: string; x: number; y: number; scale: number; zIndex: number }[] {
+  const continuousZoom = camera.value.zoom
+  const currentZoom = Math.floor(continuousZoom)
+  const zoomFraction = continuousZoom - currentZoom
+
+  // Calculate scale for current zoom level tiles
+  const currentScale = Math.pow(2, zoomFraction)
+
+  // Get tiles for current zoom level
+  const currentTiles = getTilesForZoom(currentZoom, currentScale)
+  console.log('Current Zoom:', currentZoom, 'Scale:', currentScale, 'Tiles:', currentTiles.length)
+  // Always include one zoom level lower as fallback for smoother transitions
+  // The lower zoom tiles render behind (lower zIndex) and fill gaps while current tiles load
+  const fallbackZoom = currentZoom - 1
+  if (currentZoom == MAX_ZOOM) {
+    // If we're at max zoom, don't include a fallback
+    return currentTiles
+  }
+  if (fallbackZoom >= MIN_ZOOM) {
+    const fallbackScale = currentScale * 2 // Lower zoom = tiles are 2x larger
+    const fallbackTiles = getTilesForZoom(fallbackZoom, fallbackScale)
+    return [...fallbackTiles, ...currentTiles]
+  }
+
+  return currentTiles
+}
+
+// Handle tile load events (kept for potential future use)
+function handleTileLoad(zoom: number) {
+  loadedTileZooms.value.add(zoom)
+  lastLoadedZoom.value = zoom
 }
 
 const tileUrls = computed(() => getTileUrls())
@@ -333,6 +371,16 @@ function resetAnimation() {
   if (animationFrameId.value) {
     cancelAnimationFrame(animationFrameId.value)
   }
+}
+
+// Launch hover handlers
+function handleLaunchMouseEnter(launch: Launch & { timestamp: number; isFailed: boolean }) {
+  const pos = latLngToPixel(launch.site_latitude, launch.site_longitude)
+  hoveredLaunch.value = { launch, x: pos.x, y: pos.y }
+}
+
+function handleLaunchMouseLeave() {
+  hoveredLaunch.value = null
 }
 
 // Camera controls
@@ -436,6 +484,46 @@ function resetCamera() {
   camera.value.centerLng = DEFAULT_CENTER.lng
 }
 
+// Mouse drag handlers
+function handleMouseDown(event: MouseEvent) {
+  if (event.button !== 0) return // Only left click
+  isDragging.value = true
+  dragStart.value = { x: event.clientX, y: event.clientY }
+  dragStartCenter.value = { lat: camera.value.centerLat, lng: camera.value.centerLng }
+  mapContainer.value?.style.setProperty('cursor', 'grabbing')
+}
+
+function handleMouseMove(event: MouseEvent) {
+  if (!isDragging.value) return
+
+  const deltaX = event.clientX - dragStart.value.x
+  const deltaY = event.clientY - dragStart.value.y
+
+  // Convert pixel movement to lat/lng
+  const zoom = camera.value.zoom
+  const worldSize = TILE_SIZE * Math.pow(2, zoom)
+
+  const lngDelta = (deltaX / worldSize) * 360
+  const latDelta = (deltaY / worldSize) * 180
+
+  camera.value.centerLng = Math.max(-180, Math.min(180, dragStartCenter.value.lng - lngDelta))
+  camera.value.centerLat = Math.max(-85, Math.min(85, dragStartCenter.value.lat + latDelta))
+}
+
+function handleMouseUp() {
+  if (isDragging.value) {
+    isDragging.value = false
+    mapContainer.value?.style.setProperty('cursor', 'grab')
+  }
+}
+
+function handleMouseLeave() {
+  if (isDragging.value) {
+    isDragging.value = false
+    mapContainer.value?.style.setProperty('cursor', 'grab')
+  }
+}
+
 let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
@@ -463,6 +551,13 @@ onMounted(() => {
   // Add wheel listener with passive: false to allow preventDefault
   mapContainer.value.addEventListener('wheel', handleWheel, { passive: false })
 
+  // Add mouse drag listeners
+  mapContainer.value.addEventListener('mousedown', handleMouseDown)
+  mapContainer.value.addEventListener('mousemove', handleMouseMove)
+  mapContainer.value.addEventListener('mouseup', handleMouseUp)
+  mapContainer.value.addEventListener('mouseleave', handleMouseLeave)
+  mapContainer.value.style.cursor = 'grab'
+
   // Add keyboard listeners
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
@@ -476,6 +571,10 @@ onUnmounted(() => {
 
   // Clean up event listeners
   mapContainer.value?.removeEventListener('wheel', handleWheel)
+  mapContainer.value?.removeEventListener('mousedown', handleMouseDown)
+  mapContainer.value?.removeEventListener('mousemove', handleMouseMove)
+  mapContainer.value?.removeEventListener('mouseup', handleMouseUp)
+  mapContainer.value?.removeEventListener('mouseleave', handleMouseLeave)
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('keyup', handleKeyUp)
   pressedKeys.value.clear()
@@ -494,17 +593,19 @@ onUnmounted(() => {
         <div ref="mapContainer" class="map-container"
           style="width: 100%; height: 100%; position: relative; overflow: hidden;">
           <div class="map-tiles" :style="{ width: mapWidth + 'px', height: mapHeight + 'px' }">
-            <img v-for="(tile, index) in tileUrls" :key="index" :src="tile.url" :style="{
+            <img v-for="tile in tileUrls" :key="`${tile.zIndex}-${tile.url}-${tile.x}-${tile.y}`" :src="tile.url" :style="{
               left: tile.x + 'px',
               top: tile.y + 'px',
               width: (256 * tile.scale) + 'px',
-              height: (256 * tile.scale) + 'px'
-            }" class="map-tile" />
+              height: (256 * tile.scale) + 'px',
+              zIndex: tile.zIndex
+            }" class="map-tile"  @load="handleTileLoad(tile.zIndex)" />
           </div>
 
           <svg class="launch-layer" :viewBox="`0 0 ${mapWidth} ${mapHeight}`"
-            :style="{ width: mapWidth + 'px', height: mapHeight + 'px' }">
-            <g v-for="launch in activeLaunches" :key="launch.launch_tag">
+            :style="{ width: mapWidth + 'px', height: mapHeight + 'px', zIndex: 100 }">
+            <g v-for="launch in activeLaunches" :key="launch.launch_tag" class="launch-marker"
+              @mouseenter="handleLaunchMouseEnter(launch)" @mouseleave="handleLaunchMouseLeave">
               <template v-if="!launch.isFailed">
                 <circle :cx="latLngToPixel(launch.site_latitude, launch.site_longitude).x"
                   :cy="latLngToPixel(launch.site_latitude, launch.site_longitude).y"
@@ -530,6 +631,18 @@ onUnmounted(() => {
               </template>
             </g>
           </svg>
+
+          <!-- Launch tooltip -->
+          <div v-if="hoveredLaunch" class="launch-tooltip" :style="{
+            left: hoveredLaunch.x + 'px',
+            top: hoveredLaunch.y + 'px'
+          }">
+            <div class="tooltip-site">{{ hoveredLaunch.launch.site_name }}</div>
+            <div class="tooltip-details">
+              <span class="tooltip-id">{{ hoveredLaunch.launch.flight_id }}</span>
+              <span class="tooltip-vehicle">{{ hoveredLaunch.launch.vehicle_name || 'Unknown' }}</span>
+            </div>
+          </div>
         </div>
 
         <div class="progress-container">
