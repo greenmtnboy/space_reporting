@@ -10,14 +10,34 @@ const YEAR_END = new Date('2025-12-31T23:59:59').getTime()
 const YEAR_DURATION = YEAR_END - YEAR_START
 
 // Map configuration
-const MAP_ZOOM = ref(3)
-const TILE_SIZE = ref(256)
-const MAP_CENTER = { lat: 0, lng: 10 }
+const TILE_SIZE = 256
+const DEFAULT_CENTER = { lat: 0, lng: 10 }
+
+// Virtual camera state
+const camera = ref({
+  zoom: 3,           // Continuous zoom level (can be fractional for smooth zooming)
+  centerLat: DEFAULT_CENTER.lat,
+  centerLng: DEFAULT_CENTER.lng
+})
+
+// Camera constraints
+const MIN_ZOOM = 1
+const MAX_ZOOM = 5
+const ZOOM_SPEED = 0.002  // Zoom sensitivity for wheel
+const PAN_SPEED = 20      // Pixels per keypress
 
 // Reactive dimensions for responsiveness
 const mapContainer = ref<HTMLElement | null>(null)
 const mapWidth = ref(2048)
 const mapHeight = ref(1024)
+
+// Track pressed keys for smooth panning
+const pressedKeys = ref(new Set<string>())
+
+// Mouse drag state
+const isDragging = ref(false)
+const dragStart = ref({ x: 0, y: 0 })
+const dragStartCenter = ref({ lat: 0, lng: 0 })
 
 // State
 const isPlaying = ref(false)
@@ -163,16 +183,17 @@ function shortenOrgName(name: string): string {
 
 // Convert lat/lng to pixel coordinates using Web Mercator projection
 function latLngToPixel(lat: number, lng: number): { x: number; y: number } {
-  const numTiles = Math.pow(2, MAP_ZOOM.value)
-  const worldSize = TILE_SIZE.value * numTiles
+  const zoom = camera.value.zoom
+  const numTiles = Math.pow(2, zoom)
+  const worldSize = TILE_SIZE * numTiles
 
   const worldX = ((lng + 180) / 360) * worldSize
   const latRad = lat * Math.PI / 180
   const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2))
   const worldY = (worldSize / 2) - (worldSize * mercN / (2 * Math.PI))
 
-  const centerWorldX = ((MAP_CENTER.lng + 180) / 360) * worldSize
-  const centerLatRad = MAP_CENTER.lat * Math.PI / 180
+  const centerWorldX = ((camera.value.centerLng + 180) / 360) * worldSize
+  const centerLatRad = camera.value.centerLat * Math.PI / 180
   const centerMercN = Math.log(Math.tan(Math.PI / 4 + centerLatRad / 2))
   const centerWorldY = (worldSize / 2) - (worldSize * centerMercN / (2 * Math.PI))
 
@@ -189,24 +210,33 @@ function getDotSize(payload: number): number {
   return minSize + (Math.min(payload, maxPayload) / maxPayload) * (maxSize - minSize)
 }
 
-function getTileUrls(): { url: string; x: number; y: number }[] {
-  const tiles: { url: string; x: number; y: number }[] = []
-  const numTiles = Math.pow(2, MAP_ZOOM.value)
-  const worldSize = TILE_SIZE.value * numTiles
+function getTileUrls(): { url: string; x: number; y: number; scale: number }[] {
+  const tiles: { url: string; x: number; y: number; scale: number }[] = []
 
-  const centerWorldX = ((MAP_CENTER.lng + 180) / 360) * worldSize
-  const centerLatRad = MAP_CENTER.lat * Math.PI / 180
+  // Use integer zoom for tile fetching, but apply scale for smooth zoom
+  const continuousZoom = camera.value.zoom
+  const tileZoom = Math.floor(continuousZoom)
+  const zoomFraction = continuousZoom - tileZoom
+  const tileScale = Math.pow(2, zoomFraction)
+
+  const numTiles = Math.pow(2, tileZoom)
+  const worldSize = TILE_SIZE * numTiles
+
+  const centerWorldX = ((camera.value.centerLng + 180) / 360) * worldSize
+  const centerLatRad = camera.value.centerLat * Math.PI / 180
   const centerMercN = Math.log(Math.tan(Math.PI / 4 + centerLatRad / 2))
   const centerWorldY = (worldSize / 2) - (worldSize * centerMercN / (2 * Math.PI))
 
-  const centerTileX = Math.floor(centerWorldX / TILE_SIZE.value)
-  const centerTileY = Math.floor(centerWorldY / TILE_SIZE.value)
+  const centerTileX = Math.floor(centerWorldX / TILE_SIZE)
+  const centerTileY = Math.floor(centerWorldY / TILE_SIZE)
 
-  const offsetX = centerWorldX - centerTileX * TILE_SIZE.value
-  const offsetY = centerWorldY - centerTileY * TILE_SIZE.value
+  const offsetX = centerWorldX - centerTileX * TILE_SIZE
+  const offsetY = centerWorldY - centerTileY * TILE_SIZE
 
-  const tilesX = Math.ceil(mapWidth.value / TILE_SIZE.value) + 1
-  const tilesY = Math.ceil(mapHeight.value / TILE_SIZE.value) + 1
+  // Need more tiles when scaled up
+  const scaledTileSize = TILE_SIZE * tileScale
+  const tilesX = Math.ceil(mapWidth.value / scaledTileSize) + 2
+  const tilesY = Math.ceil(mapHeight.value / scaledTileSize) + 2
 
   const halfTilesX = Math.ceil(tilesX / 2)
   const halfTilesY = Math.ceil(tilesY / 2)
@@ -217,10 +247,15 @@ function getTileUrls(): { url: string; x: number; y: number }[] {
       const tileY = centerTileY + j
 
       if (tileY >= 0 && tileY < numTiles) {
+        // Position tiles with scale applied
+        const x = mapWidth.value / 2 + (i * TILE_SIZE - offsetX) * tileScale
+        const y = mapHeight.value / 2 + (j * TILE_SIZE - offsetY) * tileScale
+
         tiles.push({
-          url: `https://a.basemaps.cartocdn.com/light_all/${MAP_ZOOM.value}/${tileX}/${tileY}.png`,
-          x: mapWidth.value / 2 + i * TILE_SIZE.value - offsetX,
-          y: mapHeight.value / 2 + j * TILE_SIZE.value - offsetY
+          url: `https://a.basemaps.cartocdn.com/light_all/${tileZoom}/${tileX}/${tileY}.png`,
+          x,
+          y,
+          scale: tileScale
         })
       }
     }
@@ -300,6 +335,107 @@ function resetAnimation() {
   }
 }
 
+// Camera controls
+function handleWheel(event: WheelEvent) {
+  event.preventDefault()
+
+  // Calculate zoom change based on wheel delta
+  const zoomDelta = -event.deltaY * ZOOM_SPEED
+  const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.value.zoom + zoomDelta))
+
+  // Zoom towards mouse position for more natural feel
+  if (newZoom !== camera.value.zoom) {
+    const rect = mapContainer.value?.getBoundingClientRect()
+    if (rect) {
+      const mouseX = event.clientX - rect.left
+      const mouseY = event.clientY - rect.top
+
+      // Calculate offset from screen center to mouse position
+      const offsetX = mouseX - mapWidth.value / 2
+      const offsetY = mouseY - mapHeight.value / 2
+
+      const oldZoom = camera.value.zoom
+      const oldWorldSize = TILE_SIZE * Math.pow(2, oldZoom)
+      const newWorldSize = TILE_SIZE * Math.pow(2, newZoom)
+
+      // After zoom, the same world point should be at the same screen position
+      // This creates a zoom-towards-cursor effect
+      const scale = oldWorldSize / newWorldSize
+      const newOffsetX = offsetX * scale
+      const newOffsetY = offsetY * scale
+
+      // Adjust center to keep mouse point fixed
+      const centerShiftX = (offsetX - newOffsetX) / newWorldSize * 360
+      const centerShiftY = (offsetY - newOffsetY) / newWorldSize * 180
+
+      camera.value.zoom = newZoom
+      camera.value.centerLng = Math.max(-180, Math.min(180, camera.value.centerLng + centerShiftX))
+      camera.value.centerLat = Math.max(-85, Math.min(85, camera.value.centerLat - centerShiftY))
+    } else {
+      camera.value.zoom = newZoom
+    }
+  }
+}
+
+function pixelToLatLng(deltaX: number, deltaY: number): { lat: number; lng: number } {
+  const zoom = camera.value.zoom
+  const worldSize = TILE_SIZE * Math.pow(2, zoom)
+
+  // Convert pixel delta to degrees
+  const lngDelta = (deltaX / worldSize) * 360
+  const latDelta = (deltaY / worldSize) * 180
+
+  return { lat: latDelta, lng: lngDelta }
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', '+', '-', '='].includes(event.key)) {
+    event.preventDefault()
+    pressedKeys.value.add(event.key)
+    updateCameraFromKeys()
+  }
+}
+
+function handleKeyUp(event: KeyboardEvent) {
+  pressedKeys.value.delete(event.key)
+}
+
+function updateCameraFromKeys() {
+  if (pressedKeys.value.size === 0) return
+
+  const delta = pixelToLatLng(PAN_SPEED, PAN_SPEED)
+
+  if (pressedKeys.value.has('ArrowLeft')) {
+    camera.value.centerLng = Math.max(-180, camera.value.centerLng - delta.lng)
+  }
+  if (pressedKeys.value.has('ArrowRight')) {
+    camera.value.centerLng = Math.min(180, camera.value.centerLng + delta.lng)
+  }
+  if (pressedKeys.value.has('ArrowUp')) {
+    camera.value.centerLat = Math.min(85, camera.value.centerLat + delta.lat)
+  }
+  if (pressedKeys.value.has('ArrowDown')) {
+    camera.value.centerLat = Math.max(-85, camera.value.centerLat - delta.lat)
+  }
+  if (pressedKeys.value.has('+') || pressedKeys.value.has('=')) {
+    camera.value.zoom = Math.min(MAX_ZOOM, camera.value.zoom + 0.05)
+  }
+  if (pressedKeys.value.has('-')) {
+    camera.value.zoom = Math.max(MIN_ZOOM, camera.value.zoom - 0.05)
+  }
+
+  // Continue updating while keys are pressed
+  if (pressedKeys.value.size > 0) {
+    requestAnimationFrame(updateCameraFromKeys)
+  }
+}
+
+function resetCamera() {
+  camera.value.zoom = 3
+  camera.value.centerLat = DEFAULT_CENTER.lat
+  camera.value.centerLng = DEFAULT_CENTER.lng
+}
+
 let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
@@ -319,29 +455,30 @@ onMounted(() => {
         mapWidth.value = width
         mapHeight.value = width / targetAspect
       }
-      let minDim = Math.min(mapWidth.value, mapHeight.value * 2)
-      if (minDim < 2000) {
-        MAP_ZOOM.value = 2
-        TILE_SIZE.value = 256
-      }
-      else if (minDim < 1000) {
-        MAP_ZOOM.value = 1
-        TILE_SIZE.value = 256
-      }
-      else {
-        MAP_ZOOM.value = 3
-        TILE_SIZE.value = 256
-      }
     }
   })
 
   resizeObserver.observe(mapContainer.value)
+
+  // Add wheel listener with passive: false to allow preventDefault
+  mapContainer.value.addEventListener('wheel', handleWheel, { passive: false })
+
+  // Add keyboard listeners
+  window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('keyup', handleKeyUp)
 })
+
 onUnmounted(() => {
   if (animationFrameId.value) {
     cancelAnimationFrame(animationFrameId.value)
   }
   resizeObserver?.disconnect()
+
+  // Clean up event listeners
+  mapContainer.value?.removeEventListener('wheel', handleWheel)
+  window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('keyup', handleKeyUp)
+  pressedKeys.value.clear()
 })
 </script>
 
@@ -359,7 +496,9 @@ onUnmounted(() => {
           <div class="map-tiles" :style="{ width: mapWidth + 'px', height: mapHeight + 'px' }">
             <img v-for="(tile, index) in tileUrls" :key="index" :src="tile.url" :style="{
               left: tile.x + 'px',
-              top: tile.y + 'px'
+              top: tile.y + 'px',
+              width: (256 * tile.scale) + 'px',
+              height: (256 * tile.scale) + 'px'
             }" class="map-tile" />
           </div>
 
@@ -408,6 +547,7 @@ onUnmounted(() => {
             {{ !isPlaying || isComplete ? 'Play' : (isPaused ? 'Resume' : 'Pause') }}
           </button>
           <button @click="resetAnimation" class="control-btn">Reset</button>
+          <button @click="resetCamera" class="control-btn">Reset View</button>
         </div>
 
         <div v-if="isComplete" class="completion-modal">
