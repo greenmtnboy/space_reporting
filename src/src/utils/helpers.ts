@@ -74,3 +74,40 @@ export function pixelToLatLngDelta(
   const latDelta = (deltaY / worldSize) * 180
   return { lat: latDelta, lng: lngDelta }
 }
+
+// Get all wrapped positions for a launch marker (handles horizontal world wrapping)
+export function getWrappedPositions(
+  lat: number,
+  lng: number,
+  zoom: number,
+  centerLat: number,
+  centerLng: number,
+  mapWidth: number,
+  mapHeight: number
+): { x: number; y: number }[] {
+  const numTiles = Math.pow(2, zoom)
+  const worldSize = TILE_SIZE * numTiles
+
+  // Get the base position
+  const basePos = latLngToPixel(lat, lng, zoom, centerLat, centerLng, mapWidth, mapHeight)
+
+  const positions: { x: number; y: number }[] = [basePos]
+
+  // Add wrapped copies to the left and right
+  // We need copies when the marker is near the edge of the visible world
+  const wrappedLeft = { x: basePos.x - worldSize, y: basePos.y }
+  const wrappedRight = { x: basePos.x + worldSize, y: basePos.y }
+
+  // Include wrapped positions if they're within the extended viewport
+  // Use a generous buffer (half a world width on each side)
+  const buffer = worldSize / 2
+
+  if (wrappedLeft.x > -buffer && wrappedLeft.x < mapWidth + buffer) {
+    positions.push(wrappedLeft)
+  }
+  if (wrappedRight.x > -buffer && wrappedRight.x < mapWidth + buffer) {
+    positions.push(wrappedRight)
+  }
+
+  return positions
+}

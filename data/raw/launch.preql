@@ -82,7 +82,6 @@ key orbit_code <- split(category,' ')[2]; # Orbit code definitions (3-letter cod
 # STO - Supersynchronous Transfer Orbit (apogee > 45,000 km)
 # XO  - Extraterrestrial Launch (e.g., launch from lunar surface)
 
-auto launch_org <- coalesce(CASE WHEN org.e_name = '-' then NULL else org.e_name end, org.u_name);
 
 root datasource raw_launch_info (
     Launch_Tag: launch_tag,
@@ -120,7 +119,6 @@ freshness by data_updated_through;
 datasource launch_info (
     launch_tag,
     launch_jd,
-    launch_org,
     vehicle.name,
     vehicle.variant,
     flight_id,
@@ -139,7 +137,7 @@ datasource launch_info (
     dest,
     orb_pay,
     orgs,
-    org_code:org.code,
+    org.code,
     _launch_code,
     ?fail_code,
     launch_date,
