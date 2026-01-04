@@ -88,6 +88,7 @@ function handleMouseUp() {
 
 .progress-bar {
   height: 8px;
+  margin: 4px 0;
   background: #e5e7eb;
   border-radius: 4px;
   cursor: pointer;
@@ -98,6 +99,7 @@ function handleMouseUp() {
 .progress-bar:hover,
 .progress-bar.dragging {
   height: 10px;
+  margin: 3px 0;
 }
 
 .progress-bar:hover .progress-handle,
