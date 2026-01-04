@@ -1,17 +1,32 @@
-import { ref, computed } from 'vue'
-import { ANIMATION_DURATION_MS, YEAR_START, YEAR_DURATION } from '../utils/constants'
+import { ref, computed, watch, type Ref } from 'vue'
 
-export function useAnimation() {
+export function useAnimation(
+  rangeStart: Ref<number>,
+  rangeDuration: Ref<number>,
+  animationDurationMs: Ref<number>
+) {
   const isPlaying = ref(false)
   const isPaused = ref(false)
   const isComplete = ref(false)
-  const currentTime = ref(YEAR_START)
+  const currentTime = ref(rangeStart.value)
   const animationStartTime = ref(0)
   const pausedElapsed = ref(0)
   const animationFrameId = ref<number | null>(null)
 
+  // Watch for range changes and reset animation
+  watch(rangeStart, (newStart) => {
+    isPlaying.value = false
+    isPaused.value = false
+    isComplete.value = false
+    currentTime.value = newStart
+    pausedElapsed.value = 0
+    if (animationFrameId.value) {
+      cancelAnimationFrame(animationFrameId.value)
+    }
+  })
+
   const progress = computed(() => {
-    return ((currentTime.value - YEAR_START) / YEAR_DURATION) * 100
+    return ((currentTime.value - rangeStart.value) / rangeDuration.value) * 100
   })
 
   const currentDateDisplay = computed(() => {
@@ -27,8 +42,8 @@ export function useAnimation() {
     if (!isPlaying.value || isPaused.value) return
 
     const elapsed = timestamp - animationStartTime.value + pausedElapsed.value
-    const timeProgress = Math.min(elapsed / ANIMATION_DURATION_MS, 1)
-    currentTime.value = YEAR_START + timeProgress * YEAR_DURATION
+    const timeProgress = Math.min(elapsed / animationDurationMs.value, 1)
+    currentTime.value = rangeStart.value + timeProgress * rangeDuration.value
 
     if (timeProgress >= 1) {
       isPlaying.value = false
@@ -41,7 +56,7 @@ export function useAnimation() {
 
   function startAnimation() {
     if (isComplete.value) {
-      currentTime.value = YEAR_START
+      currentTime.value = rangeStart.value
       pausedElapsed.value = 0
       isComplete.value = false
     }
@@ -84,7 +99,7 @@ export function useAnimation() {
     isPlaying.value = false
     isPaused.value = false
     isComplete.value = false
-    currentTime.value = YEAR_START
+    currentTime.value = rangeStart.value
     pausedElapsed.value = 0
     if (animationFrameId.value) {
       cancelAnimationFrame(animationFrameId.value)
@@ -94,10 +109,10 @@ export function useAnimation() {
   function seekTo(progressPercent: number) {
     const clampedProgress = Math.max(0, Math.min(100, progressPercent))
     const timeProgress = clampedProgress / 100
-    currentTime.value = YEAR_START + timeProgress * YEAR_DURATION
+    currentTime.value = rangeStart.value + timeProgress * rangeDuration.value
 
     // Update pausedElapsed to match the seek position
-    pausedElapsed.value = timeProgress * ANIMATION_DURATION_MS
+    pausedElapsed.value = timeProgress * animationDurationMs.value
 
     // If we were complete and seek back, reset complete state
     if (isComplete.value && clampedProgress < 100) {

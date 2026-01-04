@@ -13,11 +13,14 @@ for the materialized assets.
 
 ### Install
 
+Trilogy is a python CLI.
+
 ```bash
 pip install trilogy[cli]
 ```
 
 ### Refresh Raw Data Files
+
 
 ```bash
 trilogy refresh C:\Users\ethan\coding_projects\space_reporting\data\raw
@@ -33,5 +36,5 @@ To update the JSON used in the static websites, run the relevant output script t
 the JSON whenever required.
 
 ```bash
-trilogy exec C:\Users\ethan\coding_projects\space_reporting\data\core.preq
+trilogy run C:\Users\ethan\coding_projects\space_reporting\data\core.preql
 ```

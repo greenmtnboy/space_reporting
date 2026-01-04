@@ -8,6 +8,7 @@ import { useCamera } from './composables/useCamera'
 import { useLaunches } from './composables/useLaunches'
 import { useMapTiles } from './composables/useMapTiles'
 import { useSound } from './composables/useSound'
+import { useYearRange } from './composables/useYearRange'
 
 // Components
 import MapTiles from './components/MapTiles.vue'
@@ -17,11 +18,26 @@ import ControlPanel from './components/ControlPanel.vue'
 import BarChart from './components/BarChart.vue'
 import ChartLegend from './components/ChartLegend.vue'
 import CompletionModal from './components/CompletionModal.vue'
+import YearRangeButtons from './components/YearRangeButtons.vue'
 
 // Reactive dimensions for responsiveness
 const mapContainer = ref<HTMLElement | null>(null)
 const mapWidth = ref(2048)
 const mapHeight = ref(1024)
+
+// Initialize year range first (other composables depend on it)
+const {
+  selectedRangeId,
+  rangeStart,
+  rangeEnd,
+  rangeDuration,
+  animationDurationMs,
+  title,
+  progressStartLabel,
+  progressEndLabel,
+  selectRange,
+  options: yearRangeOptions
+} = useYearRange()
 
 // Initialize composables
 const {
@@ -36,7 +52,7 @@ const {
   resetAnimation,
   seekTo,
   cleanup: cleanupAnimation
-} = useAnimation()
+} = useAnimation(rangeStart, rangeDuration, animationDurationMs)
 
 const {
   camera,
@@ -53,7 +69,7 @@ const {
   maxOrgTotal,
   vehicleStats,
   maxVehicleTotal
-} = useLaunches(currentTime, isComplete)
+} = useLaunches(currentTime, isComplete, rangeStart, rangeEnd, rangeDuration)
 
 const { tileUrls, handleTileLoad } = useMapTiles(camera, mapWidth, mapHeight)
 
@@ -100,6 +116,12 @@ function handlePlayAgain() {
   startAnimation()
 }
 
+function handleYearRangeSelect(rangeId: string) {
+  selectRange(rangeId)
+  // Animation reset is handled by watch in useAnimation
+  resetSeenLaunches()
+}
+
 let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
@@ -136,7 +158,14 @@ onUnmounted(() => {
 <template>
   <div class="app">
     <header class="header">
-      <h1>2025 Rocket Launches</h1>
+      <div class="header-left">
+        <h1>{{ title }}</h1>
+        <YearRangeButtons
+          :options="yearRangeOptions"
+          :selected-id="selectedRangeId"
+          @select="handleYearRangeSelect"
+        />
+      </div>
       <div class="date-display">{{ currentDateDisplay }}</div>
     </header>
 
@@ -181,6 +210,8 @@ onUnmounted(() => {
           :progress="progress"
           :is-muted="isMuted"
           :volume="volume"
+          :progress-start-label="progressStartLabel"
+          :progress-end-label="progressEndLabel"
           @toggle-play-pause="handlePlayPause"
           @reset="handleReset"
           @reset-camera="resetCamera"

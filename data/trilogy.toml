@@ -1,9 +1,9 @@
 [engine]
 # Default dialect for execution
 dialect = "duck_db"
-
+parallelism = 2
 # Parallelism level for directory execution
-# parallelism = 2
+
 
 [engine.config]
 enable_gcs = true

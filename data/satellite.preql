@@ -1,0 +1,14 @@
+import raw.launch;
+
+copy into json `./raw_satellite_data.json` from 
+select
+    jcat,
+    type,
+    name,
+    launch_date,
+    decom_date,
+    owner.e_name,
+    perigee,
+    apogee,
+    inc,
+;

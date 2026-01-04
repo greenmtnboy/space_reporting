@@ -1,6 +1,5 @@
 import { computed, type Ref } from 'vue'
 import type { Launch, OrgStats, VehicleStats } from '../types'
-import { YEAR_DURATION } from '../utils/constants'
 import { shortenOrgName } from '../utils/helpers'
 import launchData from '../../../data/raw_data.json'
 
@@ -14,8 +13,15 @@ export interface ActiveLaunch extends ProcessedLaunch {
   opacity: number
 }
 
-export function useLaunches(currentTime: Ref<number>, isComplete: Ref<boolean>) {
-  const launches = computed<ProcessedLaunch[]>(() => {
+export function useLaunches(
+  currentTime: Ref<number>,
+  isComplete: Ref<boolean>,
+  rangeStart: Ref<number>,
+  rangeEnd: Ref<number>,
+  rangeDuration: Ref<number>
+) {
+  // All launches processed (not filtered by range)
+  const allLaunches = computed<ProcessedLaunch[]>(() => {
     return (launchData as Launch[])
       .map(l => ({
         ...l,
@@ -25,12 +31,19 @@ export function useLaunches(currentTime: Ref<number>, isComplete: Ref<boolean>) 
       .sort((a, b) => a.timestamp - b.timestamp)
   })
 
+  // Launches filtered by selected year range
+  const launches = computed<ProcessedLaunch[]>(() => {
+    return allLaunches.value.filter(l =>
+      l.timestamp >= rangeStart.value && l.timestamp <= rangeEnd.value
+    )
+  })
+
   const activeLaunches = computed<ActiveLaunch[]>(() => {
     if (isComplete.value) {
       return launches.value.map(l => ({ ...l, scale: 1, opacity: 0.8 }))
     }
 
-    const visibleWindow = YEAR_DURATION / 30
+    const visibleWindow = rangeDuration.value / 30
     const expandDuration = 0.15
     const holdDuration = 0.25
 

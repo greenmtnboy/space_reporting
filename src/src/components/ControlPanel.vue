@@ -8,6 +8,8 @@ defineProps<{
   progress: number
   isMuted: boolean
   volume: number
+  progressStartLabel: string
+  progressEndLabel: string
 }>()
 
 const emit = defineEmits<{
@@ -64,8 +66,8 @@ function handleMouseUp() {
         <div class="progress-handle" :style="{ left: progress + '%' }"></div>
       </div>
       <div class="progress-labels">
-        <span>Jan 2025</span>
-        <span>Dec 2025</span>
+        <span>{{ progressStartLabel }}</span>
+        <span>{{ progressEndLabel }}</span>
       </div>
     </div>
 
