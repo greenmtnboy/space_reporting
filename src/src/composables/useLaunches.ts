@@ -18,7 +18,8 @@ export function useLaunches(
   isComplete: Ref<boolean>,
   rangeStart: Ref<number>,
   rangeEnd: Ref<number>,
-  rangeDuration: Ref<number>
+  rangeDuration: Ref<number>,
+  animationDurationMs: Ref<number>
 ) {
   // All launches processed (not filtered by range)
   const allLaunches = computed<ProcessedLaunch[]>(() => {
@@ -43,7 +44,9 @@ export function useLaunches(
       return launches.value.map(l => ({ ...l, scale: 1, opacity: 0.8 }))
     }
 
-    const visibleWindow = rangeDuration.value / 30
+    // Visible window is a fixed 1.33 seconds of screen time, converted to calendar time
+    const screenTimeMs = 1333 // ~1.33 seconds of animation
+    const visibleWindow = (screenTimeMs / animationDurationMs.value) * rangeDuration.value
     const expandDuration = 0.15
     const holdDuration = 0.25
 

@@ -13,7 +13,7 @@ defineProps<{
     <h2>{{ title }}</h2>
     <div class="bar-chart">
       <div v-for="item in stats" :key="item.name" class="bar-row">
-        <div class="bar-label">{{ item.name }}</div>
+        <div class="bar-label" :title="item.name">{{ item.name }}</div>
         <div class="bar-container">
           <div
             class="bar-success"

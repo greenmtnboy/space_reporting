@@ -69,7 +69,7 @@ const {
   maxOrgTotal,
   vehicleStats,
   maxVehicleTotal
-} = useLaunches(currentTime, isComplete, rangeStart, rangeEnd, rangeDuration)
+} = useLaunches(currentTime, isComplete, rangeStart, rangeEnd, rangeDuration, animationDurationMs)
 
 const { tileUrls, handleTileLoad } = useMapTiles(camera, mapWidth, mapHeight)
 
