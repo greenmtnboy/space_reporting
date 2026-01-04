@@ -7,6 +7,7 @@ import { useAnimation } from './composables/useAnimation'
 import { useCamera } from './composables/useCamera'
 import { useLaunches } from './composables/useLaunches'
 import { useMapTiles } from './composables/useMapTiles'
+import { useSound } from './composables/useSound'
 
 // Components
 import MapTiles from './components/MapTiles.vue'
@@ -56,6 +57,15 @@ const {
 
 const { tileUrls, handleTileLoad } = useMapTiles(camera, mapWidth, mapHeight)
 
+const {
+  isMuted,
+  volume,
+  toggleMute,
+  setVolume,
+  resetSeenLaunches,
+  resumeAudioContext
+} = useSound(activeLaunches, isPlaying)
+
 // Hover state for launch tooltips
 const hoveredLaunch = ref<{ launch: ActiveLaunch; x: number; y: number } | null>(null)
 
@@ -73,6 +83,21 @@ function handleKeydown(event: KeyboardEvent) {
     event.preventDefault()
     togglePlayPause()
   }
+}
+
+function handleReset() {
+  resetAnimation()
+  resetSeenLaunches()
+}
+
+function handlePlayPause() {
+  resumeAudioContext()
+  togglePlayPause()
+}
+
+function handlePlayAgain() {
+  resetSeenLaunches()
+  startAnimation()
 }
 
 let resizeObserver: ResizeObserver | null = null
@@ -151,16 +176,20 @@ onUnmounted(() => {
           :is-paused="isPaused"
           :is-complete="isComplete"
           :progress="progress"
-          @toggle-play-pause="togglePlayPause"
-          @reset="resetAnimation"
+          :is-muted="isMuted"
+          :volume="volume"
+          @toggle-play-pause="handlePlayPause"
+          @reset="handleReset"
           @reset-camera="resetCamera"
           @seek="seekTo"
+          @toggle-mute="toggleMute"
+          @set-volume="setVolume"
         />
 
         <CompletionModal
           v-if="isComplete"
           :launch-count="accumulatedLaunches.length"
-          @play-again="startAnimation"
+          @play-again="handlePlayAgain"
         />
       </div>
 

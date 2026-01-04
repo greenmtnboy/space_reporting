@@ -25,7 +25,7 @@ defineProps<{
             class="bar-failure"
             :style="{ width: (item.failures / maxTotal) * 100 + '%' }"
           >
-            <span v-if="item.failures > 0" class="bar-value">{{ item.failures }}</span>
+            <span v-if="item.failures > 0 && (item.failures / maxTotal) >= 0.08" class="bar-value">{{ item.failures }}</span>
           </div>
         </div>
         <div class="bar-total">{{ item.total }}</div>

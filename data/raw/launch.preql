@@ -4,10 +4,10 @@ import etl;
 key launch_tag string; # Each rocket launch in the database is labelled with a unique designation. For successful orbital launches, we use the International Designation (also called the COSPAR designation, after the Committee on Space Research which adopted the system.) For other launches, I use a variation on that scheme of my own design. I introduce the generalized concept of `launch designation' to include the International/COSPAR designation and other similar schemes. The term `piece designation' is also introduced to generalize the per-piece (per-cataloged-object) international designation.
 
 # restrict imports in the launch namespacespace to those that have had launches
-import platform ? launch_tag is not null as platform;
-import vehicle ? launch_tag is not null as vehicle;
-import sites ? launch_tag is not null as site;
-import organization ? launch_tag is not null as org;
+import platform as platform;
+import vehicle as vehicle;
+import sites as site;
+import organization as org;
 
 property launch_tag.launch_jd float; # float of launch date on julian calendar
 # property <launch_tag>.launch_date string;
