@@ -19,14 +19,22 @@ defineProps<{
             class="bar-success"
             :style="{ width: (item.successes / maxTotal) * 100 + '%' }"
           >
-            <span v-if="item.successes > 0" class="bar-value">{{ item.successes }}</span>
+            <span v-if="item.successes > 0 && (item.total / maxTotal) >= 0.15" class="bar-value">{{ item.successes }}</span>
           </div>
           <div
             class="bar-failure"
             :style="{ width: (item.failures / maxTotal) * 100 + '%' }"
           >
-            <span v-if="item.failures > 0 && (item.failures / maxTotal) >= 0.08" class="bar-value">{{ item.failures }}</span>
+            <span v-if="item.failures > 0 && (item.failures / maxTotal) >= 0.15" class="bar-value">{{ item.failures }}</span>
           </div>
+          <!-- Show counts in white space when bar is too short -->
+          <span v-if="(item.total / maxTotal) < 0.15 && item.total > 0" class="bar-value-outside">
+            {{ item.successes }}<template v-if="item.failures > 0"> (<span class="failure-text">{{ item.failures }}</span>)</template>
+          </span>
+          <!-- Show failures in white space when total bar is 15-30% (failures don't fit inside) -->
+          <span v-if="(item.total / maxTotal) >= 0.15 && (item.total / maxTotal) < 0.30 && item.failures > 0 && (item.failures / maxTotal) < 0.10" class="bar-value-outside">
+            (<span class="failure-text">{{ item.failures }}</span>)
+          </span>
         </div>
         <div class="bar-total">{{ item.total }}</div>
       </div>
@@ -98,6 +106,18 @@ defineProps<{
   color: white;
   padding: 0 4px;
   font-weight: 600;
+}
+
+.bar-value-outside {
+  font-size: 9px;
+  color: #374151;
+  padding: 0 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.failure-text {
+  color: #ef4444;
 }
 
 .bar-total {
