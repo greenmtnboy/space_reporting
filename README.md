@@ -1,6 +1,6 @@
 # Space Dashboards
 
-Because space is cool. 
+Because space - rockets and satellites - are fun and have interesting data.
 
 Hosted on Github pages.
 

@@ -19,8 +19,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install trilogy
-        run: pip install pytrilogy
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
 
       - name: Refresh data
         id: refresh_step
