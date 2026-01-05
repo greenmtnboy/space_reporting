@@ -1,15 +1,18 @@
 # Space Dashboards
 
+Because space is cool. 
+
 Hosted on Github pages.
 
 [View Here](https://greenmtnboy.github.io/space_reporting/)
 
 ## Update datasources
 
-
-Core parquet files are updated through a Trilogy script. You'll need permission to write
+Core parquet files are updated through a set of [Trilogy](https://trilogydata.dev/) + DuckDB scripts, scheduled daily at 6AM. You'll need permission to write
 to the trilogy public bucket to run this, or swap out a different storage location you control
 for the materialized assets. 
+
+Note that the source data is only updated weekly/monthly; we'll skip rebuilds if there is no data to fetch.
 
 ### Install
 
@@ -26,9 +29,9 @@ pip install trilogy[cli]
 trilogy refresh C:\Users\ethan\coding_projects\space_reporting\data\raw
 ```
 
-:::tip
-The 'refresh' command is used to only update the assets when new data is available.
-:::
+> [!TIP]
+> The 'refresh' command is used to only update the assets when new data is available.
+
 
 ### Update Output
 
