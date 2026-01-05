@@ -115,7 +115,7 @@ function handleMouseUp() {
 .progress-bar {
   height: 8px;
   margin: 4px 0;
-  background: #e5e7eb;
+  background: var(--color-bg-tertiary);
   border-radius: 4px;
   cursor: pointer;
   position: relative;
@@ -136,7 +136,7 @@ function handleMouseUp() {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  background: linear-gradient(90deg, var(--color-accent-dim), var(--color-accent-bright));
   transition: width 0.1s linear;
   border-radius: 4px;
   pointer-events: none;
@@ -147,7 +147,7 @@ function handleMouseUp() {
   top: 50%;
   width: 16px;
   height: 16px;
-  background: #3b82f6;
+  background: var(--color-accent);
   border: 2px solid white;
   border-radius: 50%;
   transform: translateX(-50%) translateY(-50%) scale(0.8);
@@ -160,8 +160,9 @@ function handleMouseUp() {
 .progress-labels {
   display: flex;
   justify-content: space-between;
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-top: 4px;
 }
 
@@ -174,27 +175,33 @@ function handleMouseUp() {
 
 .control-btn {
   padding: 8px 20px;
-  border: none;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
+  font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
 }
 
 .control-btn:hover {
-  background: #d1d5db;
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-bright);
+  color: var(--color-text);
 }
 
 .control-btn.primary {
-  background: #3b82f6;
+  background: linear-gradient(135deg, var(--color-accent-dim) 0%, var(--color-accent) 100%);
+  border: 1px solid var(--color-accent);
   color: white;
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.3);
 }
 
 .control-btn.primary:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-bright) 100%);
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);
 }
 
 .sound-controls {
@@ -203,7 +210,7 @@ function handleMouseUp() {
   gap: 8px;
   margin-left: 16px;
   padding-left: 16px;
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid var(--color-border);
 }
 
 .sound-btn {
@@ -218,7 +225,7 @@ function handleMouseUp() {
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
-  background: #e5e7eb;
+  background: var(--color-bg-tertiary);
   border-radius: 2px;
   cursor: pointer;
 }
@@ -227,7 +234,7 @@ function handleMouseUp() {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
-  background: #3b82f6;
+  background: var(--color-accent);
   border-radius: 50%;
   cursor: pointer;
 }
@@ -235,7 +242,7 @@ function handleMouseUp() {
 .volume-slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  background: #3b82f6;
+  background: var(--color-accent);
   border-radius: 50%;
   cursor: pointer;
   border: none;
@@ -247,11 +254,11 @@ function handleMouseUp() {
 }
 
 .volume-slider:disabled::-webkit-slider-thumb {
-  background: #9ca3af;
+  background: var(--color-text-muted);
 }
 
 .volume-slider:disabled::-moz-range-thumb {
-  background: #9ca3af;
+  background: var(--color-text-muted);
 }
 
 /* Mobile styles */
