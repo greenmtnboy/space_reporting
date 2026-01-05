@@ -1,7 +1,8 @@
-import { computed, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import type { Launch, OrgStats, VehicleStats } from '../types'
 import { shortenOrgName } from '../utils/helpers'
-import launchData from '../../../data/raw_data.json'
+
+const DATA_URL = 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/launches_over_time/raw_data.json'
 
 export interface ProcessedLaunch extends Launch {
   timestamp: number
@@ -11,6 +12,48 @@ export interface ProcessedLaunch extends Launch {
 export interface ActiveLaunch extends ProcessedLaunch {
   scale: number
   opacity: number
+}
+
+// Shared state for launch data (loaded once, shared across all useLaunches calls)
+const launchData = ref<Launch[]>([])
+const isLoading = ref(true)
+const loadError = ref<string | null>(null)
+let loadPromise: Promise<void> | null = null
+
+export async function loadLaunchData(): Promise<void> {
+  // If already loaded, return immediately
+  if (launchData.value.length > 0) {
+    isLoading.value = false
+    return
+  }
+
+  // If already loading, wait for that to finish
+  if (loadPromise) {
+    return loadPromise
+  }
+
+  loadPromise = (async () => {
+    try {
+      isLoading.value = true
+      loadError.value = null
+      const response = await fetch(DATA_URL)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`)
+      }
+      launchData.value = await response.json()
+    } catch (err) {
+      loadError.value = err instanceof Error ? err.message : 'Unknown error loading data'
+      console.error('Failed to load launch data:', err)
+    } finally {
+      isLoading.value = false
+    }
+  })()
+
+  return loadPromise
+}
+
+export function useLaunchDataStatus() {
+  return { isLoading, loadError }
 }
 
 export function useLaunches(
@@ -23,7 +66,7 @@ export function useLaunches(
 ) {
   // All launches processed (not filtered by range)
   const allLaunches = computed<ProcessedLaunch[]>(() => {
-    return (launchData as Launch[])
+    return launchData.value
       .map(l => ({
         ...l,
         timestamp: new Date(l.launch_date).getTime(),

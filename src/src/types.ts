@@ -7,6 +7,8 @@ export interface Launch {
   site_latitude: number
   site_longitude: number
   launch_org: string
+  launch_state: string
+  state_color: string
   orb_pay: number
   vehicle_name: string | null
 }

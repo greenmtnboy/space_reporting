@@ -5,7 +5,7 @@ import type { ActiveLaunch } from './composables/useLaunches'
 // Composables
 import { useAnimation } from './composables/useAnimation'
 import { useCamera } from './composables/useCamera'
-import { useLaunches } from './composables/useLaunches'
+import { useLaunches, loadLaunchData, useLaunchDataStatus } from './composables/useLaunches'
 import { useMapTiles } from './composables/useMapTiles'
 import { useSound } from './composables/useSound'
 import { useYearRange } from './composables/useYearRange'
@@ -28,6 +28,7 @@ const mapHeight = ref(1024)
 // Initialize year range first (other composables depend on it)
 const {
   selectedRangeId,
+  selectedRange,
   rangeStart,
   rangeEnd,
   rangeDuration,
@@ -82,6 +83,9 @@ const {
   resumeAudioContext
 } = useSound(activeLaunches, isPlaying)
 
+// Data loading status
+const { isLoading: isDataLoading, loadError } = useLaunchDataStatus()
+
 // Hover state for launch tooltips
 const hoveredLaunch = ref<{ launch: ActiveLaunch; x: number; y: number } | null>(null)
 
@@ -124,7 +128,10 @@ function handleYearRangeSelect(rangeId: string) {
 
 let resizeObserver: ResizeObserver | null = null
 
-onMounted(() => {
+onMounted(async () => {
+  // Load launch data from remote source
+  await loadLaunchData()
+
   if (!mapContainer.value) return
 
   resizeObserver = new ResizeObserver((entries) => {
@@ -157,16 +164,36 @@ onUnmounted(() => {
 
 <template>
   <div class="app">
+    <!-- Loading State -->
+    <div v-if="isDataLoading" class="loading-overlay">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p>Loading launch data...</p>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="loadError" class="loading-overlay error">
+      <div class="loading-content">
+        <p>Failed to load launch data</p>
+        <p class="error-detail">{{ loadError }}</p>
+        <button @click="() => loadLaunchData()">Retry</button>
+      </div>
+    </div>
+
     <header class="header">
       <div class="header-left">
-        <h1>{{ title }}</h1>
+        <div class="header-top-row">
+          <h1>{{ title }}</h1>
+          <div class="date-display mobile-only">{{ currentDateDisplay }}</div>
+        </div>
         <YearRangeButtons
           :options="yearRangeOptions"
           :selected-id="selectedRangeId"
           @select="handleYearRangeSelect"
         />
       </div>
-      <div class="date-display">{{ currentDateDisplay }}</div>
+      <div class="date-display desktop-only">{{ currentDateDisplay }}</div>
     </header>
 
     <main class="main-content">
@@ -223,6 +250,7 @@ onUnmounted(() => {
         <CompletionModal
           v-if="isComplete"
           :launch-count="accumulatedLaunches.length"
+          :year-range-label="selectedRange.label"
           @play-again="handlePlayAgain"
         />
       </div>

@@ -1,0 +1,26 @@
+name: Refresh Data
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install trilogy
+        run: pip install pytrilogy
+
+      - name: Refresh data
+        run: |
+          trilogy refresh data --env GOOGLE_HMAC_KEY=${{ secrets.GOOGLE_HMAC_KEY }} --env GOOGLE_HMAC_SECRET=${{ secrets.GOOGLE_HMAC_SECRET }}

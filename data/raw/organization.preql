@@ -26,6 +26,68 @@ WHEN state_code = 'CN' THEN 'https://upload.wikimedia.org/wikipedia/commons/thum
 ELSE 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Flag_of_the_United_Nations.svg/2880px-Flag_of_the_United_Nations.svg.png'
 END AS string::url_image);
 
+property code.color <- 
+  CASE
+     # Major powers
+    WHEN state_code = 'US' THEN '#4A6CFF'        # bright US blue
+    WHEN state_code IN ('SU', 'RU') THEN '#FF3B3B' # bright Soviet/Russia red
+    WHEN state_code = 'CN' THEN '#FF4D00'        # vivid China red-orange
+    WHEN state_code = 'IN' THEN '#2ECC71'        # bright India green
+    WHEN state_code = 'J' THEN '#FFFFFF'         # Japan white (pops on dark)
+    WHEN state_code = 'UK' THEN '#3B7CFF'        # lifted UK blue
+    WHEN state_code = 'F' THEN '#4DA3FF'         # bright France blue
+
+    # Europe
+    WHEN state_code IN ('D', 'DR', 'DD') THEN '#FFD84D' # luminous Germany gold
+    WHEN state_code = 'NL' THEN '#FFB347'        # bright Netherlands orange
+    WHEN state_code = 'E' THEN '#FFD23F'         # Spain yellow
+    WHEN state_code = 'I' THEN '#3DDB85'         # Italy green
+    WHEN state_code = 'PL' THEN '#FFFFFF'        # Poland white
+    WHEN state_code = 'GR' THEN '#4FC3FF'        # Greece light blue
+    WHEN state_code = 'N' THEN '#5FA8FF'         # Norway blue
+    WHEN state_code = 'S' THEN '#4DD2FF'         # Sweden cyan-blue
+    WHEN state_code = 'DK' THEN '#FF5C5C'        # Denmark bright red
+    WHEN state_code = 'CH' THEN '#FF3B3B'        # Switzerland red
+    WHEN state_code = 'UA' THEN '#FFE066'        # Ukraine yellow
+
+    # Americas
+    WHEN state_code = 'CA' THEN '#FF4D4D'        # Canada bright red
+    WHEN state_code = 'BR' THEN '#2ECC71'        # Brazil bright green
+    WHEN state_code = 'AR' THEN '#7FDBFF'        # Argentina sky blue
+
+    # Middle East / Africa
+    WHEN state_code = 'IR' THEN '#2ECC71'        # Iran green
+    WHEN state_code = 'IQ' THEN '#FFFFFF'        # Iraq white (avoid black)
+    WHEN state_code = 'IL' THEN '#4DA3FF'        # Israel blue
+    WHEN state_code = 'EG' THEN '#FFFFFF'        # Egypt white
+    WHEN state_code = 'TR' THEN '#FF3B3B'        # Turkey red
+    WHEN state_code = 'SY' THEN '#FFFFFF'        # Syria white
+    WHEN state_code = 'LY' THEN '#3DDB85'        # Libya green
+    WHEN state_code = 'ZA' THEN '#2ECC71'        # South Africa green
+    WHEN state_code = 'OM' THEN '#FFFFFF'        # Oman white
+    WHEN state_code = 'LB' THEN '#3DDB85'        # Lebanon green
+    WHEN state_code = 'YE' THEN '#FFFFFF'        # Yemen white
+
+    # Asia-Pacific
+    WHEN state_code = 'KP' THEN '#FF5C5C'        # North Korea red
+    WHEN state_code = 'KR' THEN '#4DA3FF'        # South Korea blue
+    WHEN state_code = 'PK' THEN '#2ECC71'        # Pakistan green
+    WHEN state_code = 'ID' THEN '#FFFFFF'        # Indonesia white
+    WHEN state_code = 'TW' THEN '#4A6CFF'        # Taiwan blue
+    WHEN state_code = 'AU' THEN '#4A6CFF'        # Australia blue
+    WHEN state_code = 'NZ' THEN '#4A6CFF'        # New Zealand blue
+
+    # Space / supranational
+    WHEN state_code IN ('I-ESA', 'I-ESRO', 'I-ELDO') THEN '#4FC3FF' # ESA bright blue
+    WHEN state_code = 'CYM' THEN '#4A6CFF'       # UK blue (BOT)
+
+    # Unknown / placeholder
+    WHEN state_code = 'X' THEN '#7FB7FF'          # UN light blue
+
+    ELSE '#7FB7FF'
+  END::string::hex;
+
+
 auto e_name <- coalesce(CASE WHEN _e_name = '-' then NULL else _e_name end, u_name);
 
 
@@ -72,7 +134,8 @@ datasource organizations (
     short_e_name,
     ?_e_name,
     u_name,
-    data_updated_through
+    data_updated_through,
+    color
     )
 grain (code)
 file `gcs://trilogy_public_models/duckdb/launch_report/organizations.parquet`

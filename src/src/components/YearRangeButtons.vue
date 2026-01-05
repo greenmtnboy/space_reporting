@@ -67,4 +67,17 @@ const emit = defineEmits<{
 .year-btn:active {
   transform: scale(0.96);
 }
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  .year-range-buttons {
+    justify-content: center;
+  }
+
+  .year-btn {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.5625rem;
+    clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
+  }
+}
 </style>

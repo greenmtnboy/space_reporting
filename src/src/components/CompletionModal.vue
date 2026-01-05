@@ -1,6 +1,7 @@
 <script setup lang="ts">
 defineProps<{
   launchCount: number
+  yearRangeLabel: string
 }>()
 
 const emit = defineEmits<{
@@ -12,7 +13,7 @@ const emit = defineEmits<{
   <div class="completion-modal">
     <div class="modal-content">
       <h2>That's a wrap!</h2>
-      <p>on {{ launchCount }} launches in 2025</p>
+      <p>{{ launchCount }} launches in {{ yearRangeLabel }}</p>
       <button @click="emit('playAgain')" class="control-btn primary">Watch Again</button>
     </div>
   </div>

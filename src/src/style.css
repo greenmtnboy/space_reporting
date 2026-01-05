@@ -89,6 +89,55 @@ html, body {
   }
 }
 
+/* Responsive visibility utilities */
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+}
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .header-left {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .header-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .header h1 {
+    font-size: 0.875rem;
+  }
+
+  .date-display {
+    font-size: 0.75rem;
+  }
+}
+
 /* Map section */
 .map-section {
   flex: 1;
@@ -108,6 +157,9 @@ html, body {
   background-color: #1a1c22;
   overflow: hidden;
   border: 1px solid var(--color-border);
+  touch-action: none; /* Prevent default touch behaviors for custom handling */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .map-tiles {
@@ -501,4 +553,78 @@ html, body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg);
+  z-index: 1000;
+}
+
+.loading-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading-content p {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-overlay.error .loading-content p {
+  color: var(--color-failure);
+}
+
+.loading-overlay .error-detail {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  max-width: 400px;
+}
+
+.loading-overlay button {
+  padding: 0.5rem 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, var(--color-accent-dim) 0%, var(--color-accent) 100%);
+  border: 1px solid var(--color-accent);
+  color: white;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.loading-overlay button:hover {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-bright) 100%);
 }

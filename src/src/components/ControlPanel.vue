@@ -253,4 +253,45 @@ function handleMouseUp() {
 .volume-slider:disabled::-moz-range-thumb {
   background: #9ca3af;
 }
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  .control-panel {
+    gap: 8px;
+  }
+
+  .progress-container {
+    padding: 0 8px;
+  }
+
+  .controls {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 4px 0;
+  }
+
+  .control-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .sound-controls {
+    margin-left: 8px;
+    padding-left: 8px;
+    gap: 4px;
+  }
+
+  .sound-btn {
+    padding: 6px;
+  }
+
+  .sound-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .volume-slider {
+    width: 50px;
+  }
+}
 </style>

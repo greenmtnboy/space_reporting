@@ -1,5 +1,13 @@
 import raw.launch;
-  
+
+where vehicle.name = 'SE4400'
 select
-    org.state_code,
-limit 100;
+    state.code,
+    launch_tag,
+    org.code,
+    org.e_name,
+    state.e_name,
+    site.key,
+    site.name,
+    vehicle.name,
+limit 1000;

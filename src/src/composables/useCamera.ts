@@ -25,6 +25,11 @@ export function useCamera(
   const dragStart = ref({ x: 0, y: 0 })
   const dragStartCenter = ref({ lat: 0, lng: 0 })
 
+  // Touch state for pinch-to-zoom
+  const lastTouchDistance = ref(0)
+  const lastTouchCenter = ref({ x: 0, y: 0 })
+  const isTouching = ref(false)
+
   function latLngToPixel(lat: number, lng: number) {
     return latLngToPixelHelper(
       lat,
@@ -151,6 +156,103 @@ export function useCamera(
     }
   }
 
+  // Touch event handlers for mobile
+  function getTouchDistance(touches: TouchList): number {
+    if (touches.length < 2) return 0
+    const dx = touches[0].clientX - touches[1].clientX
+    const dy = touches[0].clientY - touches[1].clientY
+    return Math.sqrt(dx * dx + dy * dy)
+  }
+
+  function getTouchCenter(touches: TouchList): { x: number; y: number } {
+    if (touches.length < 2) {
+      return { x: touches[0].clientX, y: touches[0].clientY }
+    }
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2
+    }
+  }
+
+  function handleTouchStart(event: TouchEvent) {
+    event.preventDefault()
+    isTouching.value = true
+
+    if (event.touches.length === 1) {
+      // Single finger - start drag
+      dragStart.value = { x: event.touches[0].clientX, y: event.touches[0].clientY }
+      dragStartCenter.value = { lat: camera.value.centerLat, lng: camera.value.centerLng }
+    } else if (event.touches.length === 2) {
+      // Two fingers - prepare for pinch zoom
+      lastTouchDistance.value = getTouchDistance(event.touches)
+      lastTouchCenter.value = getTouchCenter(event.touches)
+      dragStart.value = lastTouchCenter.value
+      dragStartCenter.value = { lat: camera.value.centerLat, lng: camera.value.centerLng }
+    }
+  }
+
+  function handleTouchMove(event: TouchEvent) {
+    event.preventDefault()
+    if (!isTouching.value) return
+
+    if (event.touches.length === 1) {
+      // Single finger drag
+      const deltaX = event.touches[0].clientX - dragStart.value.x
+      const deltaY = event.touches[0].clientY - dragStart.value.y
+
+      const zoom = camera.value.zoom
+      const worldSize = TILE_SIZE * Math.pow(2, zoom)
+
+      const lngDelta = (deltaX / worldSize) * 360
+      const latDelta = (deltaY / worldSize) * 180
+
+      camera.value.centerLng = Math.max(-180, Math.min(180, dragStartCenter.value.lng - lngDelta))
+      camera.value.centerLat = Math.max(-85, Math.min(85, dragStartCenter.value.lat + latDelta))
+    } else if (event.touches.length === 2) {
+      // Pinch zoom
+      const currentDistance = getTouchDistance(event.touches)
+      const currentCenter = getTouchCenter(event.touches)
+
+      if (lastTouchDistance.value > 0) {
+        const scale = currentDistance / lastTouchDistance.value
+        const zoomDelta = (scale - 1) * 2 // Adjust sensitivity
+
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.value.zoom + zoomDelta))
+        camera.value.zoom = newZoom
+      }
+
+      // Also handle pan during pinch
+      const deltaX = currentCenter.x - dragStart.value.x
+      const deltaY = currentCenter.y - dragStart.value.y
+
+      const zoom = camera.value.zoom
+      const worldSize = TILE_SIZE * Math.pow(2, zoom)
+
+      const lngDelta = (deltaX / worldSize) * 360
+      const latDelta = (deltaY / worldSize) * 180
+
+      camera.value.centerLng = Math.max(-180, Math.min(180, dragStartCenter.value.lng - lngDelta))
+      camera.value.centerLat = Math.max(-85, Math.min(85, dragStartCenter.value.lat + latDelta))
+
+      lastTouchDistance.value = currentDistance
+      lastTouchCenter.value = currentCenter
+      dragStart.value = currentCenter
+      dragStartCenter.value = { lat: camera.value.centerLat, lng: camera.value.centerLng }
+    }
+  }
+
+  function handleTouchEnd(event: TouchEvent) {
+    if (event.touches.length === 0) {
+      isTouching.value = false
+      lastTouchDistance.value = 0
+    } else if (event.touches.length === 1) {
+      // Switched from pinch to single finger drag
+      dragStart.value = { x: event.touches[0].clientX, y: event.touches[0].clientY }
+      dragStartCenter.value = { lat: camera.value.centerLat, lng: camera.value.centerLng }
+      lastTouchDistance.value = 0
+    }
+  }
+
   function resetCamera() {
     camera.value.zoom = 3
     camera.value.centerLat = DEFAULT_CENTER.lat
@@ -167,6 +269,12 @@ export function useCamera(
     mapContainer.value.addEventListener('mouseleave', handleMouseLeave)
     mapContainer.value.style.cursor = 'grab'
 
+    // Touch events for mobile
+    mapContainer.value.addEventListener('touchstart', handleTouchStart, { passive: false })
+    mapContainer.value.addEventListener('touchmove', handleTouchMove, { passive: false })
+    mapContainer.value.addEventListener('touchend', handleTouchEnd)
+    mapContainer.value.addEventListener('touchcancel', handleTouchEnd)
+
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
   }
@@ -177,6 +285,13 @@ export function useCamera(
     mapContainer.value?.removeEventListener('mousemove', handleMouseMove)
     mapContainer.value?.removeEventListener('mouseup', handleMouseUp)
     mapContainer.value?.removeEventListener('mouseleave', handleMouseLeave)
+
+    // Touch events cleanup
+    mapContainer.value?.removeEventListener('touchstart', handleTouchStart)
+    mapContainer.value?.removeEventListener('touchmove', handleTouchMove)
+    mapContainer.value?.removeEventListener('touchend', handleTouchEnd)
+    mapContainer.value?.removeEventListener('touchcancel', handleTouchEnd)
+
     window.removeEventListener('keydown', handleKeyDown)
     window.removeEventListener('keyup', handleKeyUp)
     pressedKeys.value.clear()

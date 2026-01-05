@@ -17,6 +17,7 @@ defineProps<{
     }"
   >
     <div class="tooltip-site">{{ launch.site_name }}</div>
+    <div class="tooltip-state">{{ launch.launch_state }}</div>
     <div class="tooltip-details">
       <span class="tooltip-id">{{ launch.flight_id }}</span>
       <span class="tooltip-vehicle">{{ launch.vehicle_name || 'Unknown' }}</span>
@@ -41,6 +42,12 @@ defineProps<{
 
 .tooltip-site {
   font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.tooltip-state {
+  font-size: 11px;
+  color: #a5b4fc;
   margin-bottom: 4px;
 }
 

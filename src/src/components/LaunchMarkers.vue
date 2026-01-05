@@ -64,7 +64,7 @@ const markerPositions = computed(() => {
             :cy="pos.y"
             :r="getDotSize(launch.orb_pay) * launch.scale"
             class="launch-dot success"
-            :style="{ opacity: launch.opacity }"
+            :style="{ opacity: launch.opacity, fill: launch.state_color, stroke: launch.state_color, filter: `drop-shadow(0 0 3px ${launch.state_color}) drop-shadow(0 0 6px ${launch.state_color})` }"
           />
         </template>
 
@@ -106,8 +106,6 @@ const markerPositions = computed(() => {
 }
 
 .launch-dot.success {
-  fill: #4ade80;
-  stroke: #22c55e;
   stroke-width: 1;
 }
 

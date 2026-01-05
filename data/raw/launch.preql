@@ -8,6 +8,9 @@ import platform as platform;
 import vehicle as vehicle;
 import sites as site;
 import organization as org;
+import organization as state;
+
+merge org.state_code into state.code;
 
 property launch_tag.launch_jd float; # float of launch date on julian calendar
 # property <launch_tag>.launch_date string;
