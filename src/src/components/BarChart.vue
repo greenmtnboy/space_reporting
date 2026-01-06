@@ -2,11 +2,17 @@
 import { ref, nextTick, onUnmounted } from 'vue'
 import type { Stats } from '../types'
 
-defineProps<{
+const props = defineProps<{
   title: string
   stats: Stats[]
   maxTotal: number
   showFailures?: boolean
+  selectedItems?: Set<string>
+  clickable?: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'itemClick', name: string): void
 }>()
 
 // Tooltip state
@@ -84,6 +90,20 @@ function handleTouchEnd() {
   }, 1500)
 }
 
+function handleBarClick(name: string) {
+  if (props.clickable) {
+    emit('itemClick', name)
+  }
+}
+
+function isSelected(name: string): boolean {
+  return props.selectedItems?.has(name) ?? false
+}
+
+function hasAnySelected(): boolean {
+  return (props.selectedItems?.size ?? 0) > 0
+}
+
 onUnmounted(() => {
   if (hideTimeout) {
     clearTimeout(hideTimeout)
@@ -95,7 +115,17 @@ onUnmounted(() => {
   <div class="chart-block">
     <h2>{{ title }}</h2>
     <div class="bar-chart">
-      <div v-for="item in stats" :key="item.name" class="bar-row">
+      <div
+        v-for="item in stats"
+        :key="item.name"
+        class="bar-row"
+        :class="{
+          'bar-row--clickable': clickable,
+          'bar-row--selected': isSelected(item.name),
+          'bar-row--dimmed': hasAnySelected() && !isSelected(item.name)
+        }"
+        @click="handleBarClick(item.name)"
+      >
         <div
           class="bar-label"
           @mouseenter="showTooltip($event, item.name)"
@@ -169,6 +199,41 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  transition: opacity 0.15s ease;
+}
+
+.bar-row--clickable {
+  cursor: pointer;
+}
+
+.bar-row--clickable:hover {
+  background-color: rgba(14, 165, 233, 0.1);
+  margin: 0 -4px;
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+.bar-row--selected {
+  background-color: rgba(14, 165, 233, 0.15);
+  margin: 0 -4px;
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+.bar-row--selected .bar-label {
+  color: var(--color-accent-bright);
+}
+
+.bar-row--selected .bar-container {
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 8px rgba(14, 165, 233, 0.4);
+}
+
+.bar-row--dimmed {
+  opacity: 0.4;
+}
+
+.bar-row--dimmed:hover {
+  opacity: 0.7;
 }
 
 .bar-label {
@@ -189,6 +254,7 @@ onUnmounted(() => {
   background: #f3f4f6;
   border-radius: 2px;
   overflow: hidden;
+  transition: box-shadow 0.15s ease;
 }
 
 .bar-success {

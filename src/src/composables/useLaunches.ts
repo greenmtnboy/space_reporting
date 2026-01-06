@@ -7,6 +7,7 @@ const DATA_URL = 'https://storage.googleapis.com/trilogy_public_models/duckdb/la
 export interface ProcessedLaunch extends Launch {
   timestamp: number
   isFailed: boolean
+  shortenedOrg: string
 }
 
 export interface ActiveLaunch extends ProcessedLaunch {
@@ -56,13 +57,19 @@ export function useLaunchDataStatus() {
   return { isLoading, loadError }
 }
 
+export interface LaunchFilters {
+  organizations: Set<string>
+  vehicles: Set<string>
+}
+
 export function useLaunches(
   currentTime: Ref<number>,
   isComplete: Ref<boolean>,
   rangeStart: Ref<number>,
   rangeEnd: Ref<number>,
   rangeDuration: Ref<number>,
-  animationDurationMs: Ref<number>
+  animationDurationMs: Ref<number>,
+  filters?: Ref<LaunchFilters>
 ) {
   // All launches processed (not filtered by range)
   const allLaunches = computed<ProcessedLaunch[]>(() => {
@@ -70,7 +77,8 @@ export function useLaunches(
       .map(l => ({
         ...l,
         timestamp: new Date(l.launch_date).getTime(),
-        isFailed: l.success_flag.startsWith('F')
+        isFailed: l.success_flag.startsWith('F'),
+        shortenedOrg: shortenOrgName(l.launch_org)
       }))
       .sort((a, b) => a.timestamp - b.timestamp)
   })
@@ -82,9 +90,37 @@ export function useLaunches(
     )
   })
 
+  // Check if a launch matches the current filters
+  function matchesFilters(launch: ProcessedLaunch): boolean {
+    if (!filters?.value) return true
+
+    const { organizations, vehicles } = filters.value
+
+    // If no filters are active, show all
+    if (organizations.size === 0 && vehicles.size === 0) {
+      return true
+    }
+
+    // Check organization filter (using shortened name)
+    const orgMatch = organizations.size === 0 || organizations.has(launch.shortenedOrg)
+
+    // Check vehicle filter
+    const vehicleMatch = vehicles.size === 0 || vehicles.has(launch.vehicle_name || 'Unknown')
+
+    // Both must match (AND logic when both filters are active)
+    return orgMatch && vehicleMatch
+  }
+
+  // Filtered launches (by cross-filter)
+  const filteredLaunches = computed<ProcessedLaunch[]>(() => {
+    return launches.value.filter(matchesFilters)
+  })
+
   const activeLaunches = computed<ActiveLaunch[]>(() => {
+    const launchesToUse = filteredLaunches.value
+
     if (isComplete.value) {
-      return launches.value.map(l => ({ ...l, scale: 1, opacity: 0.8 }))
+      return launchesToUse.map(l => ({ ...l, scale: 1, opacity: 0.8 }))
     }
 
     // Visible window is a fixed 1.33 seconds of screen time, converted to calendar time
@@ -93,7 +129,7 @@ export function useLaunches(
     const expandDuration = 0.15
     const holdDuration = 0.25
 
-    return launches.value.filter(l => {
+    return launchesToUse.filter(l => {
       return l.timestamp <= currentTime.value &&
         l.timestamp > currentTime.value - visibleWindow
     }).map(l => {
@@ -115,15 +151,22 @@ export function useLaunches(
     })
   })
 
+  // Accumulated launches (filtered)
   const accumulatedLaunches = computed(() => {
+    return filteredLaunches.value.filter(l => l.timestamp <= currentTime.value)
+  })
+
+  // Stats are computed from ALL launches (not filtered) so we can see full picture
+  // This allows users to see all available filter options
+  const allAccumulatedLaunches = computed(() => {
     return launches.value.filter(l => l.timestamp <= currentTime.value)
   })
 
   const orgStats = computed<OrgStats[]>(() => {
     const stats: Record<string, OrgStats> = {}
 
-    accumulatedLaunches.value.forEach(l => {
-      const org = shortenOrgName(l.launch_org)
+    allAccumulatedLaunches.value.forEach(l => {
+      const org = l.shortenedOrg
       if (!stats[org]) {
         stats[org] = { name: org, successes: 0, failures: 0, total: 0 }
       }
@@ -145,7 +188,7 @@ export function useLaunches(
   const vehicleStats = computed<VehicleStats[]>(() => {
     const stats: Record<string, VehicleStats> = {}
 
-    accumulatedLaunches.value.forEach(l => {
+    allAccumulatedLaunches.value.forEach(l => {
       const vehicle = l.vehicle_name || 'Unknown'
       if (!stats[vehicle]) {
         stats[vehicle] = { name: vehicle, successes: 0, failures: 0, total: 0 }
@@ -167,6 +210,7 @@ export function useLaunches(
 
   return {
     launches,
+    filteredLaunches,
     activeLaunches,
     accumulatedLaunches,
     orgStats,
