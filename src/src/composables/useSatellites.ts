@@ -240,8 +240,17 @@ export function useSatellites(
   // Active satellites with their current state and animation progress
   const activeSatellites = computed<ActiveSatellite[]>(() => {
     const time = currentTime.value
+    // Buffer to keep satellites around for decom animation
+    const decomBufferMs = DECOM_TRACK_DECAY_DAYS * 24 * 60 * 60 * 1000
 
     return satellites.value
+      .filter(s => {
+        // Broad phase filtering:
+        // Include if launch has happened (or is impending if we wanted pre-launch, but we don't)
+        // AND it hasn't finished decommissioning (decomTimestamp + buffer)
+        // Note: 'launching' state starts AT launchTimestamp.
+        return time >= s.launchTimestamp && time <= (s.decomTimestamp + decomBufferMs)
+      })
       .map(s => {
         const { state, launchProgress, launchOpacity, decomProgress, orbitProgress } = getSatelliteState(s, time)
         return {

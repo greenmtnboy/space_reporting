@@ -332,16 +332,13 @@ export function useOrbits(
 
     let line = launchLines.get(satellite.jcat)
 
-    // Generate curved launch track points aligned with orbit inclination
-    const points = generateLaunchTrackPoints(satellite, satellite.launchProgress)
-
     if (!line) {
-      // Create new line with enough buffer for all segments
-      const maxPoints = LAUNCH_LINE_SEGMENTS + 1
-      const geometry = new THREE.BufferGeometry()
-      const positions = new Float32Array(maxPoints * 3)
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-      geometry.setDrawRange(0, points.length)
+      // Create new line with full spiral geometry (progress = 1.0)
+      const points = generateLaunchTrackPoints(satellite, 1.0)
+      
+      const geometry = new THREE.BufferGeometry().setFromPoints(points)
+      // Store total points for drawRange calculation
+      geometry.userData = { totalPoints: points.length }
 
       const material = new THREE.LineBasicMaterial({
         color: satellite.owner_color,
@@ -354,13 +351,11 @@ export function useOrbits(
       orbitGroup.value.add(line)
     }
 
-    // Update geometry with current points
-    const posAttr = line.geometry.attributes.position as THREE.BufferAttribute
-    for (let i = 0; i < points.length; i++) {
-      posAttr.setXYZ(i, points[i].x, points[i].y, points[i].z)
-    }
-    posAttr.needsUpdate = true
-    line.geometry.setDrawRange(0, points.length)
+    // Update draw range based on progress
+    // launchProgress is clamped to 1.0 by useSatellites, so this works for hold/fade phases too
+    const totalPoints = line.geometry.userData.totalPoints || LAUNCH_LINE_SEGMENTS + 1
+    const revealCount = Math.ceil(satellite.launchProgress * totalPoints)
+    line.geometry.setDrawRange(0, Math.max(2, revealCount))
 
     // Update opacity using explicit control from useSatellites
     const material = line.material as THREE.LineBasicMaterial
@@ -400,7 +395,7 @@ export function useOrbits(
       // Clean up removed satellites
       cleanupRemovedSatellites(currentIds, orbitLines)
     },
-    { deep: true }
+    { deep: false }
   )
 
   watch(
@@ -418,7 +413,7 @@ export function useOrbits(
       // Clean up completed launches
       cleanupRemovedSatellites(currentIds, launchLines)
     },
-    { deep: true }
+    { deep: false }
   )
 
   // Cleanup function
