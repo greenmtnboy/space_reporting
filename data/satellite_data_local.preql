@@ -1,7 +1,7 @@
 import raw.satellite;
 
 copy into json `./raw_satellite_data.json` from 
-where base_category = 'P' and launch_date.year = 2025
+where base_category = 'P' and launch_date.year >= 2020
 select
     jcat,
     name,
@@ -15,4 +15,4 @@ select
     inc,
     launch.site.latitude,
     launch.site.longitude
-limit 1000;
+;

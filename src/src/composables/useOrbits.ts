@@ -18,6 +18,56 @@ const LAUNCH_LINE_SEGMENTS = 128 // Segments for curved launch arc
 // Decom colors (gradient from normal to red)
 const DECOM_END_COLOR = new THREE.Color(0xff4444)
 
+// --- Optimization: Object Pools & Caches ---
+const _tempVec3 = new THREE.Vector3()
+const _groundPos = new THREE.Vector3()
+const _localPos = new THREE.Vector3()
+const _matrix = new THREE.Matrix4()
+const _invMatrix = new THREE.Matrix4()
+const _inclinationMatrix = new THREE.Matrix4()
+const _lanMatrix = new THREE.Matrix4()
+
+// Material Cache: Color -> Material
+// const materialCache = new Map<string, THREE.LineBasicMaterial>()
+
+function getCachedMaterial(colorHex: string, opacity: number = 1): THREE.LineBasicMaterial {
+  // Key by color + opacity to allow different base opacities if needed, 
+  // though we mostly manipulate opacity dynamically.
+  // Actually, we manipulate opacity on the instance. 
+  // If we share materials, changing opacity on one affects ALL.
+  // So we can only cache materials if we clone them or if we don't change properties.
+  // But we DO change opacity (fade out).
+  // So we CANNOT share materials if we animate opacity individually.
+  // UNLESS we use vertex colors and keep opacity 1, or use a custom shader.
+  // Or, we accept that material caching is only for the INITIAL creation.
+  // 
+  // Re-reading usage: 
+  // updateOrbitLine changes opacity.
+  // updateLaunchLine changes opacity.
+  // So we CANNOT share the same material instance across different satellites if they need different opacities at the same time.
+  // 
+  // However, we can pool them? 
+  // Or just minimize creation. 
+  // Given the constraint, maybe just reuse the geometry logic which is the biggest win.
+  // 
+  // Wait, Three.js materials are heavy? Not too heavy. Geometries are heavier.
+  // Let's stick to Geometry optimization for now.
+  // But wait, "Each satellite creates new ... THREE.LineBasicMaterial". 
+  // If thousands of satellites have opacity 0.7, they could share ONE material.
+  // But during fade out, they diverge.
+  // 
+  // Compromise: Cache the "base" material, and clone it? Cloning is cheap.
+  // Or just create new ones. The Vector3 allocation was the main bottleneck (129k vs 1k materials).
+  // I will skip material caching for now to avoid opacity conflicts, as satellites animate independently.
+  
+  return new THREE.LineBasicMaterial({
+    color: colorHex,
+    transparent: true,
+    opacity: opacity
+  })
+}
+// -------------------------------------------
+
 export function useOrbits(
   orbitGroup: Ref<THREE.Group | null>,
   orbitingSatellites: Ref<ActiveSatellite[]>,
@@ -29,34 +79,28 @@ export function useOrbits(
   const orbitLines = new Map<string, THREE.Line>()
   const launchLines = new Map<string, THREE.Line>()
 
-  // Convert lat/lng to 3D position on globe surface
-  function latLngToPosition(lat: number, lng: number, altitudeKm: number = 0): THREE.Vector3 {
+  // Convert lat/lng to 3D position on globe surface (writes to target or _tempVec3)
+  function setLatLngToPosition(lat: number, lng: number, altitudeKm: number, target: THREE.Vector3) {
     const phi = (90 - lat) * (Math.PI / 180)
     const theta = (lng + 180) * (Math.PI / 180)
     const radius = GLOBE_RADIUS + altitudeKm * KM_TO_UNITS
 
-    const x = -radius * Math.sin(phi) * Math.cos(theta)
-    const y = radius * Math.cos(phi)
-    const z = radius * Math.sin(phi) * Math.sin(theta)
-
-    return new THREE.Vector3(x, y, z)
+    target.x = -radius * Math.sin(phi) * Math.cos(theta)
+    target.y = radius * Math.cos(phi)
+    target.z = radius * Math.sin(phi) * Math.sin(theta)
   }
 
   // Get orbital parameters and transformation matrix for a satellite
+  // Returns values and sets the shared _matrix
   function getOrbitalParams(satellite: ActiveSatellite): {
-    a: number           // semi-major axis in Three.js units
-    b: number           // semi-minor axis in Three.js units
-    matrix: THREE.Matrix4  // orbital plane transformation
+    a: number
+    b: number
     isEscape: boolean
   } {
     // Handle escape trajectories or invalid orbits
     if (satellite.orbitType === 'ESCAPE' || !isFinite(satellite.apogee) || satellite.apogee < 0) {
-      return {
-        a: 0,
-        b: 0,
-        matrix: new THREE.Matrix4(),
-        isEscape: true
-      }
+      _matrix.identity()
+      return { a: 0, b: 0, isEscape: true }
     }
 
     // Calculate orbital parameters
@@ -72,36 +116,35 @@ export function useOrbits(
     // Inclination in radians
     const inclination = satellite.inc * (Math.PI / 180)
 
-    // Longitude of ascending node (derive from launch site, add some variation based on jcat)
+    // Longitude of ascending node
     const lanOffset = hashString(satellite.jcat) * 360
     const longitudeOfAscendingNode = (satellite.launch_site_longitude + lanOffset) * (Math.PI / 180)
 
-    // Create rotation matrices
-    const inclinationMatrix = new THREE.Matrix4().makeRotationX(inclination)
-    const lanMatrix = new THREE.Matrix4().makeRotationY(longitudeOfAscendingNode)
-    const combinedMatrix = new THREE.Matrix4().multiplyMatrices(lanMatrix, inclinationMatrix)
+    // Compute Matrix directly to avoid allocations
+    _inclinationMatrix.makeRotationX(inclination)
+    _lanMatrix.makeRotationY(longitudeOfAscendingNode)
+    _matrix.multiplyMatrices(_lanMatrix, _inclinationMatrix)
 
-    return { a, b, matrix: combinedMatrix, isEscape: false }
+    return { a, b, isEscape: false }
   }
 
   // Find the closest point on the orbit to the launch site (angle in radians)
   function findClosestOrbitAngle(
     satellite: ActiveSatellite,
     a: number,
-    b: number,
-    matrix: THREE.Matrix4
+    b: number
   ): number {
-    const groundPos = latLngToPosition(
+    setLatLngToPosition(
       satellite.launch_site_latitude,
       satellite.launch_site_longitude,
-      0
+      0,
+      _groundPos
     )
     
     // Transform ground position to local orbit space
-    const invMatrix = matrix.clone().invert()
-    const localPos = groundPos.clone().applyMatrix4(invMatrix)
+    _invMatrix.copy(_matrix).invert()
+    _localPos.copy(_groundPos).applyMatrix4(_invMatrix)
 
-    // We want to find t such that distance from (a*cos t, 0, b*sin t) to (lx, ly, lz) is minimized
     // Coarse search
     let closestAngle = 0
     let minDidstSq = Infinity
@@ -109,8 +152,8 @@ export function useOrbits(
     
     for (let i = 0; i < steps; i++) {
       const angle = (i / steps) * Math.PI * 2
-      const dx = localPos.x - a * Math.cos(angle)
-      const dz = localPos.z - b * Math.sin(angle)
+      const dx = _localPos.x - a * Math.cos(angle)
+      const dz = _localPos.z - b * Math.sin(angle)
       const d2 = dx*dx + dz*dz
       if (d2 < minDidstSq) {
         minDidstSq = d2
@@ -125,8 +168,8 @@ export function useOrbits(
       const fineSteps = 10
       for(let i=0; i<=fineSteps; i++) {
         const ang = center - range/2 + (i/fineSteps)*range
-        const dx = localPos.x - a * Math.cos(ang)
-        const dz = localPos.z - b * Math.sin(ang)
+        const dx = _localPos.x - a * Math.cos(ang)
+        const dz = _localPos.z - b * Math.sin(ang)
         const d = dx*dx + dz*dz
         if (d < minDist) {
           minDist = d
@@ -144,134 +187,145 @@ export function useOrbits(
     return closestAngle
   }
 
-  // Generate orbit ellipse points, starting from the insertion point
+  // Generate orbit ellipse points directly into a Float32Array
   function generateOrbitPoints(
     satellite: ActiveSatellite,
     segments: number = ORBIT_SEGMENTS
-  ): THREE.Vector3[] {
-    const points: THREE.Vector3[] = []
-    const { a, b, matrix, isEscape } = getOrbitalParams(satellite)
+  ): Float32Array {
+    const { a, b, isEscape } = getOrbitalParams(satellite) // Sets _matrix
+    
+    const numPoints = segments + 1
+    const positions = new Float32Array(numPoints * 3)
 
     // Handle escape trajectories
     if (isEscape) {
-      const startPos = latLngToPosition(
+      setLatLngToPosition(
         satellite.launch_site_latitude,
         satellite.launch_site_longitude,
-        Math.max(satellite.perigee, 200)
+        Math.max(satellite.perigee, 200),
+        _tempVec3
       )
-      const endPos = startPos.clone().multiplyScalar(3) // Extend outward
-      return [startPos, endPos]
+      positions[0] = _tempVec3.x
+      positions[1] = _tempVec3.y
+      positions[2] = _tempVec3.z
+      
+      _tempVec3.multiplyScalar(3) // Extend outward
+      positions[3] = _tempVec3.x
+      positions[4] = _tempVec3.y
+      positions[5] = _tempVec3.z
+      
+      return positions.slice(0, 6) // Return just 2 points
     }
 
-    // Find insertion angle so orbit starts from where launch track connects
-    const startAngle = findClosestOrbitAngle(satellite, a, b, matrix)
+    // Find insertion angle
+    const startAngle = findClosestOrbitAngle(satellite, a, b)
 
-    // Generate ellipse points starting from insertion angle
-    for (let i = 0; i <= segments; i++) {
+    // Generate points
+    for (let i = 0; i < numPoints; i++) {
       const angle = startAngle + (i / segments) * Math.PI * 2
 
-      // Ellipse in XZ plane (before rotation)
+      // Ellipse in XZ plane
       const x = a * Math.cos(angle)
       const z = b * Math.sin(angle)
-      const point = new THREE.Vector3(x, 0, z)
+      
+      _tempVec3.set(x, 0, z)
+      _tempVec3.applyMatrix4(_matrix)
 
-      // Apply orbital plane rotation
-      point.applyMatrix4(matrix)
-
-      points.push(point)
+      positions[i * 3] = _tempVec3.x
+      positions[i * 3 + 1] = _tempVec3.y
+      positions[i * 3 + 2] = _tempVec3.z
     }
 
-    return points
+    return positions
   }
 
-  // Generate launch track points that spiral up to meet the orbit
+  // Generate launch track points directly into Float32Array
   function generateLaunchTrackPoints(
     satellite: ActiveSatellite,
     progress: number,
     segments: number = LAUNCH_LINE_SEGMENTS
-  ): THREE.Vector3[] {
-    const points: THREE.Vector3[] = []
-    const { a, b, matrix, isEscape } = getOrbitalParams(satellite)
+  ): Float32Array {
+    const { a, b, isEscape } = getOrbitalParams(satellite) // Sets _matrix
 
-    // Ground position
-    const groundPos = latLngToPosition(
-      satellite.launch_site_latitude,
-      satellite.launch_site_longitude,
-      0
-    )
-
-    // For escape trajectories, use simple radial line
     if (isEscape) {
-      const targetAltitude = Math.max(satellite.perigee, 200)
-      const endPos = latLngToPosition(
+      const positions = new Float32Array(6)
+      
+      setLatLngToPosition(
         satellite.launch_site_latitude,
         satellite.launch_site_longitude,
-        targetAltitude * progress
+        0,
+        _tempVec3
       )
-      return [groundPos, endPos]
+      positions[0] = _tempVec3.x
+      positions[1] = _tempVec3.y
+      positions[2] = _tempVec3.z
+
+      const targetAltitude = Math.max(satellite.perigee, 200)
+      setLatLngToPosition(
+        satellite.launch_site_latitude,
+        satellite.launch_site_longitude,
+        targetAltitude * progress,
+        _tempVec3
+      )
+      positions[3] = _tempVec3.x
+      positions[4] = _tempVec3.y
+      positions[5] = _tempVec3.z
+      
+      return positions
     }
 
     // 1. Identify start and target angles in local orbit space
-    const invMatrix = matrix.clone().invert()
-    const localStart = groundPos.clone().applyMatrix4(invMatrix)
-    const startAngle = Math.atan2(localStart.z, localStart.x)
+    _invMatrix.copy(_matrix).invert()
+    
+    setLatLngToPosition(
+      satellite.launch_site_latitude,
+      satellite.launch_site_longitude,
+      0,
+      _groundPos
+    )
+    _localPos.copy(_groundPos).applyMatrix4(_invMatrix)
+    
+    const startAngle = Math.atan2(_localPos.z, _localPos.x)
     
     // Target is the closest point on the orbit ellipse
-    const targetAngleRef = findClosestOrbitAngle(satellite, a, b, matrix)
+    const targetAngleRef = findClosestOrbitAngle(satellite, a, b)
     
     // 2. Calculate Angle Delta for Spiral
-    // Ensure we go "forward" (positive dTheta) and complete at least one full circle (+2PI)
     let dTheta = targetAngleRef - startAngle
     while (dTheta < 0) dTheta += Math.PI * 2
-    
-    // Add full revolution(s) to "circle the earth completely"
-    // One full extra turn
-    dTheta += Math.PI * 2
+    dTheta += Math.PI * 2 // One full extra turn
 
-    // 3. Generate Spiral Points
     const numPoints = Math.max(2, Math.ceil(segments * progress))
+    const totalPoints = numPoints + 1
+    const positions = new Float32Array(totalPoints * 3)
+
     for (let i = 0; i <= numPoints; i++) {
       const t = (i / numPoints) * progress
       
-      // Interpolate Angle
       const currentAngle = startAngle + t * dTheta
       
-      // Interpolate Altitude (Radius)
-      // Calculate target radius at the specific current angle (on the ellipse)
-      // Ellipse radius r(theta) = (a*b) / sqrt((b*cos)^2 + (a*sin)^2)
-      // Note: standard ellipse parametric is x=a cos t, z=b sin t.
-      // The radius at parameter t is sqrt((a cos t)^2 + (b sin t)^2)
+      // Ellipse radius at current angle
       const rEllipse = Math.sqrt(Math.pow(a * Math.cos(currentAngle), 2) + Math.pow(b * Math.sin(currentAngle), 2))
       
-      // Interpolate from Ground Radius to Ellipse Radius
-      // Quadratic Ease-Out: t * (2 - t) -> Starts fast, flattens at top
       const groundRadius = GLOBE_RADIUS
       const altT = t * (2 - t)
       const currentRadius = groundRadius + (rEllipse - groundRadius) * altT
       
-      // Interpolate Off-Plane Offset (y)
-      // Decay from start Y to 0
-      // Use (1-t)^2 to flatten the approach to 0
-      const currentY = localStart.y * (1 - t) * (1 - t)
+      // Decay offset
+      const currentY = _localPos.y * (1 - t) * (1 - t)
       
-      // Construct Local Position
       const x = currentRadius * Math.cos(currentAngle)
       const z = currentRadius * Math.sin(currentAngle)
-      // Note: r in previous step was magnitude. But wait, x/z are parametric.
-      // Correction: The spiral should interpolate smoothly between a circle (ground) and ellipse (orbit).
-      // But we derived rEllipse using the angle. 
-      // If we use x = r * cos, z = r * sin, we get a point at distance r.
-      // This is effectively blending polar coordinates.
       
-      const localPos = new THREE.Vector3(x, currentY, z)
+      _tempVec3.set(x, currentY, z)
+      _tempVec3.applyMatrix4(_matrix)
 
-      // Transform back to World Space
-      const worldPos = localPos.clone().applyMatrix4(matrix)
-      
-      points.push(worldPos)
+      positions[i * 3] = _tempVec3.x
+      positions[i * 3 + 1] = _tempVec3.y
+      positions[i * 3 + 2] = _tempVec3.z
     }
 
-    return points
+    return positions
   }
 
   // Simple string hash for consistent randomization
@@ -291,32 +345,27 @@ export function useOrbits(
     let line = orbitLines.get(satellite.jcat)
 
     if (!line) {
-      // Create new line with full geometry
-      const points = generateOrbitPoints(satellite)
-      const geometry = new THREE.BufferGeometry().setFromPoints(points)
-      const material = new THREE.LineBasicMaterial({
-        color: satellite.owner_color,
-        transparent: true,
-        opacity: 0.7
-      })
+      // Generate points directly to BufferAttribute
+      const positions = generateOrbitPoints(satellite)
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+
+      const material = getCachedMaterial(satellite.owner_color, 0.7)
+      
       line = new THREE.Line(geometry, material)
       line.userData.satelliteId = satellite.jcat
-      line.userData.totalPoints = points.length
+      line.userData.totalPoints = positions.length / 3
       orbitLines.set(satellite.jcat, line)
       orbitGroup.value.add(line)
     }
 
-    const totalPoints = line.userData.totalPoints || ORBIT_SEGMENTS + 1
-
-    // Progressive reveal using drawRange
-    // orbitProgress: 0 = just inserted, 1 = full orbit revealed
+    const totalPoints = line.userData.totalPoints
     const revealCount = Math.ceil(satellite.orbitProgress * totalPoints)
     line.geometry.setDrawRange(0, Math.max(2, revealCount))
 
     // Update opacity based on state
     const material = line.material as THREE.LineBasicMaterial
     if (satellite.state === 'decommissioning') {
-      // Fade out and change color during decom
       material.opacity = (1 - satellite.decomProgress) * 0.7
       const originalColor = new THREE.Color(satellite.owner_color)
       material.color.lerpColors(originalColor, DECOM_END_COLOR, satellite.decomProgress)
@@ -333,31 +382,24 @@ export function useOrbits(
     let line = launchLines.get(satellite.jcat)
 
     if (!line) {
-      // Create new line with full spiral geometry (progress = 1.0)
-      const points = generateLaunchTrackPoints(satellite, 1.0)
-      
-      const geometry = new THREE.BufferGeometry().setFromPoints(points)
-      // Store total points for drawRange calculation
-      geometry.userData = { totalPoints: points.length }
+      // Generate full spiral directly to BufferAttribute
+      const positions = generateLaunchTrackPoints(satellite, 1.0)
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      geometry.userData = { totalPoints: positions.length / 3 }
 
-      const material = new THREE.LineBasicMaterial({
-        color: satellite.owner_color,
-        transparent: true,
-        opacity: 1
-      })
+      const material = getCachedMaterial(satellite.owner_color, 1)
+      
       line = new THREE.Line(geometry, material)
       line.userData.satelliteId = satellite.jcat
       launchLines.set(satellite.jcat, line)
       orbitGroup.value.add(line)
     }
 
-    // Update draw range based on progress
-    // launchProgress is clamped to 1.0 by useSatellites, so this works for hold/fade phases too
-    const totalPoints = line.geometry.userData.totalPoints || LAUNCH_LINE_SEGMENTS + 1
+    const totalPoints = line.geometry.userData.totalPoints
     const revealCount = Math.ceil(satellite.launchProgress * totalPoints)
     line.geometry.setDrawRange(0, Math.max(2, revealCount))
 
-    // Update opacity using explicit control from useSatellites
     const material = line.material as THREE.LineBasicMaterial
     material.opacity = satellite.launchOpacity
   }
