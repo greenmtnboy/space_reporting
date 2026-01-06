@@ -13,7 +13,7 @@ const KM_TO_UNITS = GLOBE_RADIUS / EARTH_RADIUS_KM
 const ORBIT_SEGMENTS = 128
 
 // Launch line settings
-const LAUNCH_LINE_SEGMENTS = 32 // Segments for curved launch arc
+const LAUNCH_LINE_SEGMENTS = 128 // Segments for curved launch arc
 
 // Decom colors (gradient from normal to red)
 const DECOM_END_COLOR = new THREE.Color(0xff4444)
@@ -184,7 +184,7 @@ export function useOrbits(
     return points
   }
 
-  // Generate launch track points that curve up to meet the orbital plane tangentially
+  // Generate launch track points that spiral up to meet the orbit
   function generateLaunchTrackPoints(
     satellite: ActiveSatellite,
     progress: number,
@@ -211,75 +211,63 @@ export function useOrbits(
       return [groundPos, endPos]
     }
 
-    // 1. Identify closest point on orbit
-    const closestAngle = findClosestOrbitAngle(satellite, a, b, matrix)
-    
-    // Transform to local orbit space to handle inclination merge
+    // 1. Identify start and target angles in local orbit space
     const invMatrix = matrix.clone().invert()
     const localStart = groundPos.clone().applyMatrix4(invMatrix)
+    const startAngle = Math.atan2(localStart.z, localStart.x)
     
-    // Calculate local target position and tangent
-    const targetX = a * Math.cos(closestAngle)
-    const targetZ = b * Math.sin(closestAngle)
-    const localTarget = new THREE.Vector3(targetX, 0, targetZ) // On orbital plane (y=0)
+    // Target is the closest point on the orbit ellipse
+    const targetAngleRef = findClosestOrbitAngle(satellite, a, b, matrix)
     
-    const tanX = -a * Math.sin(closestAngle)
-    const tanZ = b * Math.cos(closestAngle)
-    const localTangent = new THREE.Vector3(tanX, 0, tanZ).normalize()
+    // 2. Calculate Angle Delta for Spiral
+    // Ensure we go "forward" (positive dTheta) and complete at least one full circle (+2PI)
+    let dTheta = targetAngleRef - startAngle
+    while (dTheta < 0) dTheta += Math.PI * 2
     
-    // 2. Setup Cubic Bezier Control Points in Local Space
-    // P0: Start
-    const p0 = localStart.clone()
-    
-    // P3: End
-    const p3 = localTarget.clone()
-    
-    // Distance for control point scaling
-    const dist = p0.distanceTo(p3)
-    
-    // P2: Control Point 2 (at ~2/3)
-    // Backtrack from End along Tangent to ensure parallel merge.
-    // Enforce in-plane approach (y=0)
-    const p2 = p3.clone().sub(localTangent.clone().multiplyScalar(dist * 0.5))
-    p2.y = 0 
-    
-    // P1: Control Point 1 (at ~1/3)
-    // Forward from Start.
-    // Maintain off-plane offset (p1.y = p0.y) to delay inclination change
-    // Interpolate X/Z towards P2
-    const p1 = p0.clone().lerp(p2, 0.4)
-    p1.y = p0.y
+    // Add full revolution(s) to "circle the earth completely"
+    // One full extra turn
+    dTheta += Math.PI * 2
 
-    // Generate points
+    // 3. Generate Spiral Points
     const numPoints = Math.max(2, Math.ceil(segments * progress))
     for (let i = 0; i <= numPoints; i++) {
       const t = (i / numPoints) * progress
       
-      // Cubic Bezier: (1-t)^3 P0 + 3(1-t)^2 t P1 + 3(1-t) t^2 P2 + t^3 P3
-      const oneMinusT = 1 - t
-      const b0 = oneMinusT * oneMinusT * oneMinusT
-      const b1 = 3 * oneMinusT * oneMinusT * t
-      const b2 = 3 * oneMinusT * t * t
-      const b3 = t * t * t
+      // Interpolate Angle
+      const currentAngle = startAngle + t * dTheta
       
-      const localPos = new THREE.Vector3()
-        .addScaledVector(p0, b0)
-        .addScaledVector(p1, b1)
-        .addScaledVector(p2, b2)
-        .addScaledVector(p3, b3)
+      // Interpolate Altitude (Radius)
+      // Calculate target radius at the specific current angle (on the ellipse)
+      // Ellipse radius r(theta) = (a*b) / sqrt((b*cos)^2 + (a*sin)^2)
+      // Note: standard ellipse parametric is x=a cos t, z=b sin t.
+      // The radius at parameter t is sqrt((a cos t)^2 + (b sin t)^2)
+      const rEllipse = Math.sqrt(Math.pow(a * Math.cos(currentAngle), 2) + Math.pow(b * Math.sin(currentAngle), 2))
+      
+      // Interpolate from Ground Radius to Ellipse Radius
+      // Quadratic Ease-Out: t * (2 - t) -> Starts fast, flattens at top
+      const groundRadius = GLOBE_RADIUS
+      const altT = t * (2 - t)
+      const currentRadius = groundRadius + (rEllipse - groundRadius) * altT
+      
+      // Interpolate Off-Plane Offset (y)
+      // Decay from start Y to 0
+      // Use (1-t)^2 to flatten the approach to 0
+      const currentY = localStart.y * (1 - t) * (1 - t)
+      
+      // Construct Local Position
+      const x = currentRadius * Math.cos(currentAngle)
+      const z = currentRadius * Math.sin(currentAngle)
+      // Note: r in previous step was magnitude. But wait, x/z are parametric.
+      // Correction: The spiral should interpolate smoothly between a circle (ground) and ellipse (orbit).
+      // But we derived rEllipse using the angle. 
+      // If we use x = r * cos, z = r * sin, we get a point at distance r.
+      // This is effectively blending polar coordinates.
+      
+      const localPos = new THREE.Vector3(x, currentY, z)
 
       // Transform back to World Space
       const worldPos = localPos.clone().applyMatrix4(matrix)
       
-      // Altitude Adjustment
-      // Use Quadratic Ease-Out (t * (2 - t)) to start upward and flatten at orbit
-      const groundRadius = GLOBE_RADIUS
-      const targetRadius = localTarget.length() // Radius in local space is correct
-      
-      const altT = t * (2 - t)
-      const currentRadius = groundRadius + (targetRadius - groundRadius) * altT
-
-      worldPos.normalize().multiplyScalar(currentRadius)
       points.push(worldPos)
     }
 
