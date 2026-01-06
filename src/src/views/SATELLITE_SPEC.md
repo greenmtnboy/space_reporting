@@ -262,7 +262,124 @@ Launch tracks are generated at full length, then revealed via `setDrawRange()`. 
 
 ### Recommendations (Priority Order)
 
-1. **[Low Effort]** Cache original color for decom lerping
+1. **[Low Effort]** Cache original color for decom lerping ✅ Implemented
 2. **[Medium Effort]** Time-binned satellite indexing for O(log n) lookups
-3. **[High Effort]** Move satellite state computation to Web Worker for heavy years
+3. **[Medium Effort]** Web Worker geometry precomputation ✅ Implemented
 4. **[Optional]** Vertex colors for shared materials (diminishing returns)
+
+---
+
+## Web Worker Geometry Precomputation (Implemented)
+
+### Constraints
+
+**Must stay on main thread:**
+- WebGL rendering (`renderer.render()`) - WebGL context tied to main thread
+- DOM access (canvas element)
+- THREE.js scene graph mutations (add/remove objects)
+- Material/geometry GPU uploads
+
+**Can move to Web Worker:**
+- All pure math computation (no DOM/WebGL)
+- Orbit point generation
+- Launch track point generation
+- Orbital parameter calculations (angle searches, matrix transforms)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Main Thread                               │
+├─────────────────────────────────────────────────────────────────┤
+│  loadSatelliteData()                                            │
+│       │                                                          │
+│       ▼                                                          │
+│  ┌──────────────────────┐    postMessage     ┌────────────────┐ │
+│  │ useSatellites        │ ──────────────────▶│ Worker         │ │
+│  │ (sends satellite[])  │                    │                │ │
+│  └──────────────────────┘                    │ Computes:      │ │
+│                                              │ - orbitPoints  │ │
+│  ┌──────────────────────┐    onmessage      │ - launchPoints │ │
+│  │ useOrbits            │ ◀──────────────────│                │ │
+│  │ (receives buffers)   │   Transferable     └────────────────┘ │
+│  └──────────────────────┘   ArrayBuffers                        │
+│       │                                                          │
+│       ▼                                                          │
+│  THREE.BufferGeometry.setAttribute(precomputed)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Implementation
+
+**Location**: `src/workers/geometryWorker.ts`
+
+**Data flow**:
+1. `loadSatelliteData()` fetches JSON, posts satellite array to worker
+2. Worker computes all orbit + launch track `Float32Array` buffers
+3. Worker transfers buffers back via `Transferable` (zero-copy)
+4. `useOrbits` uses precomputed buffers instead of computing on-demand
+
+**Key benefits**:
+- Geometry computation off main thread during load
+- Zero per-satellite math during animation
+- `Transferable` ArrayBuffers = zero-copy transfer
+- Loading spinner can show progress while computing
+
+### Worker API
+
+```typescript
+// Main → Worker
+interface GeometryRequest {
+  type: 'compute'
+  satellites: SatelliteData[]
+}
+
+// Worker → Main
+interface GeometryResponse {
+  type: 'complete'
+  geometries: Map<string, {
+    orbitPositions: Float32Array    // Transferable
+    launchPositions: Float32Array   // Transferable
+    totalOrbitPoints: number
+    totalLaunchPoints: number
+  }>
+}
+
+// Progress updates
+interface GeometryProgress {
+  type: 'progress'
+  completed: number
+  total: number
+}
+```
+
+---
+
+## Bar Chart Active vs Decommissioned Breakdown (Implemented)
+
+### Overview
+
+The bar charts now show a breakdown of **active** vs **decommissioned** satellites, similar to the success/failure breakdown in the launch view.
+
+### Design Choices
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Color scheme** | Green = Active, Red = Decommissioned | Consistent with launch view (green = positive state, red = ended state) |
+| **Reuse Stats interface** | `successes` = active, `failures` = decommissioned | Avoids creating new types; BarChart component already supports this display mode |
+| **Decom threshold** | `currentTime >= decomTimestamp` | A satellite is considered decommissioned once the animation time passes its end_date |
+| **Legend placement** | Between bar charts and orbit legend | Groups chart-related legends together |
+
+### Implementation
+
+**Files modified**:
+- [useSatellites.ts](../composables/useSatellites.ts): `ownerStats` and `orbitTypeStats` now track active vs decommissioned counts
+- [SatellitesView.vue](./SatellitesView.vue): Enabled `showFailures` (default true), added `SatelliteLegend`
+- [SatelliteLegend.vue](../components/SatelliteLegend.vue): New component with "Active" (green) and "Decommissioned" (red) legend items
+
+### Behavior
+
+As the animation progresses:
+1. Newly launched satellites appear in the green (active) portion of bars
+2. When a satellite's `end_date` is reached, it moves from green to red (decommissioned)
+3. The legend clarifies the color meaning: Active vs Decommissioned

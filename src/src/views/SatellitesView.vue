@@ -14,6 +14,7 @@ import ControlPanel from '../components/ControlPanel.vue'
 import BarChart from '../components/BarChart.vue'
 import CompletionModal from '../components/CompletionModal.vue'
 import YearRangeButtons from '../components/YearRangeButtons.vue'
+import SatelliteLegend from '../components/SatelliteLegend.vue'
 
 // Globe container ref
 const globeContainer = ref<HTMLElement | null>(null)
@@ -218,15 +219,15 @@ onUnmounted(() => {
           title="Satellites by Owner"
           :stats="ownerStats"
           :max-total="maxOwnerTotal"
-          :show-failures="false"
         />
 
         <BarChart
           title="Satellites by Orbit Type"
           :stats="orbitTypeStats"
           :max-total="maxOrbitTypeTotal"
-          :show-failures="false"
         />
+
+        <SatelliteLegend />
 
         <div class="orbit-legend">
           <h2>Orbit Types</h2>

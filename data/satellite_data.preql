@@ -6,12 +6,13 @@ select
     jcat,
     name,
     #launch_date,
-    date_add(current_date(), day, -10) as launch_date,
-    current_date() as decom_date,
+    launch_date,
+    coalesce(decom_date, current_date()) as end_date,
     owner.e_name,
+    owner.color,
     perigee,
     apogee,
     inc,
     launch.site.latitude,
     launch.site.longitude
-limit 100;
+;

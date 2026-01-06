@@ -1,6 +1,7 @@
 import { watch, type Ref } from 'vue'
 import * as THREE from 'three'
 import type { ActiveSatellite } from '../types'
+import { getCachedGeometry } from './useGeometryCache'
 
 // Earth radius in km (for scaling)
 const EARTH_RADIUS_KM = 6371
@@ -361,16 +362,19 @@ export function useOrbits(
     let line = orbitLines.get(satellite.jcat)
 
     if (!line) {
-      // Generate points directly to BufferAttribute
-      const positions = generateOrbitPoints(satellite)
+      // Try to use precomputed geometry from worker cache
+      const cached = getCachedGeometry(satellite.jcat)
+      const positions = cached?.orbitPositions ?? generateOrbitPoints(satellite)
+      const totalPoints = cached?.totalOrbitPoints ?? positions.length / 3
+
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
       const material = getCachedMaterial(satellite.owner_color, 0.7)
-      
+
       line = new THREE.Line(geometry, material)
       line.userData.satelliteId = satellite.jcat
-      line.userData.totalPoints = positions.length / 3
+      line.userData.totalPoints = totalPoints
       orbitLines.set(satellite.jcat, line)
       orbitGroup.value.add(line)
     }
@@ -399,14 +403,17 @@ export function useOrbits(
     let line = launchLines.get(satellite.jcat)
 
     if (!line) {
-      // Generate full spiral directly to BufferAttribute
-      const positions = generateLaunchTrackPoints(satellite, 1.0)
+      // Try to use precomputed geometry from worker cache
+      const cached = getCachedGeometry(satellite.jcat)
+      const positions = cached?.launchPositions ?? generateLaunchTrackPoints(satellite, 1.0)
+      const totalPoints = cached?.totalLaunchPoints ?? positions.length / 3
+
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-      geometry.userData = { totalPoints: positions.length / 3 }
+      geometry.userData = { totalPoints }
 
       const material = getCachedMaterial(satellite.owner_color, 1)
-      
+
       line = new THREE.Line(geometry, material)
       line.userData.satelliteId = satellite.jcat
       launchLines.set(satellite.jcat, line)

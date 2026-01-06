@@ -1,5 +1,6 @@
 import { computed, ref, type Ref } from 'vue'
 import type { Satellite, ProcessedSatellite, ActiveSatellite, SatelliteState, SatelliteStats, OrbitTypeStats } from '../types'
+import { computeGeometries } from './useGeometryCache'
 
 // For MVP, load from local file. Can switch to GCS URL later.
 // Use Vite's BASE_URL to handle subpath deployment
@@ -86,11 +87,15 @@ export async function loadSatelliteData(): Promise<void> {
       const data = await response.json()
 
       // Filter out satellites with invalid data
-      satelliteData.value = data.filter((s: Satellite) =>
+      const validSatellites = data.filter((s: Satellite) =>
         s.launch_site_latitude != null &&
         s.launch_site_longitude != null &&
         s.launch_date != null
       )
+      satelliteData.value = validSatellites
+
+      // Precompute all geometry in Web Worker (off main thread)
+      await computeGeometries(validSatellites)
     } catch (err) {
       loadError.value = err instanceof Error ? err.message : 'Unknown error loading data'
       console.error('Failed to load satellite data:', err)
@@ -297,17 +302,22 @@ export function useSatellites(
   })
 
   // Stats by owner
+  // Uses successes = active, failures = decommissioned (repurposing the Stats interface)
   const ownerStats = computed<SatelliteStats[]>(() => {
     const stats: Record<string, SatelliteStats> = {}
+    const time = currentTime.value
 
     accumulatedSatellites.value.forEach(s => {
       const owner = shortenOwnerName(s.owner_e_name)
       if (!stats[owner]) {
         stats[owner] = { name: owner, successes: 0, failures: 0, total: 0 }
       }
-      // For satellites, treat decommissioned as "completed" (success) and active as "ongoing"
-      // Since we don't have success/failure data, just count totals
-      stats[owner].successes++
+      // Active = successes (green), Decommissioned = failures (red)
+      if (time >= s.decomTimestamp) {
+        stats[owner].failures++
+      } else {
+        stats[owner].successes++
+      }
       stats[owner].total++
     })
 
@@ -319,15 +329,22 @@ export function useSatellites(
   })
 
   // Stats by orbit type
+  // Uses successes = active, failures = decommissioned (repurposing the Stats interface)
   const orbitTypeStats = computed<OrbitTypeStats[]>(() => {
     const stats: Record<string, OrbitTypeStats> = {}
+    const time = currentTime.value
 
     accumulatedSatellites.value.forEach(s => {
       const orbitType = s.orbitType
       if (!stats[orbitType]) {
         stats[orbitType] = { name: orbitType, successes: 0, failures: 0, total: 0 }
       }
-      stats[orbitType].successes++
+      // Active = successes (green), Decommissioned = failures (red)
+      if (time >= s.decomTimestamp) {
+        stats[orbitType].failures++
+      } else {
+        stats[orbitType].successes++
+      }
       stats[orbitType].total++
     })
 
