@@ -289,10 +289,18 @@ export function useOrbits(
     const startAngle = Math.atan2(_localPos.z, _localPos.x)
     
     // Target is the closest point on the orbit ellipse
-    const targetAngleRef = findClosestOrbitAngle(satellite, a, b)
+    // findClosestOrbitAngle returns PARAMETRIC angle t
+    const targetParametricAngle = findClosestOrbitAngle(satellite, a, b)
+    
+    // Convert to GEOMETRIC angle phi for consistent interpolation
+    // P = (a cos t, b sin t) -> phi = atan2(y, x)
+    const targetAngleGeo = Math.atan2(
+      b * Math.sin(targetParametricAngle),
+      a * Math.cos(targetParametricAngle)
+    )
     
     // 2. Calculate Angle Delta for Spiral
-    let dTheta = targetAngleRef - startAngle
+    let dTheta = targetAngleGeo - startAngle
     while (dTheta < 0) dTheta += Math.PI * 2
     dTheta += Math.PI * 2 // One full extra turn
 
@@ -305,8 +313,15 @@ export function useOrbits(
       
       const currentAngle = startAngle + t * dTheta
       
-      // Ellipse radius at current angle
-      const rEllipse = Math.sqrt(Math.pow(a * Math.cos(currentAngle), 2) + Math.pow(b * Math.sin(currentAngle), 2))
+      // Ellipse radius at current GEOMETRIC angle
+      // r = (ab) / sqrt( (b cos theta)^2 + (a sin theta)^2 )
+      const cosTheta = Math.cos(currentAngle)
+      const sinTheta = Math.sin(currentAngle)
+      const denom = Math.sqrt(
+        Math.pow(b * cosTheta, 2) + Math.pow(a * sinTheta, 2)
+      )
+      // Safety check for degenerate orbits
+      const rEllipse = denom > 0.0001 ? (a * b) / denom : a
       
       const groundRadius = GLOBE_RADIUS
       const altT = t * (2 - t)
@@ -315,8 +330,8 @@ export function useOrbits(
       // Decay offset
       const currentY = _localPos.y * (1 - t) * (1 - t)
       
-      const x = currentRadius * Math.cos(currentAngle)
-      const z = currentRadius * Math.sin(currentAngle)
+      const x = currentRadius * cosTheta
+      const z = currentRadius * sinTheta
       
       _tempVec3.set(x, currentY, z)
       _tempVec3.applyMatrix4(_matrix)
