@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, nextTick, onUnmounted } from 'vue'
 import type { Stats } from '../types'
 
 defineProps<{
@@ -8,7 +9,86 @@ defineProps<{
   showFailures?: boolean
 }>()
 
-// Default showFailures to true
+// Tooltip state
+const tooltipVisible = ref(false)
+const tooltipText = ref('')
+const tooltipX = ref(0)
+const tooltipY = ref(0)
+const tooltipRef = ref<HTMLElement | null>(null)
+
+let hideTimeout: ReturnType<typeof setTimeout> | null = null
+
+async function showTooltip(event: MouseEvent | TouchEvent, name: string) {
+  if (hideTimeout) {
+    clearTimeout(hideTimeout)
+    hideTimeout = null
+  }
+
+  tooltipText.value = name
+  tooltipVisible.value = true
+
+  // Get position from event
+  const clientX = 'touches' in event ? event.touches[0].clientX : event.clientX
+  const clientY = 'touches' in event ? event.touches[0].clientY : event.clientY
+
+  // Initial position
+  tooltipX.value = clientX
+  tooltipY.value = clientY
+
+  // Wait for render then adjust position if needed
+  await nextTick()
+  if (tooltipRef.value) {
+    const rect = tooltipRef.value.getBoundingClientRect()
+    const padding = 8
+
+    // Adjust horizontal position to keep tooltip in viewport
+    let adjustedX = clientX
+    const halfWidth = rect.width / 2
+
+    if (clientX - halfWidth < padding) {
+      // Too far left - shift right
+      adjustedX = halfWidth + padding
+    } else if (clientX + halfWidth > window.innerWidth - padding) {
+      // Too far right - shift left
+      adjustedX = window.innerWidth - halfWidth - padding
+    }
+
+    // Adjust vertical position if too close to top
+    let adjustedY = clientY
+    if (clientY - rect.height - 12 < padding) {
+      // Show below cursor instead of above
+      adjustedY = clientY + rect.height + 24
+    }
+
+    tooltipX.value = adjustedX
+    tooltipY.value = adjustedY
+  }
+}
+
+function hideTooltip() {
+  // Small delay to allow moving between elements
+  hideTimeout = setTimeout(() => {
+    tooltipVisible.value = false
+  }, 100)
+}
+
+function handleTouchStart(event: TouchEvent, name: string) {
+  event.preventDefault()
+  showTooltip(event, name)
+}
+
+function handleTouchEnd() {
+  // Longer delay for touch to allow reading
+  hideTimeout = setTimeout(() => {
+    tooltipVisible.value = false
+  }, 1500)
+}
+
+onUnmounted(() => {
+  if (hideTimeout) {
+    clearTimeout(hideTimeout)
+  }
+})
 </script>
 
 <template>
@@ -16,7 +96,13 @@ defineProps<{
     <h2>{{ title }}</h2>
     <div class="bar-chart">
       <div v-for="item in stats" :key="item.name" class="bar-row">
-        <div class="bar-label" :title="item.name">{{ item.name }}</div>
+        <div
+          class="bar-label"
+          @mouseenter="showTooltip($event, item.name)"
+          @mouseleave="hideTooltip"
+          @touchstart="handleTouchStart($event, item.name)"
+          @touchend="handleTouchEnd"
+        >{{ item.name }}</div>
         <div class="bar-container">
           <div
             class="bar-success"
@@ -43,6 +129,21 @@ defineProps<{
         <div class="bar-total">{{ item.total }}</div>
       </div>
     </div>
+
+    <!-- Custom tooltip -->
+    <Teleport to="body">
+      <div
+        v-if="tooltipVisible"
+        ref="tooltipRef"
+        class="bar-chart-tooltip"
+        :style="{
+          left: tooltipX + 'px',
+          top: tooltipY + 'px'
+        }"
+      >
+        {{ tooltipText }}
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -78,6 +179,7 @@ defineProps<{
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text-secondary);
+  cursor: pointer;
 }
 
 .bar-container {
@@ -130,5 +232,35 @@ defineProps<{
   font-weight: 600;
   text-align: right;
   color: var(--color-text);
+}
+</style>
+
+<!-- Global styles for teleported tooltip -->
+<style>
+.bar-chart-tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%) translateY(-12px);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  max-width: 90vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .bar-chart-tooltip {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
 }
 </style>
