@@ -2,9 +2,8 @@ import { computed, ref, type Ref } from 'vue'
 import type { Satellite, ProcessedSatellite, ActiveSatellite, SatelliteState, SatelliteStats, OrbitTypeStats } from '../types'
 import { computeGeometries } from './useGeometryCache'
 
-// For MVP, load from local file. Can switch to GCS URL later.
-// Use Vite's BASE_URL to handle subpath deployment
-const DATA_URL = `${import.meta.env.BASE_URL}raw_satellite_data.json`
+// Load satellite data from public GCS bucket
+const DATA_URL = 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/satellites_over_time/raw_data_two.json'
 
 // Shared state for satellite data (loaded once, shared across all useSatellites calls)
 const satelliteData = ref<Satellite[]>([])
@@ -99,6 +98,8 @@ export async function loadSatelliteData(): Promise<void> {
     } catch (err) {
       loadError.value = err instanceof Error ? err.message : 'Unknown error loading data'
       console.error('Failed to load satellite data:', err)
+      // Reset loadPromise so retry can attempt again
+      loadPromise = null
     } finally {
       isLoading.value = false
     }

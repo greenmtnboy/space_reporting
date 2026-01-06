@@ -336,6 +336,16 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
     cleanup()
   })
 
+  // Get camera for external use (raycasting, etc.)
+  function getCamera(): THREE.PerspectiveCamera {
+    return state.camera
+  }
+
+  // Get renderer for external use
+  function getRenderer(): THREE.WebGLRenderer | null {
+    return state.renderer
+  }
+
   return {
     init,
     cleanup,
@@ -343,6 +353,8 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
     latLngToVector3,
     getOrbitGroup,
     getScene,
+    getCamera,
+    getRenderer,
     EARTH_RADIUS
   }
 }

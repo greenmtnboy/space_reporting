@@ -8,6 +8,8 @@ import { useYearRange } from '../composables/useYearRange'
 import { useSatellites, loadSatelliteData, useSatelliteDataStatus } from '../composables/useSatellites'
 import { useOrbits } from '../composables/useOrbits'
 import { useGlobe } from '../composables/useGlobe'
+// TODO: Satellite markers - disabled pending debugging
+// import { useSatelliteMarkers } from '../composables/useSatelliteMarkers'
 
 // Components
 import ControlPanel from '../components/ControlPanel.vue'
@@ -15,6 +17,8 @@ import BarChart from '../components/BarChart.vue'
 import CompletionModal from '../components/CompletionModal.vue'
 import YearRangeButtons from '../components/YearRangeButtons.vue'
 import SatelliteLegend from '../components/SatelliteLegend.vue'
+// TODO: Satellite tooltip - disabled pending debugging
+// import SatelliteTooltip from '../components/SatelliteTooltip.vue'
 
 // Globe container ref
 const globeContainer = ref<HTMLElement | null>(null)
@@ -63,6 +67,9 @@ const {
   isInitialized: isGlobeInitialized,
   latLngToVector3,
   getOrbitGroup
+  // TODO: For satellite markers - disabled pending debugging
+  // getCamera,
+  // getRenderer
 } = useGlobe(globeContainer)
 
 // Initialize satellites
@@ -84,6 +91,10 @@ const { isLoading: isDataLoading, loadError } = useSatelliteDataStatus()
 // Initialize orbits after globe is ready
 let orbitsCleanup: (() => void) | null = null
 
+// TODO: Satellite markers for hover interaction - disabled pending debugging
+// let markersCleanup: (() => void) | null = null
+// let hoveredSatellite: ReturnType<typeof useSatelliteMarkers>['hoveredSatellite'] | null = null
+
 watch(isGlobeInitialized, (initialized) => {
   if (initialized) {
     orbitGroupRef.value = getOrbitGroup()
@@ -96,6 +107,17 @@ watch(isGlobeInitialized, (initialized) => {
       latLngToVector3
     )
     orbitsCleanup = cleanup
+
+    // TODO: Satellite markers for hover interaction - disabled pending debugging
+    // const markers = useSatelliteMarkers(
+    //   orbitGroupRef,
+    //   orbitingSatellites,
+    //   getCamera,
+    //   getRenderer
+    // )
+    // markers.setup()
+    // markersCleanup = markers.cleanup
+    // hoveredSatellite = markers.hoveredSatellite
   }
 })
 
@@ -138,6 +160,10 @@ onUnmounted(() => {
   if (orbitsCleanup) {
     orbitsCleanup()
   }
+  // TODO: Satellite markers cleanup - disabled pending debugging
+  // if (markersCleanup) {
+  //   markersCleanup()
+  // }
   window.removeEventListener('keydown', handleKeydown)
 })
 </script>
