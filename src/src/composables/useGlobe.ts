@@ -1,5 +1,6 @@
 import { ref, onUnmounted, type Ref } from 'vue'
 import * as THREE from 'three'
+import { useContinentOutlines } from './useContinentOutlines'
 
 const EARTH_RADIUS = 1 // Normalized radius for the globe
 const GLOBE_COLOR = 0x005b96 // Slightly brighter base color for the globe
@@ -27,6 +28,9 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
   // Animation frame ID for cleanup
   let animationFrameId: number | null = null
   let resizeObserver: ResizeObserver | null = null
+
+  // Continent outlines
+  const continentOutlines = useContinentOutlines({ earthRadius: EARTH_RADIUS })
 
   // Globe rotation speed (radians per frame at 60fps)
   const autoRotationSpeed = 0.001
@@ -73,6 +77,10 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
     })
     state.globe = new THREE.Mesh(geometry, material)
     state.scene.add(state.globe)
+
+    // Add continent outlines as child of globe so they rotate together
+    const outlineGroup = continentOutlines.buildOutlines()
+    state.globe.add(outlineGroup)
 
     // Add orbit group to scene
     state.scene.add(state.orbitGroup)
@@ -285,6 +293,9 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
       state.renderer.dispose()
       state.renderer.domElement.remove()
     }
+
+    // Dispose continent outlines
+    continentOutlines.dispose()
 
     // Dispose geometries and materials
     state.scene.traverse((object) => {

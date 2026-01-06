@@ -50,6 +50,7 @@ const GLOBE_RADIUS = 1
 const KM_TO_UNITS = GLOBE_RADIUS / EARTH_RADIUS_KM
 const ORBIT_SEGMENTS = 128
 const LAUNCH_LINE_SEGMENTS = 128
+const SURFACE_BIAS = 0.0005 // Stay slightly above globe triangles
 
 // --- Pure math helpers (no THREE.js) ---
 
@@ -389,6 +390,10 @@ function generateLaunchTrackPoints(satellite: SatelliteInput): Float32Array {
   const totalPoints = numPoints + 1
   const positions = new Float32Array(totalPoints * 3)
 
+  // Spherical interpolation parameters
+  const R_start = 1.0 + SURFACE_BIAS
+  const phi_start = Math.asin(Math.max(-1, Math.min(1, localPos.y)))
+
   for (let i = 0; i <= numPoints; i++) {
     const t = (i / numPoints) * progress
     const currentAngle = startAngle + t * dTheta
@@ -400,13 +405,19 @@ function generateLaunchTrackPoints(satellite: SatelliteInput): Float32Array {
     )
     const rEllipse = denom > 0.0001 ? (a * b) / denom : a
 
-    const groundRadius = GLOBE_RADIUS
+    // Interpolate Radius R
     const altT = t * (2 - t)
-    const currentRadius = groundRadius + (rEllipse - groundRadius) * altT
-    const currentY = localPos.y * (1 - t) * (1 - t)
+    const currentR = R_start + (rEllipse - R_start) * altT
+    
+    // Interpolate Inclination phi (smooth merge to 0)
+    const currentPhi = phi_start * (1 - t) * (1 - t)
 
-    const x = currentRadius * cosTheta
-    const z = currentRadius * sinTheta
+    // Convert local spherical to local cartesian
+    const currentY = currentR * Math.sin(currentPhi)
+    const currentCylR = currentR * Math.cos(currentPhi)
+    
+    const x = currentCylR * cosTheta
+    const z = currentCylR * sinTheta
 
     const transformed = vec3ApplyMatrix4(x, currentY, z, matrix)
     positions[i * 3] = transformed.x
