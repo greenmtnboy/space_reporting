@@ -396,17 +396,18 @@ On smaller desktop screens and mobile devices, the fixed `height: 60vh` on the g
 
 ### Solution
 
-Replaced fixed vh units with flexible constraints:
+Replaced fixed vh units with `calc()`-based constraints that reserve space for the control panel:
 
-| Breakpoint | Globe Section | Chart Section |
-|------------|---------------|---------------|
+| Breakpoint | Globe Container | Chart Section |
+|------------|-----------------|---------------|
 | > 900px | `flex: 1`, aspect-ratio: 1 | Fixed 300px sidebar |
-| 600-900px | `max-height: 50vh`, `min-height: 250px` | Flexible, scrollable |
-| < 600px | `max-height: 45vh` | `max-height: 40vh`, compact legends |
+| 600-900px | `max-height: calc(50vh - 80px)` | `max-height: 35vh`, scrollable |
+| < 600px | `max-height: calc(45vh - 70px)` | `max-height: 30vh`, compact legends |
 
 ### Key Design Choices
 
-1. **Flexible sizing over fixed heights**: Using `max-height` constraints with `flex: 1` allows the globe to shrink when needed while maintaining usable size
+1. **calc() for control panel space**: Globe container uses `calc(50vh - 80px)` to explicitly reserve ~80px for the control panel buttons
 2. **Aspect ratio preservation**: Keeping `aspect-ratio: 1` on the globe container maintains the proper spherical rendering
-3. **Compact orbit legend on mobile**: Legend items displayed in horizontal rows to reduce vertical space usage
-4. **Scrollable chart section**: At 600px breakpoint, chart section becomes scrollable with `max-height: 40vh` to ensure controls remain visible
+3. **overflow: visible on globe-section**: Allows control panel to remain visible even when globe section is constrained
+4. **Compact orbit legend on mobile**: Legend items displayed in horizontal rows to reduce vertical space usage
+5. **Scrollable chart section**: Chart section is scrollable with constrained max-height to ensure controls remain visible
