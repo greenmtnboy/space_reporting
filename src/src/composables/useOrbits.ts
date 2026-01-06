@@ -15,6 +15,7 @@ const ORBIT_SEGMENTS = 128
 
 // Launch line settings
 const LAUNCH_LINE_SEGMENTS = 128 // Segments for curved launch arc
+const SURFACE_BIAS = 0.0005 // Stay slightly above globe triangles
 
 // Decom colors (gradient from normal to red)
 const DECOM_END_COLOR = new THREE.Color(0xff4444)
@@ -305,13 +306,14 @@ export function useOrbits(
     while (dTheta < 0) dTheta += Math.PI * 2
     dTheta += Math.PI * 2 // One full extra turn
 
-    // Calculate starting cylindrical radius (r_xz) in local space
-    // We need this because if y != 0 (off-plane), r_xz must be < 1.0 for the point to be on the sphere (R=1.0)
-    const localStartRadius = Math.sqrt(_localPos.x * _localPos.x + _localPos.z * _localPos.z)
-
     const numPoints = Math.max(2, Math.ceil(segments * progress))
     const totalPoints = numPoints + 1
     const positions = new Float32Array(totalPoints * 3)
+
+    // Spherical interpolation parameters
+    // Use a tiny bias to stay above the globe's triangle mesh
+    const R_start = 1.0 + SURFACE_BIAS
+    const phi_start = Math.asin(Math.max(-1, Math.min(1, _localPos.y)))
 
     for (let i = 0; i <= numPoints; i++) {
       const t = (i / numPoints) * progress
@@ -319,24 +321,28 @@ export function useOrbits(
       const currentAngle = startAngle + t * dTheta
       
       // Ellipse radius at current GEOMETRIC angle
-      // r = (ab) / sqrt( (b cos theta)^2 + (a sin theta)^2 )
       const cosTheta = Math.cos(currentAngle)
       const sinTheta = Math.sin(currentAngle)
       const denom = Math.sqrt(
         Math.pow(b * cosTheta, 2) + Math.pow(a * sinTheta, 2)
       )
-      // Safety check for degenerate orbits
       const rEllipse = denom > 0.0001 ? (a * b) / denom : a
       
-      // Interpolate from Local Start Radius to Ellipse Radius
+      // Interpolate Radius R
+      // Quadratic Ease-Out: starts fast, flattens at top
       const altT = t * (2 - t)
-      const currentRadius = localStartRadius + (rEllipse - localStartRadius) * altT
+      const currentR = R_start + (rEllipse - R_start) * altT
       
-      // Decay offset
-      const currentY = _localPos.y * (1 - t) * (1 - t)
+      // Interpolate Inclination phi (smooth decay to 0)
+      // Quadratic Ease-In: flattens as it approaches 0 (orbital plane)
+      const currentPhi = phi_start * (1 - t) * (1 - t)
+
+      // Convert local spherical to local cartesian
+      const currentY = currentR * Math.sin(currentPhi)
+      const currentCylR = currentR * Math.cos(currentPhi)
       
-      const x = currentRadius * cosTheta
-      const z = currentRadius * sinTheta
+      const x = currentCylR * cosTheta
+      const z = currentCylR * sinTheta
       
       _tempVec3.set(x, currentY, z)
       _tempVec3.applyMatrix4(_matrix)
