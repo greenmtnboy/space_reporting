@@ -327,23 +327,24 @@ onUnmounted(() => {
 
 @media (max-width: 900px) {
   .globe-section {
-    flex: 1;
-    min-height: 250px;
-    max-height: 50vh;
+    flex: 1 1 auto;
+    min-height: 200px;
+    overflow: visible;
   }
 
   .globe-container {
     max-width: 100%;
+    flex: 0 1 auto;
+    width: 100%;
+    height: auto;
+    max-height: calc(50vh - 80px);
     aspect-ratio: 1;
-    flex: 1;
-    min-height: 0;
-    max-height: 100%;
   }
 }
 
 @media (max-width: 600px) {
-  .globe-section {
-    max-height: 45vh;
+  .globe-container {
+    max-height: calc(45vh - 70px);
   }
 }
 
@@ -419,8 +420,8 @@ onUnmounted(() => {
 /* Responsive chart section for satellite view */
 @media (max-width: 900px) {
   .chart-section {
-    max-height: none;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    max-height: 35vh;
     overflow-y: auto;
     padding: 0.5rem;
   }
@@ -440,7 +441,7 @@ onUnmounted(() => {
 
 @media (max-width: 600px) {
   .chart-section {
-    max-height: 40vh;
+    max-height: 30vh;
     flex-wrap: nowrap;
     flex-direction: column;
     gap: 0.5rem;
