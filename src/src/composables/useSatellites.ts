@@ -112,31 +112,69 @@ export function useSatelliteDataStatus() {
   return { isLoading, loadError }
 }
 
+export interface SatelliteFilters {
+  owners: Set<string>
+  orbitTypes: Set<string>
+}
+
+// Extended ProcessedSatellite with shortened owner name for filtering
+interface ProcessedSatelliteWithOwner extends ProcessedSatellite {
+  shortenedOwner: string
+}
+
 export function useSatellites(
   currentTime: Ref<number>,
   _isComplete: Ref<boolean>,
   rangeStart: Ref<number>,
   rangeEnd: Ref<number>,
   rangeDuration: Ref<number>,
-  animationDurationMs: Ref<number>
+  animationDurationMs: Ref<number>,
+  filters?: Ref<SatelliteFilters>
 ) {
   // All satellites processed (not filtered by range)
-  const allSatellites = computed<ProcessedSatellite[]>(() => {
+  const allSatellites = computed<ProcessedSatelliteWithOwner[]>(() => {
     return satelliteData.value
       .map(s => ({
         ...s,
         launchTimestamp: new Date(s.launch_date).getTime(),
         decomTimestamp: new Date(s.end_date).getTime(),
-        orbitType: getOrbitType(s.perigee, s.apogee)
+        orbitType: getOrbitType(s.perigee, s.apogee),
+        shortenedOwner: shortenOwnerName(s.owner_e_name)
       }))
       .sort((a, b) => a.launchTimestamp - b.launchTimestamp)
   })
 
   // Satellites filtered by selected year range (launched within range)
-  const satellites = computed<ProcessedSatellite[]>(() => {
+  const satellites = computed<ProcessedSatelliteWithOwner[]>(() => {
     return allSatellites.value.filter(s =>
       s.launchTimestamp >= rangeStart.value && s.launchTimestamp <= rangeEnd.value
     )
+  })
+
+  // Check if a satellite matches the current filters
+  function matchesFilters(satellite: ProcessedSatelliteWithOwner): boolean {
+    if (!filters?.value) return true
+
+    const { owners, orbitTypes } = filters.value
+
+    // If no filters are active, show all
+    if (owners.size === 0 && orbitTypes.size === 0) {
+      return true
+    }
+
+    // Check owner filter (using shortened name)
+    const ownerMatch = owners.size === 0 || owners.has(satellite.shortenedOwner)
+
+    // Check orbit type filter
+    const orbitMatch = orbitTypes.size === 0 || orbitTypes.has(satellite.orbitType)
+
+    // Both must match (AND logic when both filters are active)
+    return ownerMatch && orbitMatch
+  }
+
+  // Filtered satellites (by cross-filter)
+  const filteredSatellites = computed<ProcessedSatelliteWithOwner[]>(() => {
+    return satellites.value.filter(matchesFilters)
   })
 
   // Animation timing parameters (in days)
@@ -144,7 +182,7 @@ export function useSatellites(
   const LEO_LAUNCH_DAYS = 2        // Days for LEO (~400km) launch track to reach orbit
   const MAX_LAUNCH_DAYS = 8        // Days for highest orbits (capped altitude) to reach orbit
   const MAX_ORBIT_ALTITUDE_KM = 36000  // Cap altitude for timing calculation
-  
+
   // Screen time constants (ms)
   const HOLD_DURATION_SCREEN_MS = 0 // Start fading immediately after reaching orbit
   const FADE_DURATION_SCREEN_MS = 3000 // Fade out over 10s
@@ -172,14 +210,14 @@ export function useSatellites(
   // Get satellite state and animation progress
   function getSatelliteState(satellite: ProcessedSatellite, time: number): { state: SatelliteState; launchProgress: number; launchOpacity: number; decomProgress: number; orbitProgress: number } {
     const ascentDurationMs = getAscentDurationMs(satellite)
-    
+
     // Convert screen time to simulation time
     const simTimePerScreenMs = rangeDuration.value / Math.max(animationDurationMs.value, 1)
     const holdDurationMs = HOLD_DURATION_SCREEN_MS * simTimePerScreenMs
     const fadeDurationMs = FADE_DURATION_SCREEN_MS * simTimePerScreenMs
-    
+
     const totalLaunchWindowMs = ascentDurationMs + holdDurationMs + fadeDurationMs
-    
+
     const decomWindowMs = DECOM_TRACK_DECAY_DAYS * 24 * 60 * 60 * 1000
     const orbitRevealMs = ORBIT_REVEAL_DAYS * 24 * 60 * 60 * 1000
 
@@ -193,7 +231,7 @@ export function useSatellites(
     if (timeSinceLaunch < totalLaunchWindowMs) {
       let launchProgress = 0
       let launchOpacity = 1
-      
+
       if (timeSinceLaunch < ascentDurationMs) {
         // Ascent Phase
         launchProgress = timeSinceLaunch / ascentDurationMs
@@ -211,9 +249,9 @@ export function useSatellites(
 
       // Orbit starts drawing when ascent completes (at ascentDurationMs)
       // Even though state is 'launching', we can calculate orbitProgress to see if we should start drawing orbit
-      // But filtering logic typically hides 'launching' satellites from orbit list. 
+      // But filtering logic typically hides 'launching' satellites from orbit list.
       // We'll address orbit visibility in the `orbitingSatellites` computed property.
-      
+
       const timeSinceInsertion = timeSinceLaunch - ascentDurationMs
       const orbitProgress = timeSinceInsertion > 0 ? Math.min(timeSinceInsertion / orbitRevealMs, 1) : 0
 
@@ -249,7 +287,7 @@ export function useSatellites(
     // Buffer to keep satellites around for decom animation
     const decomBufferMs = DECOM_TRACK_DECAY_DAYS * 24 * 60 * 60 * 1000
 
-    return satellites.value
+    return filteredSatellites.value
       .filter(s => {
         // Broad phase filtering:
         // Include if launch has happened (or is impending if we wanted pre-launch, but we don't)
@@ -297,8 +335,13 @@ export function useSatellites(
     return activeSatellites.value.filter(s => s.state === 'decommissioning')
   })
 
-  // Accumulated satellites (all that have launched up to current time)
+  // Accumulated satellites (filtered)
   const accumulatedSatellites = computed(() => {
+    return filteredSatellites.value.filter(s => s.launchTimestamp <= currentTime.value)
+  })
+
+  // Stats are computed from ALL satellites (not filtered) so users can see all available options
+  const allAccumulatedSatellites = computed(() => {
     return satellites.value.filter(s => s.launchTimestamp <= currentTime.value)
   })
 
@@ -308,8 +351,8 @@ export function useSatellites(
     const stats: Record<string, SatelliteStats> = {}
     const time = currentTime.value
 
-    accumulatedSatellites.value.forEach(s => {
-      const owner = shortenOwnerName(s.owner_e_name)
+    allAccumulatedSatellites.value.forEach(s => {
+      const owner = s.shortenedOwner
       if (!stats[owner]) {
         stats[owner] = { name: owner, successes: 0, failures: 0, total: 0 }
       }
@@ -335,7 +378,7 @@ export function useSatellites(
     const stats: Record<string, OrbitTypeStats> = {}
     const time = currentTime.value
 
-    accumulatedSatellites.value.forEach(s => {
+    allAccumulatedSatellites.value.forEach(s => {
       const orbitType = s.orbitType
       if (!stats[orbitType]) {
         stats[orbitType] = { name: orbitType, successes: 0, failures: 0, total: 0 }
@@ -362,6 +405,7 @@ export function useSatellites(
 
   return {
     satellites,
+    filteredSatellites,
     activeSatellites,
     orbitingSatellites,
     launchingSatellites,

@@ -411,3 +411,46 @@ Replaced fixed vh units with `calc()`-based constraints that reserve space for t
 3. **overflow: visible on globe-section**: Allows control panel to remain visible even when globe section is constrained
 4. **Compact orbit legend on mobile**: Legend items displayed in horizontal rows to reduce vertical space usage
 5. **Scrollable chart section**: Chart section is scrollable with constrained max-height to ensure controls remain visible
+
+---
+
+## Cross-Filter Bar Charts (2026-01-06)
+
+### Overview
+
+Bar charts now support interactive cross-filtering, allowing users to click on bars to filter the visualization. Filters are persisted in the URL for sharing.
+
+### Implementation
+
+**Files added/modified**:
+- `useCrossFilter.ts`: New composable managing filter state and URL persistence
+- `FilterChips.vue`: New component displaying active filters with clear buttons
+- `BarChart.vue`: Updated to support `clickable` prop and `selectedItems` highlighting
+- `useSatellites.ts`: Updated to accept optional filter ref and apply filtering to satellite data
+- `SatellitesView.vue`: Integrated cross-filter composable and FilterChips component
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Click to filter** | Clicking a bar toggles filter for that item (owner or orbit type) |
+| **Visual feedback** | Selected bars highlighted with cyan glow; non-selected bars dimmed |
+| **Filter chips** | Active filters shown in chips bar below header with remove buttons |
+| **Clear all** | Button to clear all active filters at once |
+| **URL persistence** | Filters encoded in URL query params (`?owner=NASA&orbit=LEO`) |
+| **Shareable links** | URL with filters can be shared to show same filtered view |
+| **Cross-chart filtering** | Selecting "LEO" orbit type filters to only LEO satellites across all charts |
+
+### URL Parameter Schema
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `owner` | Satellite owner filter(s) | `?owner=NASA&owner=SpaceX` |
+| `orbit` | Orbit type filter(s) | `?orbit=LEO&orbit=GEO` |
+
+### Design Choices
+
+1. **Stats show all data**: Bar charts display stats for ALL satellites (not filtered) so users can see available filter options
+2. **AND logic for multiple filters**: When both owner and orbit type filters are active, satellites must match both
+3. **Toggle behavior**: Clicking same bar again removes the filter (toggle on/off)
+4. **Dimming non-selected**: When filters active, non-matching bars shown at 40% opacity for context

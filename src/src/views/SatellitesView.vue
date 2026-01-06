@@ -6,8 +6,10 @@ import * as THREE from 'three'
 import { useAnimation } from '../composables/useAnimation'
 import { useYearRange } from '../composables/useYearRange'
 import { useSatellites, loadSatelliteData, useSatelliteDataStatus } from '../composables/useSatellites'
+import type { SatelliteFilters } from '../composables/useSatellites'
 import { useOrbits } from '../composables/useOrbits'
 import { useGlobe } from '../composables/useGlobe'
+import { useCrossFilter } from '../composables/useCrossFilter'
 // TODO: Satellite markers - disabled pending debugging
 // import { useSatelliteMarkers } from '../composables/useSatelliteMarkers'
 
@@ -17,6 +19,7 @@ import BarChart from '../components/BarChart.vue'
 import CompletionModal from '../components/CompletionModal.vue'
 import YearRangeButtons from '../components/YearRangeButtons.vue'
 import SatelliteLegend from '../components/SatelliteLegend.vue'
+import FilterChips from '../components/FilterChips.vue'
 // TODO: Satellite tooltip - disabled pending debugging
 // import SatelliteTooltip from '../components/SatelliteTooltip.vue'
 
@@ -72,6 +75,22 @@ const {
   // getRenderer
 } = useGlobe(globeContainer)
 
+// Initialize cross-filter
+const {
+  owners: selectedOwners,
+  orbitTypes: selectedOrbitTypes,
+  activeFilters,
+  toggleFilter,
+  removeFilter,
+  clearAllFilters
+} = useCrossFilter()
+
+// Create filters ref for useSatellites
+const satelliteFilters = computed<SatelliteFilters>(() => ({
+  owners: selectedOwners.value,
+  orbitTypes: selectedOrbitTypes.value
+}))
+
 // Initialize satellites
 const {
   activeSatellites,
@@ -83,7 +102,7 @@ const {
   maxOwnerTotal,
   orbitTypeStats,
   maxOrbitTypeTotal
-} = useSatellites(currentTime, isComplete, rangeStart, rangeEnd, rangeDuration, satelliteAnimationDurationMs)
+} = useSatellites(currentTime, isComplete, rangeStart, rangeEnd, rangeDuration, satelliteAnimationDurationMs, satelliteFilters)
 
 // Data loading status
 const { isLoading: isDataLoading, loadError } = useSatelliteDataStatus()
@@ -144,6 +163,19 @@ function handleYearRangeSelect(rangeId: string) {
   selectRange(rangeId)
 }
 
+// Cross-filter handlers
+function handleOwnerClick(name: string) {
+  toggleFilter('owner', name)
+}
+
+function handleOrbitTypeClick(name: string) {
+  toggleFilter('orbitType', name)
+}
+
+function handleFilterRemove(type: Parameters<typeof removeFilter>[0], value: string) {
+  removeFilter(type, value)
+}
+
 onMounted(async () => {
   // Load satellite data from local JSON
   await loadSatelliteData()
@@ -202,6 +234,13 @@ onUnmounted(() => {
       <div class="date-display desktop-only">{{ currentDateDisplay }}</div>
     </header>
 
+    <!-- Filter Chips -->
+    <FilterChips
+      :filters="activeFilters"
+      @remove="handleFilterRemove"
+      @clear-all="clearAllFilters"
+    />
+
     <main class="main-content">
       <div class="globe-section">
         <div
@@ -246,6 +285,9 @@ onUnmounted(() => {
           :stats="ownerStats"
           :max-total="maxOwnerTotal"
           :show-failures="true"
+          :clickable="true"
+          :selected-items="selectedOwners"
+          @item-click="handleOwnerClick"
         />
 
         <BarChart
@@ -253,6 +295,9 @@ onUnmounted(() => {
           :stats="orbitTypeStats"
           :max-total="maxOrbitTypeTotal"
           :show-failures="true"
+          :clickable="true"
+          :selected-items="selectedOrbitTypes"
+          @item-click="handleOrbitTypeClick"
         />
 
         <SatelliteLegend />

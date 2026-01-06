@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import type { ActiveLaunch } from '../composables/useLaunches'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import type { ActiveLaunch, LaunchFilters } from '../composables/useLaunches'
 
 // Composables
 import { useAnimation } from '../composables/useAnimation'
@@ -9,6 +9,7 @@ import { useLaunches, loadLaunchData, useLaunchDataStatus } from '../composables
 import { useMapTiles } from '../composables/useMapTiles'
 import { useSound } from '../composables/useSound'
 import { useYearRange } from '../composables/useYearRange'
+import { useCrossFilter } from '../composables/useCrossFilter'
 
 // Components
 import MapTiles from '../components/MapTiles.vue'
@@ -19,6 +20,7 @@ import BarChart from '../components/BarChart.vue'
 import ChartLegend from '../components/ChartLegend.vue'
 import CompletionModal from '../components/CompletionModal.vue'
 import YearRangeButtons from '../components/YearRangeButtons.vue'
+import FilterChips from '../components/FilterChips.vue'
 
 // Reactive dimensions for responsiveness
 const mapContainer = ref<HTMLElement | null>(null)
@@ -63,6 +65,22 @@ const {
   cleanupEventListeners
 } = useCamera(mapContainer, mapWidth, mapHeight)
 
+// Initialize cross-filter
+const {
+  organizations: selectedOrganizations,
+  vehicles: selectedVehicles,
+  activeFilters,
+  toggleFilter,
+  removeFilter,
+  clearAllFilters
+} = useCrossFilter()
+
+// Create filters ref for useLaunches
+const launchFilters = computed<LaunchFilters>(() => ({
+  organizations: selectedOrganizations.value,
+  vehicles: selectedVehicles.value
+}))
+
 const {
   activeLaunches,
   accumulatedLaunches,
@@ -70,7 +88,7 @@ const {
   maxOrgTotal,
   vehicleStats,
   maxVehicleTotal
-} = useLaunches(currentTime, isComplete, rangeStart, rangeEnd, rangeDuration, animationDurationMs)
+} = useLaunches(currentTime, isComplete, rangeStart, rangeEnd, rangeDuration, animationDurationMs, launchFilters)
 
 const { tileUrls, handleTileLoad } = useMapTiles(camera, mapWidth, mapHeight)
 
@@ -124,6 +142,19 @@ function handleYearRangeSelect(rangeId: string) {
   selectRange(rangeId)
   // Animation reset is handled by watch in useAnimation
   resetSeenLaunches()
+}
+
+// Cross-filter handlers
+function handleOrgClick(name: string) {
+  toggleFilter('organization', name)
+}
+
+function handleVehicleClick(name: string) {
+  toggleFilter('vehicle', name)
+}
+
+function handleFilterRemove(type: Parameters<typeof removeFilter>[0], value: string) {
+  removeFilter(type, value)
 }
 
 let resizeObserver: ResizeObserver | null = null
@@ -196,6 +227,13 @@ onUnmounted(() => {
       <div class="date-display desktop-only">{{ currentDateDisplay }}</div>
     </header>
 
+    <!-- Filter Chips -->
+    <FilterChips
+      :filters="activeFilters"
+      @remove="handleFilterRemove"
+      @clear-all="clearAllFilters"
+    />
+
     <main class="main-content">
       <div class="map-section">
         <div
@@ -260,12 +298,18 @@ onUnmounted(() => {
           title="Launches by Provider"
           :stats="orgStats"
           :max-total="maxOrgTotal"
+          :clickable="true"
+          :selected-items="selectedOrganizations"
+          @item-click="handleOrgClick"
         />
 
         <BarChart
           title="Launches by Vehicle"
           :stats="vehicleStats"
           :max-total="maxVehicleTotal"
+          :clickable="true"
+          :selected-items="selectedVehicles"
+          @item-click="handleVehicleClick"
         />
 
         <ChartLegend />
