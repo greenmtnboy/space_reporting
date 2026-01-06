@@ -400,7 +400,7 @@ Replaced fixed vh units with `calc()`-based constraints that reserve space for t
 
 | Breakpoint | Globe Container | Chart Section |
 |------------|-----------------|---------------|
-| > 900px | `flex: 1`, aspect-ratio: 1 | Fixed 300px sidebar |
+| > 900px | `max-height: calc(100vh - 200px)`, aspect-ratio: 1 | Fixed 300px sidebar |
 | 600-900px | `max-height: calc(50vh - 80px)` | `max-height: 35vh`, scrollable |
 | < 600px | `max-height: calc(45vh - 70px)` | `max-height: 30vh`, compact legends |
 
