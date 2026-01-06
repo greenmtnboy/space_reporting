@@ -383,3 +383,30 @@ As the animation progresses:
 1. Newly launched satellites appear in the green (active) portion of bars
 2. When a satellite's `end_date` is reached, it moves from green to red (decommissioned)
 3. The legend clarifies the color meaning: Active vs Decommissioned
+
+---
+
+## Responsive Design (2026-01-06)
+
+### Problem
+
+On smaller desktop screens and mobile devices, the fixed `height: 60vh` on the globe container caused:
+- Control panel buttons pushed off the bottom of the viewport
+- Overflow issues with the combined height of header, globe, charts, and footer
+
+### Solution
+
+Replaced fixed vh units with flexible constraints:
+
+| Breakpoint | Globe Section | Chart Section |
+|------------|---------------|---------------|
+| > 900px | `flex: 1`, aspect-ratio: 1 | Fixed 300px sidebar |
+| 600-900px | `max-height: 50vh`, `min-height: 250px` | Flexible, scrollable |
+| < 600px | `max-height: 45vh` | `max-height: 40vh`, compact legends |
+
+### Key Design Choices
+
+1. **Flexible sizing over fixed heights**: Using `max-height` constraints with `flex: 1` allows the globe to shrink when needed while maintaining usable size
+2. **Aspect ratio preservation**: Keeping `aspect-ratio: 1` on the globe container maintains the proper spherical rendering
+3. **Compact orbit legend on mobile**: Legend items displayed in horizontal rows to reduce vertical space usage
+4. **Scrollable chart section**: At 600px breakpoint, chart section becomes scrollable with `max-height: 40vh` to ensure controls remain visible

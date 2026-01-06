@@ -326,10 +326,24 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
+  .globe-section {
+    flex: 1;
+    min-height: 250px;
+    max-height: 50vh;
+  }
+
   .globe-container {
     max-width: 100%;
-    aspect-ratio: auto;
-    height: 60vh;
+    aspect-ratio: 1;
+    flex: 1;
+    min-height: 0;
+    max-height: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .globe-section {
+    max-height: 45vh;
   }
 }
 
@@ -400,5 +414,57 @@ onUnmounted(() => {
 
 .legend-desc {
   color: var(--color-text-muted);
+}
+
+/* Responsive chart section for satellite view */
+@media (max-width: 900px) {
+  .chart-section {
+    max-height: none;
+    flex: 0 0 auto;
+    overflow-y: auto;
+    padding: 0.5rem;
+  }
+
+  .orbit-legend {
+    flex: 1;
+    min-width: 200px;
+    margin-top: 0;
+  }
+
+  .legend-items {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .chart-section {
+    max-height: 40vh;
+    flex-wrap: nowrap;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .orbit-legend {
+    min-width: auto;
+    padding-top: 0.375rem;
+    gap: 0.375rem;
+  }
+
+  .legend-items {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.125rem 0.5rem;
+  }
+
+  .legend-item {
+    font-size: 0.5rem;
+  }
+
+  .legend-abbr {
+    width: auto;
+    min-width: 35px;
+  }
 }
 </style>
