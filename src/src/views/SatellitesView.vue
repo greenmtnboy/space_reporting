@@ -245,12 +245,14 @@ onUnmounted(() => {
           title="Satellites by Owner"
           :stats="ownerStats"
           :max-total="maxOwnerTotal"
+          :show-failures="true"
         />
 
         <BarChart
           title="Satellites by Orbit Type"
           :stats="orbitTypeStats"
           :max-total="maxOrbitTypeTotal"
+          :show-failures="true"
         />
 
         <SatelliteLegend />

@@ -2,22 +2,21 @@ import raw.satellite;
 
 
 where base_category = 'P'   
-and name = 'Zond-3'
+and apogee < 1000000
+and launch_date.year = 2025
+and decom_date is not null
 select
-case when apogee< 1000000 then 1 else 0 end as test_column,
     jcat,
     name,
-    type,
     #launch_date,
     launch_date,
-    coalesce(decom_date, current_date()) as end_date,
+    decom_date,
     owner.e_name,
     owner.color,
     perigee,
     apogee,
     inc,
     launch.site.latitude,
-    launch.site.longitude,
-    date_diff(launch_date, decom_date, day)::int as mission_duration_days
-order by   
-    mission_duration_days asc limit 100;
+    launch.site.longitude
+order by decom_date asc
+limit 10;

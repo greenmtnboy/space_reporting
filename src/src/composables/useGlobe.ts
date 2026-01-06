@@ -2,8 +2,8 @@ import { ref, onUnmounted, type Ref } from 'vue'
 import * as THREE from 'three'
 
 const EARTH_RADIUS = 1 // Normalized radius for the globe
-const GLOBE_COLOR = 0x1a1a2e // Dark blue-ish color for the globe
-const GLOBE_EMISSIVE = 0x0a0a15 // Subtle glow
+const GLOBE_COLOR = 0x005b96 // Slightly brighter base color for the globe
+const GLOBE_EMISSIVE = 0x050510 // Reduced emissive for better day/night contrast
 
 export interface GlobeState {
   scene: THREE.Scene
@@ -77,17 +77,17 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
     // Add orbit group to scene
     state.scene.add(state.orbitGroup)
 
-    // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5)
+    // Add ambient light (reduced for better day/night contrast)
+    const ambientLight = new THREE.AmbientLight(0x404050, 0.25)
     state.scene.add(ambientLight)
 
-    // Add directional light (sun-like)
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1)
-    directionalLight.position.set(5, 3, 5)
+    // Add directional light (sun-like) - brighter for clear illumination
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 6)
+    directionalLight.position.set(5, 2, 4)
     state.scene.add(directionalLight)
 
-    // Add subtle rim light for depth
-    const rimLight = new THREE.DirectionalLight(0x4488ff, 0.3)
+    // Add subtle rim light for depth on the dark side
+    const rimLight = new THREE.DirectionalLight(0x4488ff, 0.15)
     rimLight.position.set(-5, 0, -5)
     state.scene.add(rimLight)
 
