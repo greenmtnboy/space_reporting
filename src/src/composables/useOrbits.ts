@@ -26,6 +26,7 @@ const _matrix = new THREE.Matrix4()
 const _invMatrix = new THREE.Matrix4()
 const _inclinationMatrix = new THREE.Matrix4()
 const _lanMatrix = new THREE.Matrix4()
+const _tempColor = new THREE.Color() // Reused for color lerping
 
 // Material Cache: Color -> Material
 // const materialCache = new Map<string, THREE.LineBasicMaterial>()
@@ -367,8 +368,9 @@ export function useOrbits(
     const material = line.material as THREE.LineBasicMaterial
     if (satellite.state === 'decommissioning') {
       material.opacity = (1 - satellite.decomProgress) * 0.7
-      const originalColor = new THREE.Color(satellite.owner_color)
-      material.color.lerpColors(originalColor, DECOM_END_COLOR, satellite.decomProgress)
+      // Reuse _tempColor to avoid per-frame allocation
+      _tempColor.set(satellite.owner_color)
+      material.color.lerpColors(_tempColor, DECOM_END_COLOR, satellite.decomProgress)
     } else {
       material.opacity = 0.7
       material.color.set(satellite.owner_color)

@@ -185,3 +185,84 @@ for (let i = 0; i <= numPoints; i++) {
 | Orbit reveal | 3 days | Orbit draws from insertion point around full ellipse |
 
 Orbit reveal **starts when launch track reaches altitude** (overlaps with track fade period), creating smooth handoff.
+
+---
+
+## Performance Analysis (2026-01-06)
+
+### Current Optimizations
+
+| Technique | Location | Impact |
+|-----------|----------|--------|
+| **Object Pooling** | `useOrbits.ts:22-28` | Reusable temp vectors (`_tempVec3`, `_groundPos`, etc.) eliminate per-frame allocation |
+| **Float32Array Geometry** | `generateOrbitPoints()`, `generateLaunchTrackPoints()` | Direct buffer writes, no intermediate Vector3 array |
+| **Draw Range Animation** | `updateOrbitLine():364`, `updateLaunchLine():401` | Zero GPU uploads - just updates draw count integer |
+| **Map-Based Tracking** | `orbitLines`, `launchLines` Maps | O(1) lookup for add/update/remove operations |
+| **Proper Disposal** | `cleanupRemovedSatellites()` | Geometry + material dispose prevents memory leaks |
+| **Shallow Watching** | `watch(..., { deep: false })` | Avoids deep comparison overhead |
+
+### Remaining Bottlenecks
+
+#### 1. **Vue Reactivity Per-Frame Recalculation**
+**Location**: `useSatellites.ts:241-270`
+
+Every frame, `currentTime` changes trigger full recalculation of:
+- `activeSatellites` - filters all satellites, maps state
+- `orbitingSatellites`, `launchingSatellites`, `decommissioningSatellites` - additional filters
+
+**Impact**: O(n) work per frame where n = total satellites in year range
+
+**Potential Fix**:
+- Use time-binned indexing (binary search on sorted launch timestamps)
+- Only recalculate satellites near state transitions
+- Or: move to RAF-driven updates outside Vue reactivity
+
+#### 2. **Orbit Insertion Angle Search**
+**Location**: `useOrbits.ts:132-188`
+
+Per-satellite creation, runs coarse (72 steps) + fine (2×10 steps) angle search.
+
+**Impact**: ~92 trig operations per new orbit
+
+**Potential Fix**:
+- Cache the insertion angle result (orbits are static once created)
+- Current code already avoids re-searching on updates (only on creation)
+- **Status**: Already optimized - search only runs once per satellite
+
+#### 3. **Material Instance Per Satellite**
+**Location**: `useOrbits.ts:33-68`
+
+Each satellite gets unique `LineBasicMaterial` because opacity animates independently.
+
+**Impact**: ~1000+ material instances in heavy years
+
+**Potential Fix**:
+- Use vertex colors with alpha channel instead of material opacity
+- Or: custom shader with per-instance opacity uniform via InstancedMesh
+- **Trade-off**: Significant refactor for marginal gain (materials are lightweight vs geometry)
+
+#### 4. **Color Lerping in Decommission**
+**Location**: `useOrbits.ts:370-371`
+
+```typescript
+const originalColor = new THREE.Color(satellite.owner_color)
+material.color.lerpColors(originalColor, DECOM_END_COLOR, satellite.decomProgress)
+```
+
+Creates new `THREE.Color` every frame per decommissioning satellite.
+
+**Fix**: Cache original color in material userData on creation.
+
+#### 5. **Launch Track Full Regeneration**
+**Location**: `generateLaunchTrackPoints()` called with `progress=1.0` on creation
+
+Launch tracks are generated at full length, then revealed via `setDrawRange()`. This is correct.
+
+**Status**: Already optimized
+
+### Recommendations (Priority Order)
+
+1. **[Low Effort]** Cache original color for decom lerping
+2. **[Medium Effort]** Time-binned satellite indexing for O(log n) lookups
+3. **[High Effort]** Move satellite state computation to Web Worker for heavy years
+4. **[Optional]** Vertex colors for shared materials (diminishing returns)
