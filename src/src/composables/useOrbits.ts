@@ -305,6 +305,10 @@ export function useOrbits(
     while (dTheta < 0) dTheta += Math.PI * 2
     dTheta += Math.PI * 2 // One full extra turn
 
+    // Calculate starting cylindrical radius (r_xz) in local space
+    // We need this because if y != 0 (off-plane), r_xz must be < 1.0 for the point to be on the sphere (R=1.0)
+    const localStartRadius = Math.sqrt(_localPos.x * _localPos.x + _localPos.z * _localPos.z)
+
     const numPoints = Math.max(2, Math.ceil(segments * progress))
     const totalPoints = numPoints + 1
     const positions = new Float32Array(totalPoints * 3)
@@ -324,9 +328,9 @@ export function useOrbits(
       // Safety check for degenerate orbits
       const rEllipse = denom > 0.0001 ? (a * b) / denom : a
       
-      const groundRadius = GLOBE_RADIUS
+      // Interpolate from Local Start Radius to Ellipse Radius
       const altT = t * (2 - t)
-      const currentRadius = groundRadius + (rEllipse - groundRadius) * altT
+      const currentRadius = localStartRadius + (rEllipse - localStartRadius) * altT
       
       // Decay offset
       const currentY = _localPos.y * (1 - t) * (1 - t)
