@@ -23,7 +23,7 @@ export function useAnimation(
     if (animationFrameId.value) {
       cancelAnimationFrame(animationFrameId.value)
     }
-  })
+  }, { flush: 'sync' })
 
   const progress = computed(() => {
     return ((currentTime.value - rangeStart.value) / rangeDuration.value) * 100

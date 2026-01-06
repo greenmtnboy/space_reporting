@@ -1,0 +1,19 @@
+import raw.satellite;
+
+copy into json `gcs://trilogy_public_models/duckdb/launch_report/satellites_over_time/raw_data_two.json` from
+where base_category = 'P'   
+and apogee < 1000000
+select
+    jcat,
+    name,
+    #launch_date,
+    launch_date,
+    decom_date as end_date,
+    owner.e_name,
+    owner.color,
+    perigee,
+    apogee,
+    inc,
+    launch.site.latitude,
+    launch.site.longitude
+;

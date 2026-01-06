@@ -1,0 +1,18 @@
+import raw.satellite;
+
+copy into json `./raw_satellite_data.json` from 
+where base_category = 'P' and launch_date.year >= 2020
+select
+    jcat,
+    name,
+    #launch_date,
+    launch_date,
+    coalesce(decom_date, current_date()) as end_date,
+    owner.e_name,
+    owner.color,
+    perigee,
+    apogee,
+    inc,
+    launch.site.latitude,
+    launch.site.longitude
+;

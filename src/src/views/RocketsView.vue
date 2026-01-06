@@ -184,7 +184,7 @@ onUnmounted(() => {
     <header class="header">
       <div class="header-left">
         <div class="header-top-row">
-          <h1>{{ title }}</h1>
+          <h1>{{ title }} Rocket Launches</h1>
           <div class="date-display mobile-only">{{ currentDateDisplay }}</div>
         </div>
         <YearRangeButtons

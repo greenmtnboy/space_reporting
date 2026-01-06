@@ -16,3 +16,7 @@ McDowell, Jonathan C., 2020. General Catalog of Artificial Space Objects,
 Vite, vue, typescript
 
 Use pnpm not NPM for all management
+
+## Project Tracking
+
+When working on a vue view in the app, record all design choices in the relevant _SPEC markdown file under views. 
