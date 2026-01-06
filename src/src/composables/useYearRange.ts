@@ -46,9 +46,9 @@ export function useYearRange() {
   const title = computed(() => {
     const range = selectedRange.value
     if (range.startYear === range.endYear) {
-      return `${range.startYear} Rocket Launches`
+      return `${range.startYear}`
     }
-    return `${range.startYear}-${range.endYear} Rocket Launches`
+    return `${range.startYear}-${range.endYear}`
   })
 
   const progressStartLabel = computed(() => {

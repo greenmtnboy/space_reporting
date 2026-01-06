@@ -5,7 +5,10 @@ defineProps<{
   title: string
   stats: Stats[]
   maxTotal: number
+  showFailures?: boolean
 }>()
+
+// Default showFailures to true
 </script>
 
 <template>
@@ -17,11 +20,12 @@ defineProps<{
         <div class="bar-container">
           <div
             class="bar-success"
-            :style="{ width: (item.successes / maxTotal) * 100 + '%' }"
+            :style="{ width: (showFailures !== false ? (item.successes / maxTotal) : (item.total / maxTotal)) * 100 + '%' }"
           >
-            <span v-if="item.successes > 0 && (item.total / maxTotal) >= 0.15" class="bar-value">{{ item.successes }}</span>
+            <span v-if="(showFailures !== false ? item.successes : item.total) > 0 && (item.total / maxTotal) >= 0.15" class="bar-value">{{ showFailures !== false ? item.successes : item.total }}</span>
           </div>
           <div
+            v-if="showFailures !== false"
             class="bar-failure"
             :style="{ width: (item.failures / maxTotal) * 100 + '%' }"
           >
@@ -29,10 +33,10 @@ defineProps<{
           </div>
           <!-- Show counts in white space when bar is too short -->
           <span v-if="(item.total / maxTotal) < 0.15 && item.total > 0" class="bar-value-outside">
-            {{ item.successes }}<template v-if="item.failures > 0"> (<span class="failure-text">{{ item.failures }}</span>)</template>
+            {{ showFailures !== false ? item.successes : item.total }}<template v-if="showFailures !== false && item.failures > 0"> (<span class="failure-text">{{ item.failures }}</span>)</template>
           </span>
           <!-- Show failures in white space when total bar is 15-30% (failures don't fit inside) -->
-          <span v-if="(item.total / maxTotal) >= 0.15 && (item.total / maxTotal) < 0.30 && item.failures > 0 && (item.failures / maxTotal) < 0.10" class="bar-value-outside">
+          <span v-if="showFailures !== false && (item.total / maxTotal) >= 0.15 && (item.total / maxTotal) < 0.30 && item.failures > 0 && (item.failures / maxTotal) < 0.10" class="bar-value-outside">
             (<span class="failure-text">{{ item.failures }}</span>)
           </span>
         </div>

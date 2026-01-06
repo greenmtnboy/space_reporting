@@ -2,6 +2,7 @@
 defineProps<{
   launchCount: number
   yearRangeLabel: string
+  itemLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -13,7 +14,7 @@ const emit = defineEmits<{
   <div class="completion-modal">
     <div class="modal-content">
       <h2>That's a wrap!</h2>
-      <p>{{ launchCount }} launches in {{ yearRangeLabel }}</p>
+      <p>{{ launchCount }} {{ itemLabel || 'launches' }} in {{ yearRangeLabel }}</p>
       <button @click="emit('playAgain')" class="control-btn primary">Watch Again</button>
     </div>
   </div>

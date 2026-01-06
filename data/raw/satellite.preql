@@ -9,8 +9,11 @@ import launch as launch;
 key jcat string; # Alphanumeric identifier to uniquely tag space objects, consisting of a prefix letter and a sequence number.
 property jcat.satcat string; # Corresponds to the US SATCAT number; an integer value or a descriptive string if not present in SATCAT.
 
-property jcat.launch_date date;
-property jcat.decom_date date;
+property jcat._launch_date string;
+property jcat._decom_date string;
+
+property jcat.launch_date <- @extract_date(_launch_date);
+property jcat.decom_date <- @extract_date(_decom_date);
 
 property jcat.piece string; # Piece designation for the object; often matches the Launch Tag.
 property jcat.type string; # Contains SatType string; characterizes the object (P for payload, R for rocket stage, etc.).
@@ -71,11 +74,11 @@ root datasource satcat_raw (
     Type: type,
     Name: name,
     PLName: pl_name,
-    LDate: ?launch_date,
+    LDate: ?_launch_date,
     Parent: parent,
     SDate: s_date,
     Primary: primary,
-    DDate: ?decom_date,
+    DDate: ?_decom_date,
     Status: status,
     Dest: dest,
     Owner: owner.code,

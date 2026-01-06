@@ -14,7 +14,7 @@ const navItems = [
   {
     name: 'satellites',
     path: '/satellites',
-    label: 'Satellites',
+    label: 'Satellite',
     icon: 'satellite'
   }
 ]
@@ -142,11 +142,10 @@ const currentRoute = computed(() => route.name)
 .nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 50%;
+  top: 100%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
+  width: 20px;
+  height: 2px;
   background-color: var(--color-accent);
   border-radius: 0 2px 2px 0;
 }
@@ -155,7 +154,7 @@ const currentRoute = computed(() => route.name)
   font-family: var(--font-mono);
   font-size: 0.5rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   margin-top: 2px;
   opacity: 0.8;
 }
