@@ -111,8 +111,8 @@ export function useSatellites(
   _isComplete: Ref<boolean>,
   rangeStart: Ref<number>,
   rangeEnd: Ref<number>,
-  _rangeDuration: Ref<number>,
-  _animationDurationMs: Ref<number>
+  rangeDuration: Ref<number>,
+  animationDurationMs: Ref<number>
 ) {
   // All satellites processed (not filtered by range)
   const allSatellites = computed<ProcessedSatellite[]>(() => {
@@ -138,12 +138,16 @@ export function useSatellites(
   const LEO_LAUNCH_DAYS = 2        // Days for LEO (~400km) launch track to reach orbit
   const MAX_LAUNCH_DAYS = 8        // Days for highest orbits (capped altitude) to reach orbit
   const MAX_ORBIT_ALTITUDE_KM = 36000  // Cap altitude for timing calculation
-  const LAUNCH_TRACK_FADE_DAYS = 1  // Days the launch track persists after reaching orbit
+  
+  // Screen time constants (ms)
+  const HOLD_DURATION_SCREEN_MS = 0 // Start fading immediately after reaching orbit
+  const FADE_DURATION_SCREEN_MS = 3000 // Fade out over 10s
+
   // Decom track decay time (in animation days)
   const DECOM_TRACK_DECAY_DAYS = 7
 
-  // Calculate launch duration based on target orbit altitude
-  function getLaunchDurationMs(satellite: ProcessedSatellite): number {
+  // Calculate ascent duration based on target orbit altitude
+  function getAscentDurationMs(satellite: ProcessedSatellite): number {
     // Target altitude is average of perigee and apogee, capped for visualization
     const targetAltitudeKm = Math.min(
       Math.max((Math.max(satellite.perigee, 100) + Math.min(satellite.apogee, MAX_ORBIT_ALTITUDE_KM)) / 2, 100),
@@ -153,52 +157,84 @@ export function useSatellites(
     const leoAltitude = 400
     const altitudeFraction = Math.min((targetAltitudeKm - leoAltitude) / (MAX_ORBIT_ALTITUDE_KM - leoAltitude), 1)
     const daysToOrbit = LEO_LAUNCH_DAYS + altitudeFraction * (MAX_LAUNCH_DAYS - LEO_LAUNCH_DAYS)
-    const totalDays = daysToOrbit + LAUNCH_TRACK_FADE_DAYS
-    return totalDays * 24 * 60 * 60 * 1000  // Convert to ms
+    return daysToOrbit * 24 * 60 * 60 * 1000  // Convert to ms
   }
 
   // Time for orbit to complete one full revolution after insertion (in days)
   const ORBIT_REVEAL_DAYS = 3
 
   // Get satellite state and animation progress
-  function getSatelliteState(satellite: ProcessedSatellite, time: number): { state: SatelliteState; launchProgress: number; decomProgress: number; orbitProgress: number } {
-    const launchWindowMs = getLaunchDurationMs(satellite)
+  function getSatelliteState(satellite: ProcessedSatellite, time: number): { state: SatelliteState; launchProgress: number; launchOpacity: number; decomProgress: number; orbitProgress: number } {
+    const ascentDurationMs = getAscentDurationMs(satellite)
+    
+    // Convert screen time to simulation time
+    const simTimePerScreenMs = rangeDuration.value / Math.max(animationDurationMs.value, 1)
+    const holdDurationMs = HOLD_DURATION_SCREEN_MS * simTimePerScreenMs
+    const fadeDurationMs = FADE_DURATION_SCREEN_MS * simTimePerScreenMs
+    
+    const totalLaunchWindowMs = ascentDurationMs + holdDurationMs + fadeDurationMs
+    
     const decomWindowMs = DECOM_TRACK_DECAY_DAYS * 24 * 60 * 60 * 1000
     const orbitRevealMs = ORBIT_REVEAL_DAYS * 24 * 60 * 60 * 1000
 
     // Before launch
     if (time < satellite.launchTimestamp) {
-      return { state: 'pending', launchProgress: 0, decomProgress: 0, orbitProgress: 0 }
+      return { state: 'pending', launchProgress: 0, launchOpacity: 0, decomProgress: 0, orbitProgress: 0 }
     }
 
-    // During launch animation
+    // During launch animation (Ascent + Hold + Fade)
     const timeSinceLaunch = time - satellite.launchTimestamp
-    if (timeSinceLaunch < launchWindowMs) {
-      const progress = timeSinceLaunch / launchWindowMs
-      // Orbit doesn't start until launch track is complete (progress = 1)
-      return { state: 'launching', launchProgress: progress, decomProgress: 0, orbitProgress: 0 }
+    if (timeSinceLaunch < totalLaunchWindowMs) {
+      let launchProgress = 0
+      let launchOpacity = 1
+      
+      if (timeSinceLaunch < ascentDurationMs) {
+        // Ascent Phase
+        launchProgress = timeSinceLaunch / ascentDurationMs
+        launchOpacity = 1
+      } else if (timeSinceLaunch < ascentDurationMs + holdDurationMs) {
+        // Hold Phase
+        launchProgress = 1
+        launchOpacity = 1
+      } else {
+        // Fade Phase
+        launchProgress = 1
+        const fadeProgress = (timeSinceLaunch - (ascentDurationMs + holdDurationMs)) / fadeDurationMs
+        launchOpacity = 1 - fadeProgress
+      }
+
+      // Orbit starts drawing when ascent completes (at ascentDurationMs)
+      // Even though state is 'launching', we can calculate orbitProgress to see if we should start drawing orbit
+      // But filtering logic typically hides 'launching' satellites from orbit list. 
+      // We'll address orbit visibility in the `orbitingSatellites` computed property.
+      
+      const timeSinceInsertion = timeSinceLaunch - ascentDurationMs
+      const orbitProgress = timeSinceInsertion > 0 ? Math.min(timeSinceInsertion / orbitRevealMs, 1) : 0
+
+      return { state: 'launching', launchProgress, launchOpacity, decomProgress: 0, orbitProgress }
     }
 
-    // Calculate orbit reveal for post-launch states
-    // Orbit starts drawing when launch track completes (at launchWindowMs)
-    const orbitInsertionTime = satellite.launchTimestamp + launchWindowMs
+    // Post-launch (Active)
+    // Orbit is fully revealed
+    // Calculate orbit relative to insertion time
+    const orbitInsertionTime = satellite.launchTimestamp + ascentDurationMs
     const timeSinceInsertion = time - orbitInsertionTime
     const orbitProgress = Math.min(Math.max(0, timeSinceInsertion) / orbitRevealMs, 1)
 
     // Before decommission
     if (time < satellite.decomTimestamp) {
-      return { state: 'active', launchProgress: 1, decomProgress: 0, orbitProgress }
+      return { state: 'active', launchProgress: 1, launchOpacity: 0, decomProgress: 0, orbitProgress }
     }
 
     // During decommission animation
     const timeSinceDecom = time - satellite.decomTimestamp
     if (timeSinceDecom < decomWindowMs) {
       const progress = timeSinceDecom / decomWindowMs
-      return { state: 'decommissioning', launchProgress: 1, decomProgress: progress, orbitProgress }
+      return { state: 'decommissioning', launchProgress: 1, launchOpacity: 0, decomProgress: progress, orbitProgress }
     }
 
     // Fully decommissioned
-    return { state: 'decommissioned', launchProgress: 1, decomProgress: 1, orbitProgress: 1 }
+    return { state: 'decommissioned', launchProgress: 1, launchOpacity: 0, decomProgress: 1, orbitProgress: 1 }
   }
 
   // Active satellites with their current state and animation progress
@@ -207,11 +243,12 @@ export function useSatellites(
 
     return satellites.value
       .map(s => {
-        const { state, launchProgress, decomProgress, orbitProgress } = getSatelliteState(s, time)
+        const { state, launchProgress, launchOpacity, decomProgress, orbitProgress } = getSatelliteState(s, time)
         return {
           ...s,
           state,
           launchProgress,
+          launchOpacity,
           decomProgress,
           orbitProgress
         }
@@ -224,12 +261,14 @@ export function useSatellites(
   })
 
   // Satellites that are currently in orbit (for orbit rendering)
-  // Orbits appear when launch track completes, persist until decom completes
+  // Orbits appear when ascent completes.
+  // We now include 'launching' state if orbitProgress > 0 (meaning ascent is done, now in hold/fade)
   const orbitingSatellites = computed<ActiveSatellite[]>(() => {
     return activeSatellites.value.filter(s => {
-      // Only show orbit after launch is complete (active or decommissioning state)
-      // During 'launching' state, orbitProgress is 0 so no orbit shown
-      return s.state === 'active' || s.state === 'decommissioning'
+      // Show orbit if active, decommissioning, OR launching but ascent complete
+      if (s.state === 'active' || s.state === 'decommissioning') return true
+      if (s.state === 'launching' && s.orbitProgress > 0) return true
+      return false
     })
   })
 

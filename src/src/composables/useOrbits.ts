@@ -84,55 +84,64 @@ export function useOrbits(
     return { a, b, matrix: combinedMatrix, isEscape: false }
   }
 
-  // Find the orbit insertion angle - offset to create smooth tangential entry
-  function findInsertionAngle(satellite: ActiveSatellite, a: number, b: number, matrix: THREE.Matrix4): number {
+  // Find the closest point on the orbit to the launch site (angle in radians)
+  function findClosestOrbitAngle(
+    satellite: ActiveSatellite,
+    a: number,
+    b: number,
+    matrix: THREE.Matrix4
+  ): number {
     const groundPos = latLngToPosition(
       satellite.launch_site_latitude,
       satellite.launch_site_longitude,
       0
     )
-    const launchSiteDir = groundPos.clone().normalize()
+    
+    // Transform ground position to local orbit space
+    const invMatrix = matrix.clone().invert()
+    const localPos = groundPos.clone().applyMatrix4(invMatrix)
 
-    // First find the closest point on the orbit to the launch site
+    // We want to find t such that distance from (a*cos t, 0, b*sin t) to (lx, ly, lz) is minimized
+    // Coarse search
     let closestAngle = 0
-    let bestDot = -2
-    for (let i = 0; i < 72; i++) {
-      const testAngle = (i / 72) * Math.PI * 2
-      const x = a * Math.cos(testAngle)
-      const z = b * Math.sin(testAngle)
-      const testPoint = new THREE.Vector3(x, 0, z)
-      testPoint.applyMatrix4(matrix)
-      const dot = testPoint.clone().normalize().dot(launchSiteDir)
-      if (dot > bestDot) {
-        bestDot = dot
-        closestAngle = testAngle
+    let minDidstSq = Infinity
+    const steps = 72
+    
+    for (let i = 0; i < steps; i++) {
+      const angle = (i / steps) * Math.PI * 2
+      const dx = localPos.x - a * Math.cos(angle)
+      const dz = localPos.z - b * Math.sin(angle)
+      const d2 = dx*dx + dz*dz
+      if (d2 < minDidstSq) {
+        minDidstSq = d2
+        closestAngle = angle
       }
     }
 
-    // Calculate the arc length we want to travel along the orbit for a smooth curve
-    // This should be roughly proportional to the "climb distance" from ground to orbit
-    //
-    // For a tangential approach, we want the launch track length ≈ arc length on orbit
-    // Arc length = angle * radius, so angle = arcLength / radius
-    //
-    // Launch track length (approx): distance from ground to orbit insertion
-    // For simplicity, use the altitude gain as a proxy
-    const orbitRadius = (a + b) / 2  // average radius
-    const altitudeGain = orbitRadius - GLOBE_RADIUS  // climb from surface to orbit
+    // Refine search (2 passes)
+    const refine = (center: number, range: number) => {
+      let best = center
+      let minDist = minDidstSq
+      const fineSteps = 10
+      for(let i=0; i<=fineSteps; i++) {
+        const ang = center - range/2 + (i/fineSteps)*range
+        const dx = localPos.x - a * Math.cos(ang)
+        const dz = localPos.z - b * Math.sin(ang)
+        const d = dx*dx + dz*dz
+        if (d < minDist) {
+          minDist = d
+          best = ang
+        }
+      }
+      minDidstSq = minDist
+      return best
+    }
 
-    // The arc we want to "reserve" for the approach should match the climb distance
-    // This gives us the angular offset: angle = arcLength / radius
-    // But we also factor in how off-plane the launch is (more off-plane = longer path needed)
-    const offPlaneAmount = 1 - bestDot  // 0 = on plane, 1 = perpendicular
+    const stepSize = (Math.PI * 2) / steps
+    closestAngle = refine(closestAngle, stepSize * 2)
+    closestAngle = refine(closestAngle, stepSize * 0.2)
 
-    // Base arc length scales with altitude, amplified by off-plane distance
-    // Higher orbits and more off-plane launches need more angular offset
-    const effectiveArcLength = altitudeGain * (1 + offPlaneAmount * 2)
-
-    // Convert arc length to angle (clamped to max 270 degrees to avoid overshooting)
-    const insertionOffset = Math.min(effectiveArcLength / orbitRadius, Math.PI * 1.5)
-
-    return closestAngle + insertionOffset
+    return closestAngle
   }
 
   // Generate orbit ellipse points, starting from the insertion point
@@ -155,7 +164,7 @@ export function useOrbits(
     }
 
     // Find insertion angle so orbit starts from where launch track connects
-    const startAngle = findInsertionAngle(satellite, a, b, matrix)
+    const startAngle = findClosestOrbitAngle(satellite, a, b, matrix)
 
     // Generate ellipse points starting from insertion angle
     for (let i = 0; i <= segments; i++) {
@@ -202,55 +211,76 @@ export function useOrbits(
       return [groundPos, endPos]
     }
 
-    // Find insertion angle (same as orbit starting point)
-    const insertionAngle = findInsertionAngle(satellite, a, b, matrix)
+    // 1. Identify closest point on orbit
+    const closestAngle = findClosestOrbitAngle(satellite, a, b, matrix)
+    
+    // Transform to local orbit space to handle inclination merge
+    const invMatrix = matrix.clone().invert()
+    const localStart = groundPos.clone().applyMatrix4(invMatrix)
+    
+    // Calculate local target position and tangent
+    const targetX = a * Math.cos(closestAngle)
+    const targetZ = b * Math.sin(closestAngle)
+    const localTarget = new THREE.Vector3(targetX, 0, targetZ) // On orbital plane (y=0)
+    
+    const tanX = -a * Math.sin(closestAngle)
+    const tanZ = b * Math.cos(closestAngle)
+    const localTangent = new THREE.Vector3(tanX, 0, tanZ).normalize()
+    
+    // 2. Setup Cubic Bezier Control Points in Local Space
+    // P0: Start
+    const p0 = localStart.clone()
+    
+    // P3: End
+    const p3 = localTarget.clone()
+    
+    // Distance for control point scaling
+    const dist = p0.distanceTo(p3)
+    
+    // P2: Control Point 2 (at ~2/3)
+    // Backtrack from End along Tangent to ensure parallel merge.
+    // Enforce in-plane approach (y=0)
+    const p2 = p3.clone().sub(localTangent.clone().multiplyScalar(dist * 0.5))
+    p2.y = 0 
+    
+    // P1: Control Point 1 (at ~1/3)
+    // Forward from Start.
+    // Maintain off-plane offset (p1.y = p0.y) to delay inclination change
+    // Interpolate X/Z towards P2
+    const p1 = p0.clone().lerp(p2, 0.4)
+    p1.y = p0.y
 
-    // Orbit insertion point (where the launch track meets the orbit)
-    const orbitInsertX = a * Math.cos(insertionAngle)
-    const orbitInsertZ = b * Math.sin(insertionAngle)
-    const orbitInsertPos = new THREE.Vector3(orbitInsertX, 0, orbitInsertZ)
-    orbitInsertPos.applyMatrix4(matrix)
-
-    // Calculate orbit tangent at insertion point (direction of travel)
-    // Derivative of ellipse: dx/dθ = -a*sin(θ), dz/dθ = b*cos(θ)
-    const tangentX = -a * Math.sin(insertionAngle)
-    const tangentZ = b * Math.cos(insertionAngle)
-    const orbitTangent = new THREE.Vector3(tangentX, 0, tangentZ)
-    orbitTangent.applyMatrix4(matrix)
-    orbitTangent.normalize()
-
-    // We'll use a quadratic Bezier curve:
-    // P0 = ground position
-    // P2 = orbit insertion point
-    // P1 = control point that shapes the curve to arrive tangentially
-    //
-    // For the curve to arrive tangent to the orbit at P2, the control point P1
-    // should be along the line (P2 - tangent * distance)
-    const curveLength = groundPos.distanceTo(orbitInsertPos)
-    const controlPoint = orbitInsertPos.clone().sub(orbitTangent.clone().multiplyScalar(curveLength * 0.6))
-
-    // Generate curved path using quadratic Bezier
+    // Generate points
     const numPoints = Math.max(2, Math.ceil(segments * progress))
     for (let i = 0; i <= numPoints; i++) {
       const t = (i / numPoints) * progress
-
-      // Quadratic Bezier: B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+      
+      // Cubic Bezier: (1-t)^3 P0 + 3(1-t)^2 t P1 + 3(1-t) t^2 P2 + t^3 P3
       const oneMinusT = 1 - t
-      const bezierPos = new THREE.Vector3()
-        .addScaledVector(groundPos, oneMinusT * oneMinusT)
-        .addScaledVector(controlPoint, 2 * oneMinusT * t)
-        .addScaledVector(orbitInsertPos, t * t)
+      const b0 = oneMinusT * oneMinusT * oneMinusT
+      const b1 = 3 * oneMinusT * oneMinusT * t
+      const b2 = 3 * oneMinusT * t * t
+      const b3 = t * t * t
+      
+      const localPos = new THREE.Vector3()
+        .addScaledVector(p0, b0)
+        .addScaledVector(p1, b1)
+        .addScaledVector(p2, b2)
+        .addScaledVector(p3, b3)
 
-      // Adjust radius to smoothly interpolate altitude
-      // Use the bezier for direction but enforce smooth altitude progression
+      // Transform back to World Space
+      const worldPos = localPos.clone().applyMatrix4(matrix)
+      
+      // Altitude Adjustment
+      // Use Quadratic Ease-Out (t * (2 - t)) to start upward and flatten at orbit
       const groundRadius = GLOBE_RADIUS
-      const orbitRadius = orbitInsertPos.length()
-      // Ease-in altitude curve so it accelerates toward orbit height
-      const altitudeT = t * t  // quadratic ease-in
-      const currentRadius = groundRadius + (orbitRadius - groundRadius) * altitudeT
+      const targetRadius = localTarget.length() // Radius in local space is correct
+      
+      const altT = t * (2 - t)
+      const currentRadius = groundRadius + (targetRadius - groundRadius) * altT
 
-      bezierPos.normalize().multiplyScalar(currentRadius)
-      points.push(bezierPos)
+      worldPos.normalize().multiplyScalar(currentRadius)
+      points.push(worldPos)
     }
 
     return points
@@ -344,13 +374,9 @@ export function useOrbits(
     posAttr.needsUpdate = true
     line.geometry.setDrawRange(0, points.length)
 
-    // Fade out as launch completes
+    // Update opacity using explicit control from useSatellites
     const material = line.material as THREE.LineBasicMaterial
-    if (satellite.launchProgress > 0.7) {
-      material.opacity = 1 - ((satellite.launchProgress - 0.7) / 0.3)
-    } else {
-      material.opacity = 1
-    }
+    material.opacity = satellite.launchOpacity
   }
 
   // Remove objects for satellites no longer in view

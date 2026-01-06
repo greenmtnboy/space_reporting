@@ -49,6 +49,7 @@ export type SatelliteState = 'pending' | 'launching' | 'active' | 'decommissioni
 export interface ActiveSatellite extends ProcessedSatellite {
   state: SatelliteState
   launchProgress: number          // 0-1 for launch track (point rising to orbit)
+  launchOpacity: number           // 0-1 for launch track opacity
   orbitProgress: number           // 0-1 for first orbit trace, then stays at 1
   decomProgress: number           // 0-1 for decommission animation
 }
