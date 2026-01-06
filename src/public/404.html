@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // GitHub Pages SPA redirect hack
+      // Store the current path and redirect to index.html
+      // The app will then restore the correct route
+      sessionStorage.redirect = location.href;
+      location.replace('/space_reporting/');
+    </script>
+  </head>
+  <body>
+  </body>
+</html>
