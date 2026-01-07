@@ -8,8 +8,12 @@ type OrbitType = typeof ORBIT_TYPES[number]
 
 interface Voice {
   oscillator: OscillatorNode
+  subOscillator?: OscillatorNode // -1 Octave
+  subOscillator2?: OscillatorNode // -2 Octaves (Deep Bass)
   lfo: OscillatorNode
   lfoGain: GainNode
+  filterLfo?: OscillatorNode // Slow filter sweep for texture
+  filterLfoGain?: GainNode
   gain: GainNode
   filter: BiquadFilterNode
   baseFreq: number
@@ -68,7 +72,8 @@ export function useSatelliteSound(
       const filter = audioContext.createBiquadFilter()
 
       // Oscillator setup
-      osc.type = type === 'LEO' ? 'sine' : (type === 'ESCAPE' ? 'sawtooth' : 'triangle')
+      // LEO changed to triangle so we can filter it for timbre changes
+      osc.type = type === 'LEO' ? 'triangle' : (type === 'ESCAPE' ? 'sawtooth' : 'triangle')
       const baseFreq = FREQUENCIES[type]
       osc.frequency.value = baseFreq
 
@@ -76,16 +81,16 @@ export function useSatelliteSound(
       lfo.type = 'sine'
       lfo.frequency.value = LFO_RATES[type]
       // LFO Depth (how much pitch wobble)
-      // LEO needs more wobble (faster relative motion)
       const wobbleDepth = baseFreq * 0.03 // +/- 3% pitch shift
       lfoGain.gain.value = wobbleDepth
 
       lfo.connect(lfoGain)
       lfoGain.connect(osc.frequency)
 
-      // Filter setup to soften the brighter waveforms
+      // Filter setup
       filter.type = 'lowpass'
-      filter.frequency.value = baseFreq * 4
+      // Start closed-ish; we'll open it based on inclination
+      filter.frequency.value = baseFreq * 2
       filter.Q.value = 1
 
       // Gain setup (start silent)
@@ -99,7 +104,7 @@ export function useSatelliteSound(
       osc.start()
       lfo.start()
 
-      voices.set(type, {
+      const voice: Voice = {
         oscillator: osc,
         lfo,
         lfoGain,
@@ -107,7 +112,53 @@ export function useSatelliteSound(
         filter,
         baseFreq,
         type
-      })
+      }
+
+      // Add Sub-Oscillators for deep orbits (GEO, HEO, ESCAPE) for richness
+      if (['GEO', 'HEO', 'ESCAPE'].includes(type)) {
+        // Sub 1: -1 Octave
+        const subOsc = audioContext.createOscillator()
+        subOsc.type = 'sine'
+        subOsc.frequency.value = baseFreq * 0.5
+        
+        const subGain = audioContext.createGain()
+        subGain.gain.value = 0.7 // Mix level
+        
+        subOsc.connect(subGain)
+        subGain.connect(gain)
+        subOsc.start()
+        voice.subOscillator = subOsc
+
+        // Sub 2: -2 Octaves (The "Real Bass")
+        const subOsc2 = audioContext.createOscillator()
+        subOsc2.type = 'sine'
+        subOsc2.frequency.value = baseFreq * 0.25
+        
+        const subGain2 = audioContext.createGain()
+        subGain2.gain.value = 0.8 // Heavy mix
+        
+        subOsc2.connect(subGain2)
+        subGain2.connect(gain)
+        subOsc2.start()
+        voice.subOscillator2 = subOsc2
+
+        // Filter Sweep LFO: Slow "Harmonic Waves"
+        const filterLfo = audioContext.createOscillator()
+        filterLfo.type = 'sine'
+        filterLfo.frequency.value = 0.15 // Very slow breathing (approx 7s period)
+        
+        const filterLfoGain = audioContext.createGain()
+        filterLfoGain.gain.value = baseFreq * 2 // Sweep range
+        
+        filterLfo.connect(filterLfoGain)
+        filterLfoGain.connect(filter.frequency)
+        filterLfo.start()
+        
+        voice.filterLfo = filterLfo
+        voice.filterLfoGain = filterLfoGain
+      }
+
+      voices.set(type, voice)
     })
 
     isAudioInitialized.value = true
@@ -155,48 +206,63 @@ export function useSatelliteSound(
       // Calculate Average Inclination
       const avgInc = incSums[type] / count
       // Map 0-90 degrees to a frequency offset factor (e.g., 0.9 to 1.1)
-      // Higher inclination (polar) = slightly higher pitch/tension
       const incFactor = 1 + ((avgInc / 90) * 0.2 - 0.1) // +/- 10%
       
       const targetBaseFreq = voice.baseFreq * incFactor
       
-      // Update oscillator frequency (base pitch)
+      // Update oscillator frequencies
       voice.oscillator.frequency.setTargetAtTime(targetBaseFreq, audioContext!.currentTime, 0.2)
+      if (voice.subOscillator) {
+        voice.subOscillator.frequency.setTargetAtTime(targetBaseFreq * 0.5, audioContext!.currentTime, 0.2)
+      }
+      if (voice.subOscillator2) {
+        voice.subOscillator2.frequency.setTargetAtTime(targetBaseFreq * 0.25, audioContext!.currentTime, 0.2)
+      }
+
+      // TIMBRE MODULATION (Inclination)
+      // For LEO/MEO: High inclination = Brighter/Buzzer sound (Filter Open)
+      // Low inclination = Mellow/Dark sound (Filter Closed)
+      if (['LEO', 'MEO'].includes(type)) {
+         // Map inc (0-90) to multiplier (1x to 8x harmonics)
+         const brightness = 1.5 + (avgInc / 90) * 6
+         voice.filter.frequency.setTargetAtTime(targetBaseFreq * brightness, audioContext!.currentTime, 0.2)
+         // Also bump Q slightly for more character at high inc
+         voice.filter.Q.setTargetAtTime(1 + (avgInc/90) * 2, audioContext!.currentTime, 0.2)
+      }
       
-      // Update LFO depth based on count? 
-      // More satellites = more chaotic "swarm" sound -> higher LFO depth
-      const activeWobble = (voice.baseFreq * 0.02) * (1 + Math.log(count+1)/5)
+      // For Deep Orbits: Update Filter Sweep Intensity?
+      if (voice.filterLfoGain) {
+          // More satellites = wider filter sweep
+          voice.filterLfoGain.gain.setTargetAtTime(targetBaseFreq * (1 + Math.log(count+1)), audioContext!.currentTime, 0.5)
+      }
+
+      // Update LFO depth
+      // Reduced wobble to avoid "sireny" sound (was 0.02 base)
+      const activeWobble = (voice.baseFreq * 0.005) * (1 + Math.log(count+1)/5)
       voice.lfoGain.gain.setTargetAtTime(activeWobble, audioContext!.currentTime, 0.5)
 
-      // Calculate desired volume based on count
-      // Logarithmic scaling so 1 satellite makes sound, but 1000 isn't deafening
+      // Calculate desired volume
       const countFactor = Math.log(count + 1) / Math.log(maxSatellites + 1)
       
       // Distance attenuation
-      // As camera moves away, global volume might drop, or balance changes?
-      // For now, let's make the "Deeper" sounds more prominent when further away
-      // and "Higher" sounds more prominent when close?
-      // Or just simple distance attenuation for all?
-      // Let's try: detailed sounds (LEO) fade out when far. Deep sounds (GEO) stay.
-      
       let distanceFactor = 1.0
       if (type === 'LEO') {
-        // LEO fades out quickly as you zoom out (radius is ~1 earth radius)
-        // Camera starts at z=25. Earth radius = 1.
         distanceFactor = Math.max(0, 1 - (distToCenter - 5) / 20)
       } else if (type === 'GEO') {
-        // GEO (radius ~6.6) stays audible longer
         distanceFactor = Math.max(0.2, 1 - (distToCenter - 10) / 40)
       } else {
-        distanceFactor = 0.8 // Others are consistent
+        distanceFactor = 0.8
       }
 
-      const targetGain = Math.min(0.8, countFactor * distanceFactor * 0.5)
+      // Boost volume for deep orbits ("louder on the low end")
+      // Increased from 1.5 to 3.0 to compensate for lower satellite counts
+      const deepOrbitBoost = ['GEO', 'HEO', 'ESCAPE'].includes(type) ? 3.0 : 1.0
+
+      const targetGain = Math.min(0.8, countFactor * distanceFactor * 0.5 * deepOrbitBoost)
 
       voice.gain.gain.setTargetAtTime(targetGain, audioContext!.currentTime, 0.2)
       
-      // Slight detune for chorus effect based on count
-      // More satellites = more "wobbly" / thick sound
+      // Detune
       const detuneAmount = Math.min(count, 50) 
       voice.oscillator.detune.setTargetAtTime(detuneAmount, audioContext!.currentTime, 0.1)
     })
