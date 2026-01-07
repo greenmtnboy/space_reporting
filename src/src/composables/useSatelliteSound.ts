@@ -2,9 +2,17 @@ import { ref, watch, onUnmounted, type Ref } from 'vue'
 import type { ActiveSatellite } from '../types'
 import * as THREE from 'three'
 
-// Orbit types from types.ts: 'LEO' | 'MEO' | 'GEO' | 'HEO' | 'ESCAPE'
+// Orbit types from types.ts
 const ORBIT_TYPES = ['LEO', 'MEO', 'GEO', 'HEO', 'ESCAPE'] as const
 type OrbitType = typeof ORBIT_TYPES[number]
+
+// Expanded Voice Keys to include inclination buckets
+const VOICE_KEYS = [
+  'LEO_EQ', 'LEO_MID', 'LEO_POLAR',
+  'MEO_EQ', 'MEO_MID', 'MEO_POLAR',
+  'GEO', 'HEO', 'ESCAPE'
+] as const
+type VoiceKey = typeof VOICE_KEYS[number]
 
 interface Voice {
   oscillator: OscillatorNode
@@ -17,7 +25,7 @@ interface Voice {
   gain: GainNode
   filter: BiquadFilterNode
   baseFreq: number
-  type: OrbitType
+  key: VoiceKey
 }
 
 export function useSatelliteSound(
@@ -31,10 +39,10 @@ export function useSatelliteSound(
 
   let audioContext: AudioContext | null = null
   let masterGain: GainNode | null = null
-  const voices: Map<OrbitType, Voice> = new Map()
+  const voices: Map<VoiceKey, Voice> = new Map()
 
-  // Base frequencies for each orbit type (bigger orbit = deeper note)
-  const FREQUENCIES: Record<OrbitType, number> = {
+  // Frequencies (Root Note A)
+  const BASE_FREQS: Record<OrbitType, number> = {
     'LEO': 440,   // A4
     'MEO': 220,   // A3
     'GEO': 110,   // A2
@@ -42,15 +50,15 @@ export function useSatelliteSound(
     'ESCAPE': 27.5 // A0
   }
 
-  // LFO frequencies (Hz) roughly matching orbital periods in 1min=1yr simulation
-  // LEO (~1.5h period) -> ~1.5 Hz
-  // GEO (~24h period) -> ~0.1 Hz
-  const LFO_RATES: Record<OrbitType, number> = {
-    'LEO': 1.5,
-    'MEO': 0.5,
-    'GEO': 0.1,
-    'HEO': 0.2, // Elliptical, average
-    'ESCAPE': 0.05 // Very slow
+  // Helper to map satellite to VoiceKey
+  function getVoiceKey(sat: ActiveSatellite): VoiceKey {
+    const inc = sat.inc || 0
+    if (sat.orbitType === 'LEO' || sat.orbitType === 'MEO') {
+      if (inc < 30) return `${sat.orbitType}_EQ` as VoiceKey
+      if (inc < 60) return `${sat.orbitType}_MID` as VoiceKey
+      return `${sat.orbitType}_POLAR` as VoiceKey
+    }
+    return sat.orbitType as VoiceKey
   }
 
   function initAudio() {
@@ -61,42 +69,88 @@ export function useSatelliteSound(
     masterGain.gain.value = volume.value
     masterGain.connect(audioContext.destination)
 
-    // Create voices for each orbit type
-    ORBIT_TYPES.forEach(type => {
+    // Initialize all voices
+    VOICE_KEYS.forEach(key => {
       if (!audioContext) return
 
-      const osc = audioContext.createOscillator()
-      const lfo = audioContext.createOscillator()
-      const lfoGain = audioContext.createGain()
-      const gain = audioContext.createGain()
-      const filter = audioContext.createBiquadFilter()
+      // Determine OrbitType from Key
+      let orbitType: OrbitType
+      let inclinationType: 'EQ' | 'MID' | 'POLAR' | null = null
 
-      // Oscillator setup
-      // LEO changed to triangle so we can filter it for timbre changes
-      osc.type = type === 'LEO' ? 'triangle' : (type === 'ESCAPE' ? 'sawtooth' : 'triangle')
-      const baseFreq = FREQUENCIES[type]
+      if (key.startsWith('LEO')) {
+        orbitType = 'LEO'
+        inclinationType = key.split('_')[1] as any
+      } else if (key.startsWith('MEO')) {
+        orbitType = 'MEO'
+        inclinationType = key.split('_')[1] as any
+      } else {
+        orbitType = key as OrbitType
+      }
+
+      const baseFreq = BASE_FREQS[orbitType]
+
+      // OSCILLATOR SETUP
+      const osc = audioContext.createOscillator()
+      
+      // Waveform & Timbre Customization per Bucket
+      if (inclinationType === 'EQ') {
+        // Equatorial: Smooth, rounded, steady
+        osc.type = 'sine'
+      } else if (inclinationType === 'POLAR') {
+        // Polar: Sharp, buzzy, urgent
+        osc.type = 'sawtooth'
+      } else {
+        // Mid / Others: Balanced
+        osc.type = 'triangle'
+      }
+      
       osc.frequency.value = baseFreq
 
-      // LFO Setup (FM Synthesis for Doppler/Orbit effect)
+      // LFO SETUP (Vibrato/Doppler)
+      const lfo = audioContext.createOscillator()
       lfo.type = 'sine'
-      lfo.frequency.value = LFO_RATES[type]
-      // LFO Depth (how much pitch wobble)
-      const wobbleDepth = baseFreq * 0.03 // +/- 3% pitch shift
-      lfoGain.gain.value = wobbleDepth
+      const lfoGain = audioContext.createGain()
+      
+      // LFO Rate
+      if (orbitType === 'LEO') {
+        // Faster orbits
+        if (inclinationType === 'POLAR') lfo.frequency.value = 2.0 // Fast flutter
+        else if (inclinationType === 'EQ') lfo.frequency.value = 0.5 // Slow swell
+        else lfo.frequency.value = 1.2
+      } else if (orbitType === 'GEO') {
+        lfo.frequency.value = 0.1
+      } else {
+        lfo.frequency.value = 0.5
+      }
 
+      // LFO Depth (Wobble)
+      const wobbleDepth = baseFreq * 0.005
+      lfoGain.gain.value = wobbleDepth
+      
       lfo.connect(lfoGain)
       lfoGain.connect(osc.frequency)
 
-      // Filter setup
+      // FILTER SETUP
+      const filter = audioContext.createBiquadFilter()
       filter.type = 'lowpass'
-      // Start closed-ish; we'll open it based on inclination
-      filter.frequency.value = baseFreq * 2
-      filter.Q.value = 1
+      
+      // Filter Tone
+      if (inclinationType === 'EQ') {
+        filter.frequency.value = baseFreq * 2 // Darker
+        filter.Q.value = 0.5
+      } else if (inclinationType === 'POLAR') {
+        filter.frequency.value = baseFreq * 8 // Open, bright
+        filter.Q.value = 2 // Resonant
+      } else {
+        filter.frequency.value = baseFreq * 4 // Neutral
+        filter.Q.value = 1
+      }
 
-      // Gain setup (start silent)
+      // GAIN
+      const gain = audioContext.createGain()
       gain.gain.value = 0
 
-      // Connect graph
+      // CONNECT GRAPH
       osc.connect(filter)
       filter.connect(gain)
       gain.connect(masterGain!)
@@ -111,54 +165,47 @@ export function useSatelliteSound(
         gain,
         filter,
         baseFreq,
-        type
+        key
       }
 
-      // Add Sub-Oscillators for deep orbits (GEO, HEO, ESCAPE) for richness
-      if (['GEO', 'HEO', 'ESCAPE'].includes(type)) {
-        // Sub 1: -1 Octave
-        const subOsc = audioContext.createOscillator()
-        subOsc.type = 'sine'
-        subOsc.frequency.value = baseFreq * 0.5
-        
-        const subGain = audioContext.createGain()
-        subGain.gain.value = 0.7 // Mix level
-        
-        subOsc.connect(subGain)
-        subGain.connect(gain)
-        subOsc.start()
-        voice.subOscillator = subOsc
+      // SUB-OSCILLATORS & HARMONIC WAVES (Deep Orbits)
+      if (['GEO', 'HEO', 'ESCAPE'].includes(key)) {
+        // Sub 1 (-1 Octave)
+        const sub1 = audioContext.createOscillator()
+        sub1.type = 'sine'
+        sub1.frequency.value = baseFreq * 0.5
+        const sub1Gain = audioContext.createGain()
+        sub1Gain.gain.value = 0.7
+        sub1.connect(sub1Gain)
+        sub1Gain.connect(gain)
+        sub1.start()
+        voice.subOscillator = sub1
 
-        // Sub 2: -2 Octaves (The "Real Bass")
-        const subOsc2 = audioContext.createOscillator()
-        subOsc2.type = 'sine'
-        subOsc2.frequency.value = baseFreq * 0.25
-        
-        const subGain2 = audioContext.createGain()
-        subGain2.gain.value = 0.8 // Heavy mix
-        
-        subOsc2.connect(subGain2)
-        subGain2.connect(gain)
-        subOsc2.start()
-        voice.subOscillator2 = subOsc2
+        // Sub 2 (-2 Octaves)
+        const sub2 = audioContext.createOscillator()
+        sub2.type = 'sine'
+        sub2.frequency.value = baseFreq * 0.25
+        const sub2Gain = audioContext.createGain()
+        sub2Gain.gain.value = 0.8
+        sub2.connect(sub2Gain)
+        sub2Gain.connect(gain)
+        sub2.start()
+        voice.subOscillator2 = sub2
 
-        // Filter Sweep LFO: Slow "Harmonic Waves"
-        const filterLfo = audioContext.createOscillator()
-        filterLfo.type = 'sine'
-        filterLfo.frequency.value = 0.15 // Very slow breathing (approx 7s period)
-        
-        const filterLfoGain = audioContext.createGain()
-        filterLfoGain.gain.value = baseFreq * 2 // Sweep range
-        
-        filterLfo.connect(filterLfoGain)
-        filterLfoGain.connect(filter.frequency)
-        filterLfo.start()
-        
-        voice.filterLfo = filterLfo
-        voice.filterLfoGain = filterLfoGain
+        // Filter LFO (Harmonic Waves)
+        const fLfo = audioContext.createOscillator()
+        fLfo.type = 'sine'
+        fLfo.frequency.value = 0.28 // ~3.5s period
+        const fLfoGain = audioContext.createGain()
+        fLfoGain.gain.value = baseFreq * 2
+        fLfo.connect(fLfoGain)
+        fLfoGain.connect(filter.frequency)
+        fLfo.start()
+        voice.filterLfo = fLfo
+        voice.filterLfoGain = fLfoGain
       }
 
-      voices.set(type, voice)
+      voices.set(key, voice)
     })
 
     isAudioInitialized.value = true
@@ -172,109 +219,76 @@ export function useSatelliteSound(
 
     const satellites = activeSatellites.value
     const camera = getCamera()
-    
-    // reset counts and inclination accumulator
-    const counts: Record<OrbitType, number> = {
-      LEO: 0, MEO: 0, GEO: 0, HEO: 0, ESCAPE: 0
-    }
-    const incSums: Record<OrbitType, number> = {
-      LEO: 0, MEO: 0, GEO: 0, HEO: 0, ESCAPE: 0
-    }
-    
-    // Tally up satellites
-    satellites.forEach(sat => {
-      // Assuming 'orbitType' is populated on ActiveSatellite (it is in types.ts)
-      if (counts[sat.orbitType] !== undefined) {
-        counts[sat.orbitType]++
-        incSums[sat.orbitType] += sat.inc || 0
-      }
-    })
-
-    // Update each voice
     const maxSatellites = Math.max(1, satellites.length)
     const cameraPos = camera.position
-    const distToCenter = cameraPos.length() // Distance from center of earth (0,0,0)
+    const distToCenter = cameraPos.length()
 
-    voices.forEach((voice, type) => {
-      const count = counts[type]
+    // 1. Reset Counts
+    const counts: Record<VoiceKey, number> = {} as any
+    VOICE_KEYS.forEach(k => counts[k] = 0)
+
+    // 2. Tally Satellites into Buckets
+    satellites.forEach(sat => {
+      const key = getVoiceKey(sat)
+      counts[key]++
+    })
+
+    // 3. Update Voices
+    voices.forEach((voice, key) => {
+      const count = counts[key]
+      
       if (count === 0) {
-        // Smooth fade out
         voice.gain.gain.setTargetAtTime(0, audioContext!.currentTime, 0.5)
         return
       }
 
-      // Calculate Average Inclination
-      const avgInc = incSums[type] / count
-      // Map 0-90 degrees to a frequency offset factor (e.g., 0.9 to 1.1)
-      const incFactor = 1 + ((avgInc / 90) * 0.2 - 0.1) // +/- 10%
-      
-      const targetBaseFreq = voice.baseFreq * incFactor
-      
-      // Update oscillator frequencies
-      voice.oscillator.frequency.setTargetAtTime(targetBaseFreq, audioContext!.currentTime, 0.2)
-      if (voice.subOscillator) {
-        voice.subOscillator.frequency.setTargetAtTime(targetBaseFreq * 0.5, audioContext!.currentTime, 0.2)
-      }
-      if (voice.subOscillator2) {
-        voice.subOscillator2.frequency.setTargetAtTime(targetBaseFreq * 0.25, audioContext!.currentTime, 0.2)
-      }
-
-      // TIMBRE MODULATION (Inclination)
-      // For LEO/MEO: High inclination = Brighter/Buzzer sound (Filter Open)
-      // Low inclination = Mellow/Dark sound (Filter Closed)
-      if (['LEO', 'MEO'].includes(type)) {
-         // Map inc (0-90) to multiplier (1x to 8x harmonics)
-         const brightness = 1.5 + (avgInc / 90) * 6
-         voice.filter.frequency.setTargetAtTime(targetBaseFreq * brightness, audioContext!.currentTime, 0.2)
-         // Also bump Q slightly for more character at high inc
-         voice.filter.Q.setTargetAtTime(1 + (avgInc/90) * 2, audioContext!.currentTime, 0.2)
-      }
-      
-      // For Deep Orbits: Update Filter Sweep Intensity?
-      if (voice.filterLfoGain) {
-          // More satellites = wider filter sweep
-          voice.filterLfoGain.gain.setTargetAtTime(targetBaseFreq * (1 + Math.log(count+1)), audioContext!.currentTime, 0.5)
-      }
-
-      // Update LFO depth
-      // Reduced wobble to avoid "sireny" sound (was 0.02 base)
-      const activeWobble = (voice.baseFreq * 0.005) * (1 + Math.log(count+1)/5)
-      voice.lfoGain.gain.setTargetAtTime(activeWobble, audioContext!.currentTime, 0.5)
-
-      // Calculate desired volume
+      // Count Factor (Logarithmic)
+      // Note: We use global maxSatellites to normalize, so small buckets are quieter than big ones
       const countFactor = Math.log(count + 1) / Math.log(maxSatellites + 1)
-      
-      // Distance attenuation
+
+      // Distance Attenuation
       let distanceFactor = 1.0
-      if (type === 'LEO') {
-        distanceFactor = Math.max(0, 1 - (distToCenter - 5) / 20)
-      } else if (type === 'GEO') {
+      if (key.startsWith('LEO')) {
+        // LEO floor of 0.1 at 25 units
+        distanceFactor = Math.max(0.1, 1 - (distToCenter - 5) / 25)
+      } else if (key === 'GEO') {
         distanceFactor = Math.max(0.2, 1 - (distToCenter - 10) / 40)
       } else {
         distanceFactor = 0.8
       }
 
-      // Boost volume for deep orbits ("louder on the low end")
-      // Increased from 1.5 to 3.0 to compensate for lower satellite counts
-      const deepOrbitBoost = ['GEO', 'HEO', 'ESCAPE'].includes(type) ? 3.0 : 1.0
+      // Boosts
+      let boost = 1.0
+      // Deep orbit boost
+      if (['GEO', 'HEO', 'ESCAPE'].includes(key)) boost *= 3.0
+      // Polar boost (make them cut through)
+      if (key.includes('POLAR')) boost *= 1.2
+      // EQ dampening (keep it subtle)
+      if (key.includes('EQ')) boost *= 0.8
 
-      const targetGain = Math.min(0.8, countFactor * distanceFactor * 0.5 * deepOrbitBoost)
-
+      const targetGain = Math.min(0.8, countFactor * distanceFactor * 0.5 * boost)
       voice.gain.gain.setTargetAtTime(targetGain, audioContext!.currentTime, 0.2)
+
+      // Dynamic LFO Depth based on density (more chaos with more sats)
+      const activeWobble = (voice.baseFreq * 0.005) * (1 + Math.log(count + 1) / 5)
+      voice.lfoGain.gain.setTargetAtTime(activeWobble, audioContext!.currentTime, 0.5)
       
-      // Detune
-      const detuneAmount = Math.min(count, 50) 
+      // Filter LFO Intensity (Deep Orbits)
+      if (voice.filterLfoGain) {
+         voice.filterLfoGain.gain.setTargetAtTime(voice.baseFreq * (1 + Math.log(count+1)), audioContext!.currentTime, 0.5)
+      }
+      
+      // Detune (Chorus)
+      const detuneAmount = Math.min(count, 50)
       voice.oscillator.detune.setTargetAtTime(detuneAmount, audioContext!.currentTime, 0.1)
     })
   }
 
-  // Animation loop for sound updates
   let animationFrame: number
   function loop() {
     if (isPlaying.value) {
       updateSound()
     } else {
-      // Fade out if paused
       voices.forEach(v => {
         if(audioContext) {
            v.gain.gain.setTargetAtTime(0, audioContext.currentTime, 0.5)
@@ -284,59 +298,34 @@ export function useSatelliteSound(
     animationFrame = requestAnimationFrame(loop)
   }
 
-  // Watch playback state
   watch(isPlaying, (playing) => {
-    if (playing && !audioContext) {
-      initAudio()
-    }
+    if (playing && !audioContext) initAudio()
   })
 
-  // Watch volume
   watch(volume, (v) => {
-    if (masterGain) {
-      masterGain.gain.setTargetAtTime(v, audioContext!.currentTime, 0.1)
-    }
+    if (masterGain) masterGain.gain.setTargetAtTime(v, audioContext!.currentTime, 0.1)
   })
 
-  // Watch mute
   watch(isMuted, (muted) => {
     if (masterGain && audioContext) {
-      const target = muted ? 0 : volume.value
-      masterGain.gain.setTargetAtTime(target, audioContext.currentTime, 0.1)
+      masterGain.gain.setTargetAtTime(muted ? 0 : volume.value, audioContext.currentTime, 0.1)
     }
   })
   
-  // Start the loop
   loop()
 
   onUnmounted(() => {
     cancelAnimationFrame(animationFrame)
-    if (audioContext) {
-      audioContext.close()
-    }
+    if (audioContext) audioContext.close()
   })
 
-  function toggleMute() {
-    isMuted.value = !isMuted.value
-  }
-
-  function setVolume(v: number) {
-    volume.value = Math.max(0, Math.min(1, v))
-  }
+  function toggleMute() { isMuted.value = !isMuted.value }
+  function setVolume(v: number) { volume.value = Math.max(0, Math.min(1, v)) }
   
   function resumeAudioContext() {
-    if (audioContext?.state === 'suspended') {
-      audioContext.resume()
-    } else if (!audioContext && isPlaying.value) {
-        initAudio()
-    }
+    if (audioContext?.state === 'suspended') audioContext.resume()
+    else if (!audioContext && isPlaying.value) initAudio()
   }
 
-  return {
-    isMuted,
-    volume,
-    toggleMute,
-    setVolume,
-    resumeAudioContext
-  }
+  return { isMuted, volume, toggleMute, setVolume, resumeAudioContext }
 }
