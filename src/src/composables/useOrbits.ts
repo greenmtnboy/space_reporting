@@ -367,7 +367,8 @@ export function useOrbits(
 
   // Create or update orbit line for a satellite
   function updateOrbitLine(satellite: ActiveSatellite) {
-    if (!orbitGroup.value) return
+    const { orbitLinesGroup: group } = getOrCreateGroups()
+    if (!group) return
 
     let line = orbitLines.get(satellite.jcat)
 
@@ -386,7 +387,7 @@ export function useOrbits(
       line.userData.satelliteId = satellite.jcat
       line.userData.totalPoints = totalPoints
       orbitLines.set(satellite.jcat, line)
-      orbitGroup.value.add(line)
+      group.add(line)
     }
 
     const totalPoints = line.userData.totalPoints
@@ -408,7 +409,8 @@ export function useOrbits(
 
   // Create or update launch line for a satellite
   function updateLaunchLine(satellite: ActiveSatellite) {
-    if (!orbitGroup.value) return
+    const { launchLinesGroup: group } = getOrCreateGroups()
+    if (!group) return
 
     let line = launchLines.get(satellite.jcat)
 
@@ -427,7 +429,7 @@ export function useOrbits(
       line = new THREE.Line(geometry, material)
       line.userData.satelliteId = satellite.jcat
       launchLines.set(satellite.jcat, line)
-      orbitGroup.value.add(line)
+      group.add(line)
     }
 
     const totalPoints = line.geometry.userData.totalPoints
@@ -438,19 +440,67 @@ export function useOrbits(
     material.opacity = satellite.launchOpacity
   }
 
+  // Separate child groups for orbits and launches (enables O(n) clear instead of O(n²) remove)
+  let orbitLinesGroup: THREE.Group | null = null
+  let launchLinesGroup: THREE.Group | null = null
+
+  function getOrCreateGroups() {
+    if (!orbitGroup.value) return { orbitLinesGroup: null, launchLinesGroup: null }
+
+    if (!orbitLinesGroup) {
+      orbitLinesGroup = new THREE.Group()
+      orbitLinesGroup.name = 'orbitLines'
+      orbitGroup.value.add(orbitLinesGroup)
+    }
+    if (!launchLinesGroup) {
+      launchLinesGroup = new THREE.Group()
+      launchLinesGroup.name = 'launchLines'
+      orbitGroup.value.add(launchLinesGroup)
+    }
+    return { orbitLinesGroup, launchLinesGroup }
+  }
+
   // Remove objects for satellites no longer in view
   function cleanupRemovedSatellites(
     currentIds: Set<string>,
-    objectMap: Map<string, THREE.Line>
+    objectMap: Map<string, THREE.Line>,
+    targetGroup: THREE.Group | null
   ) {
-    if (!orbitGroup.value) return
+    if (!targetGroup) return
 
-    for (const [id, line] of objectMap) {
-      if (!currentIds.has(id)) {
-        orbitGroup.value.remove(line)
-        line.geometry.dispose()
-        ;(line.material as THREE.Material).dispose()
-        objectMap.delete(id)
+    // Count how many we need to remove
+    let removeCount = 0
+    for (const id of objectMap.keys()) {
+      if (!currentIds.has(id)) removeCount++
+    }
+
+    // If removing more than half, it's faster to clear and re-add keepers
+    // This avoids O(n²) from repeated indexOf + splice in remove()
+    if (removeCount > objectMap.size / 2) {
+      const keepLines: THREE.Line[] = []
+      for (const [id, line] of objectMap) {
+        if (currentIds.has(id)) {
+          keepLines.push(line)
+        } else {
+          line.geometry.dispose()
+          ;(line.material as THREE.Material).dispose()
+          objectMap.delete(id)
+        }
+      }
+      // Clear this group's children, then re-add keepers
+      targetGroup.clear()
+      for (const line of keepLines) {
+        targetGroup.add(line)
+      }
+    } else {
+      // Removing few objects - individual removal is fine
+      for (const [id, line] of objectMap) {
+        if (!currentIds.has(id)) {
+          targetGroup.remove(line)
+          line.geometry.dispose()
+          ;(line.material as THREE.Material).dispose()
+          objectMap.delete(id)
+        }
       }
     }
   }
@@ -469,7 +519,7 @@ export function useOrbits(
       }
 
       // Clean up removed satellites
-      cleanupRemovedSatellites(currentIds, orbitLines)
+      cleanupRemovedSatellites(currentIds, orbitLines, orbitLinesGroup)
     },
     { deep: false }
   )
@@ -487,27 +537,36 @@ export function useOrbits(
       }
 
       // Clean up completed launches
-      cleanupRemovedSatellites(currentIds, launchLines)
+      cleanupRemovedSatellites(currentIds, launchLines, launchLinesGroup)
     },
     { deep: false }
   )
 
   // Cleanup function
   function cleanup() {
-    if (orbitGroup.value) {
-      for (const line of orbitLines.values()) {
-        orbitGroup.value.remove(line)
-        line.geometry.dispose()
-        ;(line.material as THREE.Material).dispose()
-      }
-      for (const line of launchLines.values()) {
-        orbitGroup.value.remove(line)
-        line.geometry.dispose()
-        ;(line.material as THREE.Material).dispose()
-      }
+    // Clear child groups - O(n) instead of O(n²)
+    orbitLinesGroup?.clear()
+    launchLinesGroup?.clear()
+
+    // Clear parent group (removes the child groups too)
+    orbitGroup.value?.clear()
+
+    // Dispose GPU resources for all tracked lines
+    for (const line of orbitLines.values()) {
+      line.geometry.dispose()
+      ;(line.material as THREE.Material).dispose()
     }
+    for (const line of launchLines.values()) {
+      line.geometry.dispose()
+      ;(line.material as THREE.Material).dispose()
+    }
+
     orbitLines.clear()
     launchLines.clear()
+
+    // Reset group references
+    orbitLinesGroup = null
+    launchLinesGroup = null
   }
 
   return {
