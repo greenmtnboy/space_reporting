@@ -112,9 +112,9 @@ export function useSatelliteSound(
       } else if (subType === 'EQ') {
         osc.type = 'sine'
       } else if (subType === 'POLAR') {
-        osc.type = 'sawtooth'
+        osc.type = 'sine'
       } else {
-        osc.type = 'triangle'
+        osc.type = 'sine'
       }
       
       osc.frequency.value = baseFreq
