@@ -10,6 +10,7 @@ import type { SatelliteFilters } from '../composables/useSatellites'
 import { useOrbits } from '../composables/useOrbits'
 import { useGlobe } from '../composables/useGlobe'
 import { useCrossFilter } from '../composables/useCrossFilter'
+import { useSatelliteSound } from '../composables/useSatelliteSound'
 // TODO: Satellite markers - disabled pending debugging
 // import { useSatelliteMarkers } from '../composables/useSatelliteMarkers'
 
@@ -69,9 +70,9 @@ const {
   cleanup: cleanupGlobe,
   isInitialized: isGlobeInitialized,
   latLngToVector3,
-  getOrbitGroup
+  getOrbitGroup,
+  getCamera
   // TODO: For satellite markers - disabled pending debugging
-  // getCamera,
   // getRenderer
 } = useGlobe(globeContainer)
 
@@ -106,6 +107,15 @@ const {
 
 // Data loading status
 const { isLoading: isDataLoading, loadError } = useSatelliteDataStatus()
+
+// Initialize sound
+const {
+  isMuted,
+  volume,
+  toggleMute,
+  setVolume,
+  resumeAudioContext
+} = useSatelliteSound(activeSatellites, getCamera, isPlaying)
 
 // Initialize orbits after globe is ready
 let orbitsCleanup: (() => void) | null = null
@@ -152,6 +162,7 @@ function handleReset() {
 }
 
 function handlePlayPause() {
+  resumeAudioContext()
   togglePlayPause()
 }
 
@@ -260,14 +271,16 @@ onUnmounted(() => {
           :is-paused="isPaused"
           :is-complete="isComplete"
           :progress="progress"
-          :is-muted="true"
-          :volume="0"
+          :is-muted="isMuted"
+          :volume="volume"
           :progress-start-label="progressStartLabel"
           :progress-end-label="progressEndLabel"
-          :hide-sound="true"
+          :hide-sound="false"
           @toggle-play-pause="handlePlayPause"
           @reset="handleReset"
           @seek="seekTo"
+          @toggle-mute="toggleMute"
+          @set-volume="setVolume"
         />
 
         <CompletionModal
