@@ -363,7 +363,6 @@ onUnmounted(() => {
 .globe-container {
   flex: 0 1 auto;
   width: 100%;
-  max-width: 800px;
   max-height: calc(100vh - 200px);
   aspect-ratio: 1;
   position: relative;
