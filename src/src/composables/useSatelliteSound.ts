@@ -6,9 +6,10 @@ import * as THREE from 'three'
 const ORBIT_TYPES = ['LEO', 'MEO', 'GEO', 'HEO', 'ESCAPE'] as const
 type OrbitType = typeof ORBIT_TYPES[number]
 
-// Expanded Voice Keys to include inclination buckets
+// Expanded Voice Keys to include LEO altitude bands and MEO buckets
+// LEO split by altitude: LOW (<700km), MID (700-1200km), HIGH (>1200km)
 const VOICE_KEYS = [
-  'LEO_EQ', 'LEO_MID', 'LEO_POLAR',
+  'LEO_LOW', 'LEO_MID', 'LEO_HIGH',
   'MEO_EQ', 'MEO_MID', 'MEO_POLAR',
   'GEO', 'HEO', 'ESCAPE'
 ] as const
@@ -41,9 +42,10 @@ export function useSatelliteSound(
   let masterGain: GainNode | null = null
   const voices: Map<VoiceKey, Voice> = new Map()
 
-  // Frequencies (Root Note A)
+  // Base Frequencies (Root Note A)
+  // LEO voices will form a Major Triad (singing chord)
   const BASE_FREQS: Record<OrbitType, number> = {
-    'LEO': 440,   // A4
+    'LEO': 440,   // A4 Base
     'MEO': 220,   // A3
     'GEO': 110,   // A2
     'HEO': 55,    // A1
@@ -52,12 +54,21 @@ export function useSatelliteSound(
 
   // Helper to map satellite to VoiceKey
   function getVoiceKey(sat: ActiveSatellite): VoiceKey {
-    const inc = sat.inc || 0
-    if (sat.orbitType === 'LEO' || sat.orbitType === 'MEO') {
-      if (inc < 30) return `${sat.orbitType}_EQ` as VoiceKey
-      if (inc < 60) return `${sat.orbitType}_MID` as VoiceKey
-      return `${sat.orbitType}_POLAR` as VoiceKey
+    if (sat.orbitType === 'LEO') {
+      const alt = (sat.perigee + sat.apogee) / 2
+      if (alt < 700) return 'LEO_LOW'   // Starlink, ISS
+      if (alt < 1200) return 'LEO_MID'  // Iridium
+      return 'LEO_HIGH'                 // OneWeb, etc
     }
+    
+    // MEO split by inclination
+    if (sat.orbitType === 'MEO') {
+      const inc = sat.inc || 0
+      if (inc < 30) return 'MEO_EQ'
+      if (inc < 60) return 'MEO_MID'
+      return 'MEO_POLAR'
+    }
+
     return sat.orbitType as VoiceKey
   }
 
@@ -73,34 +84,36 @@ export function useSatelliteSound(
     VOICE_KEYS.forEach(key => {
       if (!audioContext) return
 
-      // Determine OrbitType from Key
       let orbitType: OrbitType
-      let inclinationType: 'EQ' | 'MID' | 'POLAR' | null = null
+      let subType: string | null = null
 
       if (key.startsWith('LEO')) {
         orbitType = 'LEO'
-        inclinationType = key.split('_')[1] as any
+        subType = key.split('_')[1]
       } else if (key.startsWith('MEO')) {
         orbitType = 'MEO'
-        inclinationType = key.split('_')[1] as any
+        subType = key.split('_')[1]
       } else {
         orbitType = key as OrbitType
       }
 
-      const baseFreq = BASE_FREQS[orbitType]
+      let baseFreq = BASE_FREQS[orbitType]
 
       // OSCILLATOR SETUP
       const osc = audioContext.createOscillator()
       
-      // Waveform & Timbre Customization per Bucket
-      if (inclinationType === 'EQ') {
-        // Equatorial: Smooth, rounded, steady
+      // Waveform & Pitch Customization
+      if (orbitType === 'LEO') {
+        // "Sweet high pitched singing" -> Sine waves forming a chord
         osc.type = 'sine'
-      } else if (inclinationType === 'POLAR') {
-        // Polar: Sharp, buzzy, urgent
+        if (subType === 'LOW') baseFreq = 440 // A4
+        if (subType === 'MID') baseFreq = 554.37 // C#5 (Major 3rd)
+        if (subType === 'HIGH') baseFreq = 659.25 // E5 (Perfect 5th)
+      } else if (subType === 'EQ') {
+        osc.type = 'sine'
+      } else if (subType === 'POLAR') {
         osc.type = 'sawtooth'
       } else {
-        // Mid / Others: Balanced
         osc.type = 'triangle'
       }
       
@@ -113,10 +126,8 @@ export function useSatelliteSound(
       
       // LFO Rate
       if (orbitType === 'LEO') {
-        // Faster orbits
-        if (inclinationType === 'POLAR') lfo.frequency.value = 2.0 // Fast flutter
-        else if (inclinationType === 'EQ') lfo.frequency.value = 0.5 // Slow swell
-        else lfo.frequency.value = 1.2
+        // Gentle vibrato for singing
+        lfo.frequency.value = 4.0 
       } else if (orbitType === 'GEO') {
         lfo.frequency.value = 0.1
       } else {
@@ -124,7 +135,7 @@ export function useSatelliteSound(
       }
 
       // LFO Depth (Wobble)
-      const wobbleDepth = baseFreq * 0.005
+      const wobbleDepth = baseFreq * (orbitType === 'LEO' ? 0.015 : 0.005)
       lfoGain.gain.value = wobbleDepth
       
       lfo.connect(lfoGain)
@@ -134,11 +145,14 @@ export function useSatelliteSound(
       const filter = audioContext.createBiquadFilter()
       filter.type = 'lowpass'
       
-      // Filter Tone
-      if (inclinationType === 'EQ') {
+      if (orbitType === 'LEO') {
+        // Pure tone, let it through
+        filter.frequency.value = baseFreq * 4
+        filter.Q.value = 0.5
+      } else if (subType === 'EQ') {
         filter.frequency.value = baseFreq * 2 // Darker
         filter.Q.value = 0.5
-      } else if (inclinationType === 'POLAR') {
+      } else if (subType === 'POLAR') {
         filter.frequency.value = baseFreq * 8 // Open, bright
         filter.Q.value = 2 // Resonant
       } else {
@@ -243,7 +257,6 @@ export function useSatelliteSound(
       }
 
       // Count Factor (Logarithmic)
-      // Note: We use global maxSatellites to normalize, so small buckets are quieter than big ones
       const countFactor = Math.log(count + 1) / Math.log(maxSatellites + 1)
 
       // Distance Attenuation
@@ -257,21 +270,34 @@ export function useSatelliteSound(
         distanceFactor = 0.8
       }
 
-      // Boosts
+      // Boosts / Deweighting
       let boost = 1.0
+      
       // Deep orbit boost
       if (['GEO', 'HEO', 'ESCAPE'].includes(key)) boost *= 3.0
-      // Polar boost (make them cut through)
+      
+      // LEO Deweighting (Significant reduction)
+      if (key.startsWith('LEO')) {
+        boost *= 0.5 // Reduced from 1.0 to 0.2 to handle massive counts
+      }
+
+      // Polar boost
       if (key.includes('POLAR')) boost *= 1.2
-      // EQ dampening (keep it subtle)
+      // EQ dampening
       if (key.includes('EQ')) boost *= 0.8
 
       const targetGain = Math.min(0.8, countFactor * distanceFactor * 0.5 * boost)
       voice.gain.gain.setTargetAtTime(targetGain, audioContext!.currentTime, 0.2)
 
-      // Dynamic LFO Depth based on density (more chaos with more sats)
-      const activeWobble = (voice.baseFreq * 0.005) * (1 + Math.log(count + 1) / 5)
-      voice.lfoGain.gain.setTargetAtTime(activeWobble, audioContext!.currentTime, 0.5)
+      // Dynamic LFO Depth based on density
+      // For singing LEO, keep it more constant vibrato
+      if (key.startsWith('LEO')) {
+        // Subtle increase in vibrato depth with count
+         voice.lfoGain.gain.setTargetAtTime(voice.baseFreq * 0.015 * (1 + Math.log(count+1)/10), audioContext!.currentTime, 0.5)
+      } else {
+        const activeWobble = (voice.baseFreq * 0.005) * (1 + Math.log(count + 1) / 5)
+        voice.lfoGain.gain.setTargetAtTime(activeWobble, audioContext!.currentTime, 0.5)
+      }
       
       // Filter LFO Intensity (Deep Orbits)
       if (voice.filterLfoGain) {
