@@ -40,7 +40,7 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
   let previousMousePosition = { x: 0, y: 0 }
   let userRotationVelocity = { x: 0, y: 0 }
   const dragSensitivity = 0.005
-  const zoomSensitivity = 0.001
+  const zoomSensitivity = 0.005
   const minZoom = 2
   const maxZoom = 100
   const friction = 0.95 // Momentum decay
@@ -167,8 +167,11 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
 
   function onWheel(event: WheelEvent) {
     event.preventDefault()
-    const zoomDelta = event.deltaY * zoomSensitivity
-    state.camera.position.z = Math.max(minZoom, Math.min(maxZoom, state.camera.position.z + zoomDelta))
+    // Scale zoom delta by current distance for consistent feel
+    // Slower when zoomed in close, faster when zoomed out far
+    const currentZ = state.camera.position.z
+    const zoomDelta = event.deltaY * zoomSensitivity * currentZ /10
+    state.camera.position.z = Math.max(minZoom, Math.min(maxZoom, currentZ + zoomDelta))
   }
 
   // Touch support handlers
@@ -208,10 +211,10 @@ export function useGlobe(containerRef: Ref<HTMLElement | null>) {
 
       previousMousePosition = { x: event.touches[0].clientX, y: event.touches[0].clientY }
     } else if (event.touches.length === 2) {
-      // Pinch zoom
+      // Pinch zoom - scale proportionally to current distance
       const currentDistance = getTouchDistance(event.touches)
-      const zoomDelta = (lastTouchDistance - currentDistance) * 0.01
-      state.camera.position.z = Math.max(minZoom, Math.min(maxZoom, state.camera.position.z + zoomDelta))
+      const zoomRatio = lastTouchDistance / currentDistance
+      state.camera.position.z = Math.max(minZoom, Math.min(maxZoom, state.camera.position.z * zoomRatio))
       lastTouchDistance = currentDistance
     }
   }
