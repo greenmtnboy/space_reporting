@@ -2,9 +2,9 @@
 # Default dialect for execution
 dialect = "duck_db"
 parallelism = 2
-# Parallelism level for directory execution
-
+env_file="../.env"
 
 [engine.config]
 enable_gcs = true
 enable_python_datasources = true
+
