@@ -35,10 +35,10 @@ jobs:
 
           if [ $EXIT_CODE -eq 0 ]; then
             echo "Changes detected. Running downstream preql..."
-            trilogy run data.core.preql \
+            trilogy run data/core.preql \
               --env GOOGLE_HMAC_KEY=${{ secrets.GOOGLE_HMAC_KEY }} \
               --env GOOGLE_HMAC_SECRET=${{ secrets.GOOGLE_HMAC_SECRET }}
-            trilogy run satellite_data.core.preql \
+            trilogy run data/satellite_data.preql \
               --env GOOGLE_HMAC_KEY=${{ secrets.GOOGLE_HMAC_KEY }} \
               --env GOOGLE_HMAC_SECRET=${{ secrets.GOOGLE_HMAC_SECRET }}
           elif [ $EXIT_CODE -eq 2 ]; then
