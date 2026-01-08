@@ -19,5 +19,15 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
+    <!-- GoatCounter analytics - only loads on GitHub Pages -->
+    <script>
+      if (window.location.hostname.endsWith('github.io')) {
+        var script = document.createElement('script');
+        script.setAttribute('data-goatcounter', 'https://space-reporting.goatcounter.com/count');
+        script.async = true;
+        script.src = '//gc.zgo.at/count.js';
+        document.body.appendChild(script);
+      }
+    </script>
   </body>
 </html>
