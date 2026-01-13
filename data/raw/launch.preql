@@ -151,5 +151,5 @@ datasource launch_info (
     data_updated_through
     )
 grain (launch_tag)
-file `gcs://trilogy_public_models/duckdb/launch_report/launch.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/launch.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/launch.parquet`
 freshness by data_updated_through;

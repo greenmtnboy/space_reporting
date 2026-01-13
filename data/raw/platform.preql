@@ -75,5 +75,5 @@ datasource platform_info (
     data_updated_through
     )
 grain (code)
-file `gcs://trilogy_public_models/duckdb/launch_report/platform_info.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/platform_info.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/platform_info.parquet`
 freshness by data_updated_through;

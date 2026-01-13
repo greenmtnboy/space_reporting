@@ -52,5 +52,5 @@ datasource stages (
     data_updated_through
     )
 grain (name)
-file `gcs://trilogy_public_models/duckdb/launch_report/stages.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/stages.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/stages.parquet`
 freshness by data_updated_through;

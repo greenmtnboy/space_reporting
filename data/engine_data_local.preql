@@ -1,0 +1,20 @@
+import raw.launch;
+
+copy into json `./raw_engine_data.json` from
+select
+    launch_count,
+    min(launch_date) as first_launch,
+    max(launch_date) as last_launch,
+    vehicle.stage.engine.name,
+    vehicle.stage.engine.chambers,
+    vehicle.stage.engine_count,
+    vehicle.stage.engine.date,
+    vehicle.stage.engine.family,
+    vehicle.stage.engine.fuel,
+    vehicle.stage.engine.group,
+    vehicle.stage.engine.manufacturer,
+    vehicle.stage.engine.isp,
+    vehicle.stage.engine.thrust,
+having launch_count>0;
+
+

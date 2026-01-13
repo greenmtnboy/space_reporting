@@ -162,5 +162,5 @@ datasource satcat (
     data_update_date: data_updated_through
     )
 grain (jcat)
-file `gcs://trilogy_public_models/duckdb/launch_report/satcat.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/satcat.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/satcat.parquet`
 freshness by data_updated_through;

@@ -77,6 +77,6 @@ datasource engine (
     data_updated_through
     )
 grain (name)
-file `gcs://trilogy_public_models/duckdb/launch_report/engine.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/engine.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/engine.parquet`
 freshness by data_updated_through;
 

@@ -1,0 +1,9 @@
+import raw.launch;
+
+copy into json `./raw_data.json` from
+where launch_date is not null
+and site.latitude is not null and site.longitude is not null
+and success_flag is not null
+select
+    
+limit 100;

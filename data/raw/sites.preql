@@ -62,5 +62,5 @@ datasource sites (
     data_updated_through
     )
 grain (key)
-file `gcs://trilogy_public_models/duckdb/launch_report/sites.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/sites.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/sites.parquet`
 freshness by data_updated_through;
