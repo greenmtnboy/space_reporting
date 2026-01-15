@@ -6,7 +6,15 @@ export default defineConfig({
   plugins: [
     vue(),
     // Polyfill Node crypto and stream for trilogy-studio-components
-    nodePolyfills({ include: ['crypto', 'stream'] }),
+    nodePolyfills({
+      include: ['crypto', 'stream'],
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+      protocolImports: true,
+    }),
   ],
   base: '/space_reporting/',
 })

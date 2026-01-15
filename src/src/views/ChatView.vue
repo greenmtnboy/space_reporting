@@ -63,6 +63,14 @@ onMounted(async () => {
     if (!trilogy.chatStore.activeChatId) {
       trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat')
     }
+
+    // Ensure production resolver is used
+    trilogy.resolver.settingStore.loadSettings()
+    const currentResolver = trilogy.resolver.settingStore.settings.trilogyResolver
+    if (!currentResolver || currentResolver.includes('localhost')) {
+      trilogy.resolver.settingStore.updateSetting('trilogyResolver', 'https://trilogy-service.fly.dev')
+      trilogy.resolver.settingStore.saveSettings()
+    }
   } catch (error) {
     console.error('Failed to initialize DuckDB:', error)
     dbStatus.value = 'error'
@@ -164,122 +172,23 @@ function getDefaultModels(provider: string) {
 }
 
 const canConnect = computed(() => selectedProvider.value && apiKeyInput.value && selectedModel.value)
+
 const connectionInfo = computed(() => {
   if (!llmStore.activeConnection) return ''
   const conn = llmStore.getConnection(llmStore.activeConnection)
   return conn ? `${conn.name} (${conn.model})` : ''
 })
-
-// Debug query execution
-const debugResult = ref<string>('')
-const debugLoading = ref(false)
-
-const runDebugQuery = async () => {
-  debugLoading.value = true
-  debugResult.value = 'Running tests...'
-  const results: string[] = []
-  
-  try {
-    // Get the connection
-    const conn = trilogy.connectionStore.connections[dataConnectionName]
-    if (!conn) {
-      debugResult.value = 'Error: Connection not found'
-      return
-    }
-    
-    // Test 1: Direct DuckDB query
-    console.log('Test 1: Direct DuckDB query...')
-    try {
-      const directResult = await conn.query('SELECT 1 as test')
-      console.log('Direct query result:', directResult)
-      results.push('✅ Test 1 (Direct DuckDB): Success')
-    } catch (e) {
-      console.error('Direct query error:', e)
-      results.push(`❌ Test 1 (Direct DuckDB): ${e instanceof Error ? e.message : String(e)}`)
-    }
-    
-    // Test 2: QueryExecutionService with SQL (bypasses resolver hash)
-    console.log('Test 2: QueryExecutionService (SQL)...')
-    try {
-      const { resultPromise } = await trilogy.queryExecutionService.executeQuery(
-        dataConnectionName,
-        { text: 'SELECT 1 as test', editorType: 'sql', imports: [] }
-      )
-      const result = await resultPromise
-      results.push(result.success 
-        ? '✅ Test 2 (SQL via Service): Success' 
-        : `❌ Test 2 (SQL via Service): ${result.error}`)
-    } catch (e) {
-      console.error('SQL service error:', e)
-      results.push(`❌ Test 2 (SQL via Service): ${e instanceof Error ? e.message : String(e)}`)
-    }
-    
-    // Test 3: Resolver validate_query (triggers createHash for caching)
-    console.log('Test 3: Resolver validate_query (uses createHash)...')
-    try {
-      const validateResult = await trilogy.queryExecutionService.trilogyResolver.validate_query(
-        'SELECT 1',
-        null,
-        null,
-        null,
-        null
-      )
-      console.log('Validate result:', validateResult)
-      results.push('✅ Test 3 (Resolver validate_query): Success - createHash works!')
-    } catch (e) {
-      console.error('Resolver validate error:', e)
-      results.push(`❌ Test 3 (Resolver validate_query): ${e instanceof Error ? e.message : String(e)}\n   Stack: ${e instanceof Error ? e.stack?.split('\n').slice(0, 5).join('\n   ') : 'N/A'}`)
-    }
-    
-    // Test 4: QueryExecutionService with Trilogy (uses resolver + createHash)
-    console.log('Test 4: QueryExecutionService (Trilogy)...')
-    try {
-      const { resultPromise } = await trilogy.queryExecutionService.executeQuery(
-        dataConnectionName,
-        { text: 'SELECT 1 as test', editorType: 'trilogy', imports: [] }
-      )
-      const result = await resultPromise
-      results.push(result.success 
-        ? '✅ Test 4 (Trilogy via Service): Success' 
-        : `❌ Test 4 (Trilogy via Service): ${result.error}`)
-    } catch (e) {
-      console.error('Trilogy service error:', e)
-      results.push(`❌ Test 4 (Trilogy via Service): ${e instanceof Error ? e.message : String(e)}\n   Stack: ${e instanceof Error ? e.stack?.split('\n').slice(0, 5).join('\n   ') : 'N/A'}`)
-    }
-    
-    debugResult.value = results.join('\n\n')
-  } catch (error) {
-    console.error('Debug query error:', error)
-    debugResult.value = `❌ Unexpected error: ${error instanceof Error ? error.message : String(error)}\n\nStack: ${error instanceof Error ? error.stack : 'N/A'}`
-  } finally {
-    debugLoading.value = false
-  }
-}
 </script>
 
 <template>
   <div class="chat-view">
     <div class="chat-header-bar">
       <h1>Chat with GCAT Data</h1>
-      <div class="header-actions">
-        <!-- Debug Query Button -->
-        <button class="debug-btn" @click="runDebugQuery" :disabled="debugLoading || dbStatus !== 'ready'">
-          🔍 Test Query
-        </button>
-        <div class="db-status" :class="dbStatus">
-          <span class="status-dot"></span>
-          <span v-if="dbStatus === 'loading'">Initializing DuckDB...</span>
-          <span v-else-if="dbStatus === 'ready'">DuckDB Ready</span>
-          <span v-else>DuckDB Error: {{ dbError }}</span>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Debug Result Panel -->
-    <div v-if="debugResult" class="debug-panel">
-      <div class="debug-result">
-        <pre>{{ debugResult }}</pre>
-        <button class="debug-close" @click="debugResult = ''">✕</button>
+      <div class="db-status" :class="dbStatus">
+        <span class="status-dot"></span>
+        <span v-if="dbStatus === 'loading'">Initializing DuckDB...</span>
+        <span v-else-if="dbStatus === 'ready'">DuckDB Ready</span>
+        <span v-else>DuckDB Error: {{ dbError }}</span>
       </div>
     </div>
     
