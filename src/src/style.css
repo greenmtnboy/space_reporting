@@ -5,7 +5,9 @@
 }
 
 :root {
+  /* App color palette */
   --color-bg: #030305;
+  --color-bg-primary: #030305;
   --color-bg-secondary: #08090d;
   --color-bg-tertiary: #0d0f14;
   --color-text: #e8eaed;
@@ -21,9 +23,56 @@
   --color-border: #1a1d24;
   --color-border-bright: #2a3040;
   --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+
+  /* trilogy-studio-components theming variables */
+  --bg-color: var(--color-bg-primary);
+  --text-color: var(--color-text);
+  --text-faint: var(--color-text-muted);
+  --text-subtle: var(--color-text-muted);
+  --border: var(--color-border);
+  --border-light: var(--color-border);
+  --border-color: var(--color-border);
+  --sidebar-bg: var(--color-bg-secondary);
+  --sidebar-font: var(--color-text);
+  --sidebar-selector-bg: var(--color-bg-tertiary);
+  --sidebar-selector-font: var(--color-text);
+  --sidebar-selector-selected-bg: var(--color-accent);
+  --query-window-bg: var(--color-bg-tertiary);
+  --query-window-font: var(--color-text);
+  --result-window-bg: var(--color-bg-primary);
+  --button-bg: var(--color-bg-tertiary);
+  --button-text: var(--color-text);
+  --button-mouseover: var(--color-bg-secondary);
+  --button-font-size: 0.875rem;
+  --special-text: var(--color-accent);
+  --font-size: 0.875rem;
+  --small-font-size: 0.75rem;
+  --bg-loading: var(--color-bg-tertiary);
+  --link-color: var(--color-accent-bright);
+
+  /* Editor/code related variables */
+  --editor-bg: var(--color-bg-tertiary);
+  --editor-font: var(--color-text);
+  --editor-line-numbers: var(--color-text-muted);
+
+  /* Results/table variables */
+  --table-header-bg: var(--color-bg-secondary);
+  --table-row-hover: rgba(14, 165, 233, 0.1);
+  --table-border: var(--color-border);
+
+  /* Input/form variables */
+  --input-bg: var(--color-bg-tertiary);
+  --input-border: var(--color-border);
+  --input-focus-border: var(--color-accent);
+
+  /* Status colors */
+  --success-color: var(--color-success);
+  --error-color: var(--color-failure);
+  --warning-color: #f59e0b;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--color-bg);
@@ -164,7 +213,8 @@ html, body {
   background-color: #1a1c22;
   overflow: hidden;
   border: 1px solid var(--color-border);
-  touch-action: none; /* Prevent default touch behaviors for custom handling */
+  touch-action: none;
+  /* Prevent default touch behaviors for custom handling */
   -webkit-user-select: none;
   user-select: none;
 }
@@ -282,12 +332,12 @@ html, body {
   background: linear-gradient(135deg, var(--color-accent-dim) 0%, var(--color-accent) 100%);
   border: 1px solid var(--color-accent);
   color: white;
-  box-shadow: 0 0 12px rgba(14, 165, 233, 0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .control-btn.primary:hover {
   background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-bright) 100%);
-  box-shadow: 0 0 20px rgba(14, 165, 233, 0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .control-btn:active {
@@ -361,6 +411,7 @@ html, body {
     flex-direction: row;
     flex-wrap: wrap;
   }
+
   .chart-block {
     flex: 1;
     min-width: 280px;

@@ -1,10 +1,10 @@
 import raw.launch;
 
-copy into json `./raw_engine_data.json` from
+copy into json `../src/public/raw_engine_data.json` from
+where launch_date is not null and launch_date.year=2025
 select
-    launch_count,
-    min(launch_date) as first_launch,
-    max(launch_date) as last_launch,
+    launch_date,
+    launch_tag,
     vehicle.stage.engine.name,
     vehicle.stage.engine.chambers,
     vehicle.stage.engine_count,
@@ -15,6 +15,30 @@ select
     vehicle.stage.engine.manufacturer,
     vehicle.stage.engine.isp,
     vehicle.stage.engine.thrust,
-having launch_count>0;
+    CASE 
+    
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'Hybrid' THEN '#7E57C2' # purple (mixed-cycle / hybrid)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'N2' THEN '#9E9E9E' # neutral gray (inert / pressurization)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'NA/AA' THEN '#A51C1C' # deep maroon (nitric acid + aromatic amine)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'NA/Amine' THEN '#C62828' # red (nitric acid + amine family)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'NA/Kero' THEN '#BF6B00' # burnt orange (nitric acid + kerosene mix)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'NA/Turps' THEN '#D97704' # orange (nitric acid + turpentine)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'NA/UDMH' THEN '#8B0000' # dark crimson (nitric acid + UDMH)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'MonoHyd' THEN '#880E4F' # deep magenta (monopropellant / hydrazine-like)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'NTO/Hyd' THEN '#D84315' # reddish-orange (NTO + hydrazine family)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'NTO/UDMH' THEN '#BF360C' # brick red (NTO + UDMH)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'H2O2/Kero' THEN '#FFB300' # amber (hydrogen peroxide + kerosene)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'LOX/Alcohol' THEN '#42A5F5' # light blue (LOX + alcohol)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'LOX/UDMH' THEN '#1E88E5' # medium blue (LOX + UDMH)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'LOX/NH3' THEN '#26C6DA' # cyan (LOX + ammonia)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'LOX/Kero' THEN '#1976D2' # royal blue (LOX + kerosene)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'LOX/Methane' THEN '#0288D1' # blue-cyan (LOX + methane)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'LOX/Propane' THEN '#039BE5' # sky blue (LOX + propane)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'LOX/LH2' THEN '#0D47A1' # deep navy (LOX + liquid hydrogen)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'Green' THEN '#2E7D32' # forest green (green propellants)
+    WHEN COALESCE(vehicle.stage.engine.group, 'Unspecified')= 'EP' THEN '#009688' # teal (electric / electric-propulsion)
+    ELSE '#616161' # default gray (unspecified / other)
+END AS group_hex_color
+;
 
 
