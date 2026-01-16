@@ -14,6 +14,7 @@ provide('llmConnectionStore', trilogy.llmConnectionStore)
 provide('connectionStore', trilogy.connectionStore)
 provide('editorStore', trilogy.editorStore)
 provide('chatStore', trilogy.chatStore)
+provide('userSettingsStore', trilogy.userSettingsStore)
 provide('queryExecutionService', trilogy.queryExecutionService)
 
 // Track DuckDB connection status
@@ -71,12 +72,39 @@ onMounted(async () => {
       trilogy.resolver.settingStore.updateSetting('trilogyResolver', 'https://trilogy-service.fly.dev')
       trilogy.resolver.settingStore.saveSettings()
     }
+
+    // Load bundled models
+    try {
+      const modelsUrl = `${import.meta.env.BASE_URL}models.json`
+      console.log(`Fetching models from ${modelsUrl}...`)
+      const response = await fetch(modelsUrl)
+      if (response.ok) {
+        const models = await response.json()
+        console.log(`Loaded ${models.length} models from bundle`)
+        
+        models.forEach((model: any) => {
+          // Check if editor already exists (using base name like 'etl')
+          if (!trilogy.editorStore.editors[model.name]) {
+            console.log(`Creating editor for model: ${model.name} on connection: ${dataConnectionName}`)
+            trilogy.editorStore.newEditor(model.name, 'preql', dataConnectionName, model.contents)
+          } else {
+            console.log(`Editor for model ${model.name} already exists.`)
+          }
+        })
+      }
+    } catch (modelError) {
+      console.error('Failed to load bundled models:', modelError)
+    }
   } catch (error) {
     console.error('Failed to initialize DuckDB:', error)
     dbStatus.value = 'error'
     dbError.value = error instanceof Error ? error.message : 'Unknown error'
   }
 })
+
+const handlePaste = () => {
+  setTimeout(loadModels, 0)
+}
 
 // Use the chat composable with tools
 const chat = useTrilogyChat({
@@ -112,8 +140,17 @@ const connectProvider = async () => {
 
 // Load models when provider/API key change
 const loadModels = async () => {
-  if (!selectedProvider.value || !apiKeyInput.value) {
+  if (!selectedProvider.value) {
     availableModels.value = []
+    return
+  }
+  
+  // If no API key, just show default models but don't try to fetch
+  if (!apiKeyInput.value) {
+    availableModels.value = getDefaultModels(selectedProvider.value)
+    if (availableModels.value.length > 0 && !selectedModel.value) {
+      selectedModel.value = availableModels.value[0].id
+    }
     return
   }
   
@@ -161,7 +198,10 @@ function getDefaultModels(provider: string) {
         { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
       ]
     case 'openai':
-      return [{ id: 'gpt-4o', name: 'GPT-4o' }]
+      return [
+        { id: 'gpt-5.2', name: 'GPT-5.2' }, 
+        { id: 'gpt-4o', name: 'GPT-4o' }
+      ]
     case 'google':
       return [{ id: 'gemini-2.5-pro-preview-05-06', name: 'Gemini 2.5 Pro' }]
     case 'mistral':
@@ -173,29 +213,38 @@ function getDefaultModels(provider: string) {
 
 const canConnect = computed(() => selectedProvider.value && apiKeyInput.value && selectedModel.value)
 
+const connectTooltip = computed(() => {
+  if (canConnect.value) return 'Connect to LLM'
+  const missing = []
+  if (!selectedProvider.value) missing.push('provider')
+  if (!apiKeyInput.value) missing.push('API key')
+  if (!selectedModel.value) missing.push('model')
+  return `Missing: ${missing.join(', ')}`
+})
+
 const connectionInfo = computed(() => {
   if (!llmStore.activeConnection) return ''
   const conn = llmStore.getConnection(llmStore.activeConnection)
   return conn ? `${conn.name} (${conn.model})` : ''
 })
+
+const activeDatasets = computed(() => {
+  return chat.activeImportsForChat.value.map(imp => imp.alias || imp.name)
+})
 </script>
 
 <template>
   <div class="chat-view">
-    <div class="chat-header-bar">
-      <h1>Chat with GCAT Data</h1>
-      <div class="db-status" :class="dbStatus">
-        <span class="status-dot"></span>
-        <span v-if="dbStatus === 'loading'">Initializing DuckDB...</span>
-        <span v-else-if="dbStatus === 'ready'">DuckDB Ready</span>
-        <span v-else>DuckDB Error: {{ dbError }}</span>
-      </div>
-    </div>
-    
     <!-- Provider Selection - show when no active LLM connection -->
     <div v-if="!hasActiveLLMConnection" class="provider-setup">
       <div class="setup-header">
-        <h2>Configure LLM Connection</h2>
+        <h1>Chat with GCAT Data</h1>
+        <div class="db-status-badge" :class="dbStatus">
+          <span class="status-dot"></span>
+          <span v-if="dbStatus === 'loading'">Initializing DuckDB...</span>
+          <span v-else-if="dbStatus === 'ready'">DuckDB Ready</span>
+          <span v-else>DuckDB Error</span>
+        </div>
         <p>Select a provider to start chatting about your space data.</p>
       </div>
 
@@ -212,18 +261,36 @@ const connectionInfo = computed(() => {
 
         <div class="form-group" v-if="selectedProvider">
           <label for="api-key">API Key</label>
-          <input 
-            id="api-key" 
-            type="password" 
-            v-model="apiKeyInput" 
-            placeholder="Enter your API key"
-            @blur="loadModels" 
-          />
+          <div class="input-with-cta">
+            <input 
+              id="api-key" 
+              type="password" 
+              v-model="apiKeyInput" 
+              placeholder="Enter your API key"
+              @blur="loadModels"
+              @paste="handlePaste"
+            />
+            <button 
+              v-if="apiKeyInput && availableModels.length === 0" 
+              class="cta-btn" 
+              @click="loadModels"
+              title="Fetch models for this API key"
+            >
+              Fetch Models
+            </button>
+          </div>
         </div>
 
-        <div class="form-group" v-if="selectedProvider && apiKeyInput && availableModels.length > 0">
+        <div class="form-group" v-if="selectedProvider">
           <label for="model-select">Model</label>
-          <select id="model-select" v-model="selectedModel">
+          <select 
+            id="model-select" 
+            v-model="selectedModel" 
+            :disabled="!apiKeyInput || loadingModels"
+          >
+            <option v-if="availableModels.length === 0" value="">
+              {{ apiKeyInput ? 'Loading models...' : 'Enter API key to see models' }}
+            </option>
             <option v-for="model in availableModels" :key="model.id" :value="model.id">
               {{ model.name }}
             </option>
@@ -234,7 +301,12 @@ const connectionInfo = computed(() => {
           <p class="loading-text">Loading models...</p>
         </div>
 
-        <button class="connect-btn" @click="connectProvider" :disabled="!canConnect">
+        <button 
+          class="connect-btn" 
+          @click="connectProvider" 
+          :disabled="!canConnect"
+          :title="connectTooltip"
+        >
           Connect
         </button>
 
@@ -245,36 +317,54 @@ const connectionInfo = computed(() => {
     </div>
 
     <!-- Chat Interface -->
-    <div v-else class="chat-container">
-      <LLMChatSplitView
-        :title="chat.activeChatTitle.value"
-        :editableTitle="true"
-        placeholder="Ask about your space data... (Enter to send)"
-        :systemPrompt="chat.chatSystemPrompt.value"
-        :connectionInfo="connectionInfo"
-        :symbols="chat.chatSymbols.value"
-        :initialMessages="chat.activeChatMessages.value"
-        :initialArtifacts="chat.activeChatArtifacts.value"
-        :initialActiveArtifactIndex="chat.activeChatArtifactIndex.value"
-        :externalLoading="chat.isChatLoading.value"
-        :activeToolName="chat.activeToolName.value"
-        :onSendMessage="chat.handleChatMessageWithTools"
-        @update:messages="chat.handleMessagesUpdate"
-        @update:artifacts="chat.handleArtifactsUpdate"
-        @update:activeArtifactIndex="chat.handleActiveArtifactUpdate"
-        @title-update="chat.handleTitleUpdate"
-      >
-        <template #header-actions>
-          <div class="chat-header-controls">
-            <span v-if="connectionInfo" class="connection-badge">
-              {{ connectionInfo }}
-            </span>
-            <button class="header-btn" @click="showProviderSelector = true" title="Change LLM">
-              ⚙️
-            </button>
+    <div v-else class="chat-interface">
+      <div class="chat-header-bar">
+        <div class="header-main">
+          <h2>{{ chat.activeChatTitle.value }}</h2>
+          <div v-if="activeDatasets.length > 0" class="looking-at">
+            <span class="looking-at-label">Looking at:</span>
+            <div class="dataset-tags">
+              <span v-for="name in activeDatasets" :key="name" class="dataset-tag">{{ name }}</span>
+            </div>
           </div>
-        </template>
-      </LLMChatSplitView>
+        </div>
+
+        <div class="header-actions">
+          <div class="db-status mini" :class="dbStatus" :title="dbError || dbStatus">
+            <span class="status-dot"></span>
+            <span class="status-text desktop-only">DuckDB</span>
+          </div>
+          
+          <span v-if="connectionInfo" class="connection-badge">
+            {{ connectionInfo }}
+          </span>
+          
+          <button class="header-action-btn" @click="showProviderSelector = true; llmStore.activeConnection = ''" title="Change LLM">
+            <i class="mdi mdi-cog-outline"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="chat-container">
+        <LLMChatSplitView
+          :editableTitle="true"
+          :showHeader="false"
+          placeholder="Ask about your space data... (Enter to send)"
+          :systemPrompt="chat.chatSystemPrompt.value"
+          :connectionInfo="connectionInfo"
+          :symbols="chat.chatSymbols.value"
+          :initialMessages="chat.activeChatMessages.value"
+          :initialArtifacts="chat.activeChatArtifacts.value"
+          :initialActiveArtifactIndex="chat.activeChatArtifactIndex.value"
+          :externalLoading="chat.isChatLoading.value"
+          :activeToolName="chat.activeToolName.value"
+          :onSendMessage="chat.handleChatMessageWithTools"
+          @update:messages="chat.handleMessagesUpdate"
+          @update:artifacts="chat.handleArtifactsUpdate"
+          @update:activeArtifactIndex="chat.handleActiveArtifactUpdate"
+          @title-update="chat.handleTitleUpdate"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -283,24 +373,42 @@ const connectionInfo = computed(() => {
 .chat-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100vh;
+  overflow: hidden;
   background-color: var(--color-bg-primary);
+}
+
+.chat-interface {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chat-header-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1.5rem;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--color-border);
   background-color: var(--color-bg-secondary);
+  height: 48px;
 }
 
-.chat-header-bar h1 {
-  font-size: 1.25rem;
-  font-weight: 600;
+.header-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.chat-header-bar h2 {
+  font-size: 0.9375rem;
+  font-weight: 700;
   color: var(--color-text);
   margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .db-status {
@@ -402,31 +510,44 @@ const connectionInfo = computed(() => {
   color: var(--color-text);
 }
 
-/* Provider Setup */
 .provider-setup {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   flex: 1;
-  padding: 20px;
+  padding: 40px 20px;
+  background: radial-gradient(circle at center, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
 }
 
 .setup-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
-.setup-header h2 {
-  margin: 0 0 10px 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--color-text);
+.setup-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 
 .setup-header p {
   margin: 0;
   color: var(--color-text-muted);
+  max-width: 400px;
+}
+
+.db-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  margin-bottom: 24px;
 }
 
 .setup-form {
@@ -477,7 +598,28 @@ const connectionInfo = computed(() => {
 
 .connect-btn:disabled {
   opacity: 0.5;
-  cursor: not-allowed;
+  cursor: help;
+}
+
+.input-with-cta {
+  display: flex;
+  gap: 8px;
+}
+
+.cta-btn {
+  padding: 8px 12px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.cta-btn:hover {
+  background-color: var(--color-accent);
+  color: white;
 }
 
 .error-message {
@@ -493,11 +635,12 @@ const connectionInfo = computed(() => {
 /* Chat Container */
 .chat-container {
   flex: 1;
-  overflow: hidden;
   display: flex;
-  min-height: 0; /* Critical for flex children to shrink properly */
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
   
-  /* CSS variables for trilogy-studio-components theming */
   --bg-color: var(--color-bg-primary);
   --text-color: var(--color-text);
   --text-faint: var(--color-text-muted);
@@ -521,186 +664,346 @@ const connectionInfo = computed(() => {
   --editor-bg: var(--color-bg-tertiary);
 }
 
-/* Deep overrides for split view layout */
 .chat-container :deep(.chat-split-container) {
-  display: flex;
-  flex-direction: row;
-  height: 100%;
-  width: 100%;
+  display: flex !important;
+  flex-direction: row !important; /* Force horizontal */
+  height: 100% !important;
+  width: 100% !important;
+  flex: 1 !important;
+  min-height: 0 !important;
 }
 
 .chat-container :deep(.chat-panel) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 300px;
-  height: 100%;
+  flex: 1 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
 }
 
-.chat-container :deep(.sidebar-panel) {
-  width: 350px;
-  min-width: 250px;
-  max-width: 500px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--color-border);
-  background-color: var(--color-bg-primary);
-}
-
-/* LLM Chat Container - ensure full height */
 .chat-container :deep(.llm-chat-container) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background-color: var(--color-bg-primary);
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
-/* Chat messages area - fill available space */
-.chat-container :deep(.chat-messages) {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background-color: var(--color-bg-primary);
-}
-
-/* Fix textarea styling */
-.chat-container :deep(textarea) {
-  background-color: var(--color-bg-tertiary) !important;
-  color: var(--color-text) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: 6px;
-  width: 100%;
-  min-height: 44px;
-  max-height: 200px;
-  padding: 12px 14px;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  resize: none;
-  font-family: inherit;
-}
-
-.chat-container :deep(textarea:focus) {
-  outline: none;
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
-}
-
-.chat-container :deep(textarea::placeholder) {
-  color: var(--color-text-muted);
-}
-
-/* Fix input container */
-.chat-container :deep(.input-container) {
-  background-color: var(--color-bg-secondary);
-  border-top: 1px solid var(--color-border);
-  padding: 12px 16px;
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-}
-
-/* Fix buttons */
-.chat-container :deep(.send-button) {
-  background-color: var(--color-accent);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 10px 20px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-  flex-shrink: 0;
-  height: 44px;
-}
-
-.chat-container :deep(.send-button:hover:not(:disabled)) {
-  background-color: var(--color-accent-dim);
-}
-
-.chat-container :deep(.send-button:disabled) {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Fix sidebar tabs */
-.chat-container :deep(.sidebar-tabs) {
-  background-color: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.chat-container :deep(.sidebar-tab) {
-  background: transparent;
-  color: var(--color-text);
-}
-
-.chat-container :deep(.sidebar-tab.active) {
-  color: var(--color-accent);
-  border-bottom-color: var(--color-accent);
-}
-
-/* Fix symbols pane */
-.chat-container :deep(.symbols-pane) {
-  background-color: var(--color-bg-primary);
-  border: none;
-  width: 100%;
-}
-
-.chat-container :deep(.symbols-search) {
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-
-/* Message bubbles */
-.chat-container :deep(.message) {
-  border-radius: 8px;
-}
-
-.chat-container :deep(.message.user) {
-  background-color: var(--color-accent);
-  color: white;
-}
-
-.chat-container :deep(.message.assistant) {
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text);
-}
-
-/* Chat header */
-.chat-container :deep(.chat-header) {
-  background-color: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
-}
-
+/* Header Controls */
 .chat-header-controls {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.connection-badge {
-  padding: 4px 10px;
-  background-color: rgba(76, 175, 80, 0.1);
-  color: #4caf50;
-  font-size: 0.75rem;
-  border: 1px solid rgba(76, 175, 80, 0.3);
-  border-radius: 4px;
-}
-
-.header-btn {
-  background: transparent;
+.header-action-btn {
+  background-color: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
-  padding: 4px 8px;
+  color: var(--color-text-muted);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.header-action-btn:hover {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-accent);
   color: var(--color-text);
 }
 
-.header-btn:hover {
+.db-status.mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 28px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.status-text {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.connection-badge {
+  padding: 0 10px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  background-color: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  color: var(--color-accent-bright);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.looking-at {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+  padding-right: 12px;
+  border-right: 1px solid var(--color-border);
+  max-width: 400px;
+}
+
+.looking-at-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.dataset-tags {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 2px 0;
+}
+
+.dataset-tags::-webkit-scrollbar {
+  height: 2px;
+}
+
+.dataset-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-accent-bright);
+  background: rgba(56, 189, 248, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  white-space: nowrap;
+}
+
+/* Deep overrides for layout and chart fixing */
+.chat-container :deep(.sidebar-panel) {
+  border-left: 1px solid var(--color-border);
+}
+
+/* Ensure results and charts can fill space */
+.chat-container :deep(.result-window),
+.chat-container :deep(.artifacts-container) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-container :deep(.artifact-content) {
+  flex: 1;
+  overflow: auto !important;
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+}
+
+/* Explicitly target visualizer height */
+.chat-container :deep(.visualizer-content),
+.chat-container :deep(.chart-container),
+.chat-container :deep(.plotly-chart),
+.chat-container :deep(.js-plotly-plot) {
+  flex: 1 1 auto !important;
+  min-height: 450px !important;
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.chat-container :deep(.chat-split-container) {
+  height: 100%;
+}
+
+/* ChatGPT style chat messages */
+.chat-container :deep(.chat-messages) {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 20px 0;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.chat-container :deep(.message) {
+  padding: 20px;
+  border-radius: 0;
+  margin: 0;
+  max-width: none;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  display: flex;
+  gap: 20px;
+}
+
+.chat-container :deep(.message.user) {
+  background-color: var(--color-bg-primary);
+  flex-direction: row-reverse;
+}
+
+.chat-container :deep(.message.user .message-content) {
+  background-color: var(--color-bg-tertiary);
+  padding: 12px 18px;
+  border-radius: 18px;
+  max-width: 80%;
+  color: var(--color-text);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.chat-container :deep(.message.assistant) {
   background-color: var(--color-bg-secondary);
+}
+
+.chat-container :deep(.message.assistant .message-content) {
+  max-width: 85%;
+  flex: 1;
+}
+
+/* Profile icons removed */
+
+/* Symbols Pane Custom Styling */
+.chat-container :deep(.symbols-pane) {
+  background-color: var(--color-bg-primary) !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-container :deep(.search-container) {
+  padding: 8px 12px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-container :deep(.symbols-search) {
+  background-color: var(--color-bg-tertiary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px !important;
+  height: 28px !important;
+  padding: 0 8px !important;
+  font-size: 0.8125rem !important;
+  color: var(--color-text) !important;
+  font-family: inherit;
+}
+
+.chat-container :deep(.symbols-search:focus) {
+  border-color: var(--color-accent) !important;
+  outline: none;
+}
+
+/* Filter buttons */
+.chat-container :deep(.filter-container) {
+  padding: 6px 12px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.chat-container :deep(.filter-label) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.filter-label input) {
+  display: none;
+}
+
+.chat-container :deep(.filter-label:has(input:checked)) {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-accent-dim);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Chat Overrides */
+.chat-container :deep(.llm-chat-header) {
+  height: 36px;
+  padding: 0 12px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.llm-chat-header h2) {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+  font-family: inherit;
+}
+
+.chat-container :deep(.sidebar-tabs) {
+  height: 36px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.sidebar-tab) {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: inherit;
+}
+
+.chat-container :deep(.sidebar-tab.active) {
+  color: var(--color-accent);
+}
+
+.chat-container :deep(.input-container) {
+  padding: 16px;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+  background: transparent;
+  border: none;
+}
+
+.chat-container :deep(textarea) {
+  background-color: var(--color-bg-tertiary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 12px !important;
+  padding: 12px 16px !important;
+  font-size: 0.9375rem !important;
+  font-family: inherit;
+  color: var(--color-text) !important;
+  resize: none !important;
+  width: 100% !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.chat-container :deep(.send-button) {
+  height: 36px;
+  border-radius: 8px;
+  padding: 0 16px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  margin-left: 8px;
 }
 </style>

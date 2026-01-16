@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref, watch } from 'vue'
 import { useEngines, loadEngineData, useEngineDataStatus, type EngineLaunch } from '../composables/useEngines'
 import { useAnimation } from '../composables/useAnimation'
 import { useYearRange } from '../composables/useYearRange'
@@ -38,8 +38,10 @@ const {
 const { isLoading, loadError } = useEngineDataStatus()
 const {
   engineGroups,
-  groupColors,
-  visibleLaunches,
+  firstStageOnlyVisible,
+  boostersVisible,
+  secondStageVisible,
+  upperStageVisible,
   groupStats,
   maxGroupTotal,
   totalEngineFireings
@@ -51,10 +53,14 @@ onMounted(async () => {
 })
 
 // Spiral chart config
-const spiralSize = 800
+const spiralSize = 400
 const spiralCenter = spiralSize / 2
-const maxRadius = spiralSize / 2 - 60
-const minRadius = 40
+const maxRadius = spiralSize / 2 - 40
+const minRadius = 8 // Start very close to center
+const boosterRadius = maxRadius + 25 // Boosters render outside
+
+// How long it takes for an engine to spiral from center to edge (in animation ms)
+const SPIRAL_OUT_DURATION = 1000 * 60 * 60 * 24 * 60 // 60 days in animation time
 
 // Interface for individual dots on the spiral
 interface SpiralDot {
@@ -64,22 +70,136 @@ interface SpiralDot {
   y: number
   color: string
   opacity: number
+  isNew: boolean
 }
 
-// Generate dots for the spiral - one dot per engine in engine_count
-const spiralDots = computed<SpiralDot[]>(() => {
+// Special case engine layouts
+function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx: number; dy: number }> {
+  const spacing = dotRadius * 2.2
+  const positions: Array<{ dx: number; dy: number }> = []
+
+  if (engineCount === 1) {
+    positions.push({ dx: 0, dy: 0 })
+  } else if (engineCount <= 4) {
+    // Square/diamond pattern for 2-4 engines
+    const offsets = [
+      { dx: -spacing/2, dy: -spacing/2 },
+      { dx: spacing/2, dy: -spacing/2 },
+      { dx: -spacing/2, dy: spacing/2 },
+      { dx: spacing/2, dy: spacing/2 }
+    ]
+    for (let i = 0; i < engineCount; i++) {
+      positions.push(offsets[i])
+    }
+  } else if (engineCount === 9) {
+    // Falcon 9 octaweb: 1 center + 8 around
+    positions.push({ dx: 0, dy: 0 })
+    const ringRadius = spacing * 1.2
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * ringRadius,
+        dy: Math.sin(angle) * ringRadius
+      })
+    }
+  } else if (engineCount === 33) {
+    // Starship Raptor: 3 center + 10 middle + 20 outer
+    // Inner 3 in triangle
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * spacing * 0.6,
+        dy: Math.sin(angle) * spacing * 0.6
+      })
+    }
+    // Middle ring of 10
+    const middleRadius = spacing * 1.8
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * middleRadius,
+        dy: Math.sin(angle) * middleRadius
+      })
+    }
+    // Outer ring of 20
+    const outerRadius = spacing * 3.2
+    for (let i = 0; i < 20; i++) {
+      const angle = (i / 20) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * outerRadius,
+        dy: Math.sin(angle) * outerRadius
+      })
+    }
+  } else if (engineCount <= 8) {
+    // Single ring for 5-8 engines
+    for (let i = 0; i < engineCount; i++) {
+      const angle = (i / engineCount) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * spacing,
+        dy: Math.sin(angle) * spacing
+      })
+    }
+  } else {
+    // Default: center + concentric rings (7 in first ring for octaweb-style)
+    positions.push({ dx: 0, dy: 0 })
+    let remaining = engineCount - 1
+    let ring = 1
+
+    while (remaining > 0) {
+      const ringRadius = spacing * ring * 1.1
+      // First ring: use 7 or 8 based on remaining, then scale up
+      let enginesInRing: number
+      if (ring === 1) {
+        enginesInRing = Math.min(remaining, remaining <= 8 ? remaining : 8)
+      } else {
+        enginesInRing = Math.min(remaining, ring * 6 + 2)
+      }
+
+      for (let i = 0; i < enginesInRing; i++) {
+        const angle = (i / enginesInRing) * Math.PI * 2 - Math.PI / 2
+        positions.push({
+          dx: Math.cos(angle) * ringRadius,
+          dy: Math.sin(angle) * ringRadius
+        })
+      }
+
+      remaining -= enginesInRing
+      ring++
+    }
+  }
+
+  return positions
+}
+
+// Track recently appeared engines for flare effect
+const recentLaunches = ref<Set<string>>(new Set())
+const seenLaunches = ref<Set<string>>(new Set())
+const FLARE_DURATION = 300 // ms
+
+// Generate dots for a spiral - engines spawn at center and spiral outward based on age
+function generateSpiralDots(
+  launches: EngineLaunch[],
+  spiralCenterX: number
+): SpiralDot[] {
   const dots: SpiralDot[] = []
-  const timeRange = rangeEnd.value - rangeStart.value
-  const turns = 6
-  const decayMs = 1000 * 60 * 60 * 24 * 30 // 1 month decay
+  const turns = 4
+  const decayMs = 1000 * 60 * 60 * 24 * 30 // 1 month brightness decay
 
-  for (const launch of visibleLaunches.value) {
-    const t = (launch.timestamp - rangeStart.value) / timeRange
-    const baseAngle = t * turns * Math.PI * 2 - Math.PI / 2
-    const r = minRadius + t * (maxRadius - minRadius)
-
-    // Calculate brightness based on recency
+  for (const launch of launches) {
+    // Age = time since this engine appeared (in animation time)
     const age = currentTime.value - launch.timestamp
+    if (age < 0) continue // Not yet visible
+
+    // Progress through spiral: 0 = just appeared (center), 1 = fully spiraled out
+    const spiralProgress = Math.min(1, age / SPIRAL_OUT_DURATION)
+    
+    // Angle increases as engine spirals outward (multiple turns)
+    const baseAngle = spiralProgress * turns * Math.PI * 2 - Math.PI / 2
+    
+    // Radius: start near center, move outward
+    const r = minRadius + spiralProgress * (maxRadius - minRadius)
+
+    // Brightness: recent engines are brighter
     let opacity = 0.4
     if (age >= 0 && age < decayMs) {
       opacity = 0.4 + 0.6 * (1 - age / decayMs)
@@ -87,56 +207,29 @@ const spiralDots = computed<SpiralDot[]>(() => {
 
     const engineCount = launch.vehicle_stage_engine_count || 1
     const color = launch.group_hex_color
+    const dotRadius = 2.5
 
-    // Base position on spiral
-    const baseX = spiralCenter + Math.cos(baseAngle) * r
+    // Position on spiral
+    const baseX = spiralCenterX + Math.cos(baseAngle) * r
     const baseY = spiralCenter + Math.sin(baseAngle) * r
 
-    // Create dots arranged like rocket engine clusters (concentric circles)
-    // Engine arrangements: 1 center, then rings of 6, 12, etc.
-    const dotRadius = 3 // radius of each dot
-    const spacing = dotRadius * 2.2 // space between dot centers
-
-    // Generate positions in concentric pattern
-    const positions: Array<{ dx: number; dy: number }> = []
-
-    if (engineCount === 1) {
-      positions.push({ dx: 0, dy: 0 })
-    } else if (engineCount <= 4) {
-      // Square/diamond pattern for 2-4 engines
-      const offsets = [
-        { dx: -spacing/2, dy: -spacing/2 },
-        { dx: spacing/2, dy: -spacing/2 },
-        { dx: -spacing/2, dy: spacing/2 },
-        { dx: spacing/2, dy: spacing/2 }
-      ]
-      for (let i = 0; i < engineCount; i++) {
-        positions.push(offsets[i])
-      }
-    } else {
-      // Center engine + concentric rings
-      positions.push({ dx: 0, dy: 0 })
-      let remaining = engineCount - 1
-      let ring = 1
-
-      while (remaining > 0) {
-        const ringRadius = spacing * ring
-        const enginesInRing = Math.min(remaining, ring * 6) // 6, 12, 18...
-
-        for (let i = 0; i < enginesInRing; i++) {
-          const ringAngle = (i / enginesInRing) * Math.PI * 2 - Math.PI / 2
-          positions.push({
-            dx: Math.cos(ringAngle) * ringRadius,
-            dy: Math.sin(ringAngle) * ringRadius
-          })
-        }
-
-        remaining -= enginesInRing
-        ring++
-      }
+    // Check for flare effect (newly appearing)
+    const launchKey = `${launch.launch_tag}-${launch.vehicle_stage_engine_name}-${launch.vehicle_stage_number}`
+    let isNew = false
+    if (!seenLaunches.value.has(launchKey)) {
+      seenLaunches.value.add(launchKey)
+      recentLaunches.value.add(launchKey)
+      isNew = true
+      setTimeout(() => {
+        recentLaunches.value.delete(launchKey)
+      }, FLARE_DURATION)
+    } else if (recentLaunches.value.has(launchKey)) {
+      isNew = true
     }
 
-    // Add dots at calculated positions
+    // Create dots arranged like rocket engine clusters
+    const positions = getClusterPositions(engineCount, dotRadius)
+
     for (let i = 0; i < engineCount && i < positions.length; i++) {
       dots.push({
         launch,
@@ -144,31 +237,134 @@ const spiralDots = computed<SpiralDot[]>(() => {
         x: baseX + positions[i].dx,
         y: baseY + positions[i].dy,
         color,
-        opacity
+        opacity,
+        isNew
       })
     }
   }
 
   return dots
+}
+
+// Generate booster dots (outside main spiral, also spiral out)
+function generateBoosterDots(launches: EngineLaunch[], spiralCenterX: number): SpiralDot[] {
+  const dots: SpiralDot[] = []
+  
+  const boostersByLaunch = new Map<string, EngineLaunch[]>()
+  for (const launch of launches) {
+    const key = launch.launch_tag
+    if (!boostersByLaunch.has(key)) {
+      boostersByLaunch.set(key, [])
+    }
+    boostersByLaunch.get(key)!.push(launch)
+  }
+
+  const decayMs = 1000 * 60 * 60 * 24 * 30
+  const turns = 4
+
+  for (const [launchTag, boosters] of boostersByLaunch) {
+    const firstBooster = boosters[0]
+    const age = currentTime.value - firstBooster.timestamp
+    if (age < 0) continue
+
+    const spiralProgress = Math.min(1, age / SPIRAL_OUT_DURATION)
+    const baseAngle = spiralProgress * turns * Math.PI * 2 - Math.PI / 2
+    
+    let opacity = 0.4
+    if (age >= 0 && age < decayMs) {
+      opacity = 0.4 + 0.6 * (1 - age / decayMs)
+    }
+
+    // Position boosters at opposing angles around the booster ring
+    const totalBoosters = boosters.reduce((sum, b) => sum + (b.vehicle_stage_engine_count || 1), 0)
+    const angleSpread = totalBoosters <= 2 ? Math.PI : (Math.PI * 2) / totalBoosters
+
+    // Flare effect
+    const launchKey = `booster-${launchTag}`
+    let isNew = false
+    if (!seenLaunches.value.has(launchKey)) {
+      seenLaunches.value.add(launchKey)
+      recentLaunches.value.add(launchKey)
+      isNew = true
+      setTimeout(() => {
+        recentLaunches.value.delete(launchKey)
+      }, FLARE_DURATION)
+    } else if (recentLaunches.value.has(launchKey)) {
+      isNew = true
+    }
+
+    // Boosters also spiral out but stay on the outer ring
+    const boosterR = minRadius + spiralProgress * (boosterRadius - minRadius)
+
+    let boosterIdx = 0
+    for (const booster of boosters) {
+      const count = booster.vehicle_stage_engine_count || 1
+
+      for (let i = 0; i < count; i++) {
+        const angle = baseAngle + (boosterIdx + i) * angleSpread
+        
+        dots.push({
+          launch: booster,
+          engineIndex: i,
+          x: spiralCenterX + Math.cos(angle) * boosterR,
+          y: spiralCenter + Math.sin(angle) * boosterR,
+          color: booster.group_hex_color,
+          opacity,
+          isNew
+        })
+      }
+      boosterIdx += count
+    }
+  }
+
+  return dots
+}
+
+// Reset tracking when animation resets or seeks backward
+watch(() => currentTime.value, (newTime, oldTime) => {
+  if (newTime < oldTime) {
+    seenLaunches.value.clear()
+    recentLaunches.value.clear()
+  }
 })
 
-// Generate spiral guide path
-const spiralGuidePath = computed(() => {
+// Spiral dots for each stage
+const coreSpiral = computed(() => generateSpiralDots(firstStageOnlyVisible.value, spiralCenter))
+const boosterDots = computed(() => generateBoosterDots(boostersVisible.value, spiralCenter))
+const secondSpiral = computed(() => generateSpiralDots(secondStageVisible.value, spiralCenter))
+const upperSpiral = computed(() => generateSpiralDots(upperStageVisible.value, spiralCenter))
+
+// Generate spiral guide path (faint background line)
+function generateSpiralPath(centerX: number): string {
   const points: string[] = []
-  const turns = 6
-  const steps = 360
+  const turns = 4
+  const steps = 300
 
   for (let i = 0; i <= steps; i++) {
     const t = i / steps
     const angle = t * turns * Math.PI * 2 - Math.PI / 2
     const r = minRadius + t * (maxRadius - minRadius)
-    const x = spiralCenter + Math.cos(angle) * r
+    const x = centerX + Math.cos(angle) * r
     const y = spiralCenter + Math.sin(angle) * r
     points.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`)
   }
 
   return points.join(' ')
-})
+}
+
+const spiralGuidePath = computed(() => generateSpiralPath(spiralCenter))
+
+// Count engines per spiral
+const coreStageCounts = computed(() => 
+  firstStageOnlyVisible.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0) +
+  boostersVisible.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0)
+)
+const secondStageCounts = computed(() => 
+  secondStageVisible.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0)
+)
+const upperStageCounts = computed(() => 
+  upperStageVisible.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0)
+)
 </script>
 
 <template>
@@ -206,40 +402,128 @@ const spiralGuidePath = computed(() => {
     </header>
 
     <main class="main-content">
-      <div class="spiral-section">
-        <div class="spiral-container">
-          <!-- Main spiral visualization -->
-          <svg :viewBox="`0 0 ${spiralSize} ${spiralSize}`" class="spiral-chart">
-            <!-- Spiral guide line -->
-            <path
-              :d="spiralGuidePath"
-              fill="none"
-              stroke="rgba(255,255,255,0.1)"
-              stroke-width="1"
-            />
+      <div class="spirals-section">
+        <div class="spirals-container">
+          <!-- Core Stage Spiral (Stage 0+1) -->
+          <div class="spiral-wrapper">
+            <h3 class="spiral-label">Core Stage</h3>
+            <svg :viewBox="`0 0 ${spiralSize} ${spiralSize}`" class="spiral-chart">
+              <!-- Spiral guide line (faint background) -->
+              <path
+                :d="spiralGuidePath"
+                fill="none"
+                stroke="rgba(255,255,255,0.08)"
+                stroke-width="2"
+                class="spiral-guide"
+              />
+              
+              <!-- Booster outer ring guide -->
+              <circle
+                :cx="spiralCenter"
+                :cy="spiralCenter"
+                :r="boosterRadius"
+                fill="none"
+                stroke="rgba(255,255,255,0.05)"
+                stroke-width="1"
+                stroke-dasharray="4 4"
+              />
 
-            <!-- Engine dots - one per engine in engine_count -->
-            <circle
-              v-for="dot in spiralDots"
-              :key="`${dot.launch.launch_tag}-${dot.launch.vehicle_stage_engine_name}-${dot.engineIndex}`"
-              :cx="dot.x"
-              :cy="dot.y"
-              :r="3"
-              :fill="dot.color"
-              :opacity="dot.opacity"
-              class="launch-point"
-            >
-              <title>{{ dot.launch.vehicle_stage_engine_name }} ({{ dot.launch.vehicle_stage_engine_group }}) - {{ dot.launch.launch_date }}</title>
-            </circle>
+              <!-- Booster dots (outside spiral) -->
+              <circle
+                v-for="dot in boosterDots"
+                :key="`booster-${dot.launch.launch_tag}-${dot.engineIndex}`"
+                :cx="dot.x"
+                :cy="dot.y"
+                :r="3"
+                :fill="dot.color"
+                :opacity="dot.opacity"
+                class="engine-dot"
+                :class="{ 'is-new': dot.isNew }"
+              >
+                <title>{{ dot.launch.vehicle_stage_engine_name }} (Booster) - {{ dot.launch.launch_date }}</title>
+              </circle>
 
-            <!-- Center info -->
-            <text :x="spiralCenter" :y="spiralCenter - 10" text-anchor="middle" class="center-count">
-              {{ totalEngineFireings }}
-            </text>
-            <text :x="spiralCenter" :y="spiralCenter + 15" text-anchor="middle" class="center-label">
-              engine firings
-            </text>
-          </svg>
+              <!-- Core engine dots -->
+              <circle
+                v-for="dot in coreSpiral"
+                :key="`core-${dot.launch.launch_tag}-${dot.launch.vehicle_stage_engine_name}-${dot.engineIndex}`"
+                :cx="dot.x"
+                :cy="dot.y"
+                :r="2.5"
+                :fill="dot.color"
+                :opacity="dot.opacity"
+                class="engine-dot"
+                :class="{ 'is-new': dot.isNew }"
+              >
+                <title>{{ dot.launch.vehicle_stage_engine_name }} - {{ dot.launch.launch_date }}</title>
+              </circle>
+            </svg>
+            <div class="spiral-count">{{ coreStageCounts }}</div>
+          </div>
+
+          <!-- Second Stage Spiral -->
+          <div class="spiral-wrapper">
+            <h3 class="spiral-label">Second Stage</h3>
+            <svg :viewBox="`0 0 ${spiralSize} ${spiralSize}`" class="spiral-chart">
+              <path
+                :d="spiralGuidePath"
+                fill="none"
+                stroke="rgba(255,255,255,0.08)"
+                stroke-width="2"
+                class="spiral-guide"
+              />
+
+              <circle
+                v-for="dot in secondSpiral"
+                :key="`second-${dot.launch.launch_tag}-${dot.launch.vehicle_stage_engine_name}-${dot.engineIndex}`"
+                :cx="dot.x"
+                :cy="dot.y"
+                :r="2.5"
+                :fill="dot.color"
+                :opacity="dot.opacity"
+                class="engine-dot"
+                :class="{ 'is-new': dot.isNew }"
+              >
+                <title>{{ dot.launch.vehicle_stage_engine_name }} - {{ dot.launch.launch_date }}</title>
+              </circle>
+            </svg>
+            <div class="spiral-count">{{ secondStageCounts }}</div>
+          </div>
+
+          <!-- Upper Stages Spiral -->
+          <div class="spiral-wrapper">
+            <h3 class="spiral-label">Upper Stages</h3>
+            <svg :viewBox="`0 0 ${spiralSize} ${spiralSize}`" class="spiral-chart">
+              <path
+                :d="spiralGuidePath"
+                fill="none"
+                stroke="rgba(255,255,255,0.08)"
+                stroke-width="2"
+                class="spiral-guide"
+              />
+
+              <circle
+                v-for="dot in upperSpiral"
+                :key="`upper-${dot.launch.launch_tag}-${dot.launch.vehicle_stage_engine_name}-${dot.engineIndex}`"
+                :cx="dot.x"
+                :cy="dot.y"
+                :r="2.5"
+                :fill="dot.color"
+                :opacity="dot.opacity"
+                class="engine-dot"
+                :class="{ 'is-new': dot.isNew }"
+              >
+                <title>{{ dot.launch.vehicle_stage_engine_name }} - {{ dot.launch.launch_date }}</title>
+              </circle>
+            </svg>
+            <div class="spiral-count">{{ upperStageCounts }}</div>
+          </div>
+        </div>
+
+        <!-- Total counter below spirals -->
+        <div class="total-counter">
+          <span class="total-count">{{ totalEngineFireings }}</span>
+          <span class="total-label">total engine firings</span>
         </div>
 
         <ControlPanel
@@ -358,7 +642,7 @@ const spiralGuidePath = computed(() => {
   padding: 0 1.5rem;
 }
 
-.spiral-section {
+.spirals-section {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -366,35 +650,88 @@ const spiralGuidePath = computed(() => {
   position: relative;
 }
 
-.spiral-container {
+.spirals-container {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 1rem;
   min-height: 0;
+}
+
+.spiral-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spiral-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
 }
 
 .spiral-chart {
   width: 100%;
-  max-width: 600px;
+  max-width: 250px;
   height: auto;
-  max-height: 100%;
   aspect-ratio: 1;
 }
 
-.launch-point {
+.spiral-guide {
+  opacity: 0.5;
+}
+
+.spiral-count {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.engine-dot {
   transition: opacity 0.1s ease;
 }
 
-.center-count {
-  font-size: 48px;
-  font-weight: 700;
-  fill: var(--color-text);
+.engine-dot.is-new {
+  animation: flare 0.4s ease-out;
 }
 
-.center-label {
-  font-size: 14px;
-  fill: var(--color-text-muted);
+@keyframes flare {
+  0% {
+    filter: brightness(3) drop-shadow(0 0 6px currentColor);
+    r: 6;
+  }
+  50% {
+    filter: brightness(2) drop-shadow(0 0 3px currentColor);
+  }
+  100% {
+    filter: brightness(1) drop-shadow(0 0 0 transparent);
+  }
+}
+
+.total-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem 0;
+}
+
+.total-count {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.total-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -499,10 +836,26 @@ const spiralGuidePath = computed(() => {
   }
 }
 
-/* Mobile responsive */
+/* Responsive */
+@media (max-width: 1100px) {
+  .spirals-container {
+    flex-wrap: wrap;
+  }
+
+  .spiral-chart {
+    max-width: 200px;
+  }
+}
+
 @media (max-width: 900px) {
   .main-content {
     flex-direction: column;
+  }
+
+  .spirals-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .chart-section {
@@ -515,6 +868,16 @@ const spiralGuidePath = computed(() => {
   .legend-card {
     flex: 1;
     min-width: 200px;
+  }
+}
+
+@media (max-width: 700px) {
+  .spirals-container {
+    flex-direction: column;
+  }
+
+  .spiral-chart {
+    max-width: 280px;
   }
 }
 
@@ -542,6 +905,14 @@ const spiralGuidePath = computed(() => {
 
   .footer {
     padding: 0.5rem 1rem;
+  }
+
+  .spiral-chart {
+    max-width: 250px;
+  }
+
+  .total-count {
+    font-size: 2rem;
   }
 }
 </style>

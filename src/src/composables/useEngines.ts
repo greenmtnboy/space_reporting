@@ -6,6 +6,7 @@ const DATA_URL = `${import.meta.env.BASE_URL}raw_engine_data.json`
 export interface EngineLaunch {
   launch_date: string
   launch_tag: string
+  vehicle_stage_number: number
   vehicle_stage_engine_name: string
   vehicle_stage_engine_fuel: string
   vehicle_stage_engine_group: string
@@ -55,10 +56,11 @@ export async function loadEngineData(): Promise<void> {
         throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`)
       }
       const data = await response.json()
-      
+
       engineData.value = data.map((d: any) => ({
         ...d,
         timestamp: new Date(d.launch_date).getTime(),
+        vehicle_stage_number: d.vehicle_stage_number ?? 1,
         vehicle_stage_engine_fuel: d.vehicle_stage_engine_fuel?.trim() || 'Unknown',
         vehicle_stage_engine_group: d.vehicle_stage_engine_group?.trim() || 'Unknown',
         vehicle_stage_engine_count: d.vehicle_stage_engine_count || 1,
@@ -127,6 +129,32 @@ export function useEngines(
     return launchesInRange.value.filter(l => l.timestamp <= currentTime.value)
   })
 
+  // Staged launches for multi-spiral display
+  // Stage 0+1: Boosters + First Stage (core engines)
+  const coreStageVisible = computed(() => {
+    return visibleLaunches.value.filter(l => l.vehicle_stage_number <= 1)
+  })
+
+  // Stage 2: Second Stage
+  const secondStageVisible = computed(() => {
+    return visibleLaunches.value.filter(l => l.vehicle_stage_number === 2)
+  })
+
+  // Stage 3+: Upper/Kick Stages
+  const upperStageVisible = computed(() => {
+    return visibleLaunches.value.filter(l => l.vehicle_stage_number >= 3)
+  })
+
+  // Boosters only (stage 0) - rendered outside main spiral
+  const boostersVisible = computed(() => {
+    return visibleLaunches.value.filter(l => l.vehicle_stage_number === 0)
+  })
+
+  // First stage only (stage 1) - core engines
+  const firstStageOnlyVisible = computed(() => {
+    return visibleLaunches.value.filter(l => l.vehicle_stage_number === 1)
+  })
+
   // Stats for bar chart - counts engine firings (engine_count) per group up to current time
   const groupStats = computed<Stats[]>(() => {
     const counts: Record<string, number> = {}
@@ -159,6 +187,11 @@ export function useEngines(
     groupColors,
     launchesInRange,
     visibleLaunches,
+    coreStageVisible,
+    secondStageVisible,
+    upperStageVisible,
+    boostersVisible,
+    firstStageOnlyVisible,
     groupStats,
     maxGroupTotal,
     totalEngineFireings
