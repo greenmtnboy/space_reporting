@@ -52,12 +52,12 @@ onMounted(async () => {
   startAnimation()
 })
 
-// Spiral chart config
-const spiralSize = 400
+// Spiral chart config - larger spirals
+const spiralSize = 550
 const spiralCenter = spiralSize / 2
-const maxRadius = spiralSize / 2 - 40
-const minRadius = 8 // Start very close to center
-const boosterRadius = maxRadius + 25 // Boosters render outside
+const maxRadius = spiralSize / 2 - 50
+const minRadius = 10 // Start very close to center
+const boosterRadius = maxRadius + 30 // Boosters render outside
 
 // How long it takes for an engine to spiral from center to edge (in animation ms)
 const SPIRAL_OUT_DURATION = 1000 * 60 * 60 * 24 * 60 // 60 days in animation time
@@ -193,16 +193,25 @@ function generateSpiralDots(
     // Progress through spiral: 0 = just appeared (center), 1 = fully spiraled out
     const spiralProgress = Math.min(1, age / SPIRAL_OUT_DURATION)
     
+    // Skip engines that have fully spiraled out (they disappear)
+    if (spiralProgress >= 1) continue
+    
     // Angle increases as engine spirals outward (multiple turns)
     const baseAngle = spiralProgress * turns * Math.PI * 2 - Math.PI / 2
     
     // Radius: start near center, move outward
     const r = minRadius + spiralProgress * (maxRadius - minRadius)
 
-    // Brightness: recent engines are brighter
+    // Brightness: recent engines are brighter, fade out near edge
     let opacity = 0.4
     if (age >= 0 && age < decayMs) {
       opacity = 0.4 + 0.6 * (1 - age / decayMs)
+    }
+    
+    // Fade out as approaching end of spiral
+    if (spiralProgress > 0.8) {
+      const fadeProgress = (spiralProgress - 0.8) / 0.2 // 0 to 1 in last 20%
+      opacity = opacity * (1 - fadeProgress)
     }
 
     const engineCount = launch.vehicle_stage_engine_count || 1
@@ -268,11 +277,21 @@ function generateBoosterDots(launches: EngineLaunch[], spiralCenterX: number): S
     if (age < 0) continue
 
     const spiralProgress = Math.min(1, age / SPIRAL_OUT_DURATION)
+    
+    // Skip boosters that have fully spiraled out
+    if (spiralProgress >= 1) continue
+    
     const baseAngle = spiralProgress * turns * Math.PI * 2 - Math.PI / 2
     
     let opacity = 0.4
     if (age >= 0 && age < decayMs) {
       opacity = 0.4 + 0.6 * (1 - age / decayMs)
+    }
+    
+    // Fade out as approaching end of spiral
+    if (spiralProgress > 0.8) {
+      const fadeProgress = (spiralProgress - 0.8) / 0.2
+      opacity = opacity * (1 - fadeProgress)
     }
 
     // Position boosters at opposing angles around the booster ring
@@ -653,10 +672,11 @@ const upperStageCounts = computed(() =>
 .spirals-container {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: 1rem;
+  gap: 0.5rem;
   min-height: 0;
+  padding: 0;
 }
 
 .spiral-wrapper {
@@ -664,6 +684,9 @@ const upperStageCounts = computed(() =>
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  max-width: 450px;
 }
 
 .spiral-label {
@@ -677,9 +700,9 @@ const upperStageCounts = computed(() =>
 
 .spiral-chart {
   width: 100%;
-  max-width: 250px;
-  height: auto;
-  aspect-ratio: 1;
+  height: 100%;
+  max-height: 100%;
+  flex: 1;
 }
 
 .spiral-guide {
