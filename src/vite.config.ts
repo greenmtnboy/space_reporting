@@ -17,4 +17,9 @@ export default defineConfig({
     }),
   ],
   base: '/space_reporting/',
+  build: {
+    rollupOptions: {
+      external: ['@motherduck/wasm-client'],
+    },
+  },
 })
