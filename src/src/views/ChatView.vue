@@ -4,7 +4,7 @@ import {
   useTrilogyChat,
   useTrilogyCore,
   LLMChatSplitView,
-} from 'trilogy-studio-components'
+} from '@trilogy-data/trilogy-studio-components'
 import ViewHeader from '../components/ViewHeader.vue'
 
 // Initialize Trilogy core (all stores/services)
