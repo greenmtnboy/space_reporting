@@ -260,9 +260,9 @@ const activeDatasets = computed(() => {
         <h1>Chat with GCAT Data</h1>
         <div class="db-status-badge" :class="dbStatus">
           <span class="status-dot"></span>
-          <span v-if="dbStatus === 'loading'">Initializing DuckDB...</span>
-          <span v-else-if="dbStatus === 'ready'">DuckDB Ready</span>
-          <span v-else>DuckDB Error</span>
+          <span v-if="dbStatus === 'loading'">Initializing Local Database...</span>
+          <span v-else-if="dbStatus === 'ready'">Database Ready</span>
+          <span v-else>Database Creation Error</span>
         </div>
         <p>Select an AI provider to start chatting about space data.</p>
       </div>
@@ -414,12 +414,10 @@ const activeDatasets = computed(() => {
 
 .chat-header-bar {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-bg-secondary);
-  height: 48px;
+  align-items: flex-start;
+  padding: 1rem 1.5rem;
+  flex-shrink: 0;
 }
 
 .header-main {
@@ -429,12 +427,10 @@ const activeDatasets = computed(() => {
 }
 
 .chat-header-bar h1 {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 300;
   color: var(--color-text);
   margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 .chat-header-bar .header-left {
@@ -446,8 +442,10 @@ const activeDatasets = computed(() => {
 .chat-header-bar .header-top-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 1rem;
 }
+
+
 
 .db-status {
   display: flex;

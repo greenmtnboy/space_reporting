@@ -1,7 +1,7 @@
 import { computed, ref, type Ref } from 'vue'
 import type { Stats } from '../types'
 
-const DATA_URL = `${import.meta.env.BASE_URL}raw_engine_data.json`
+const DATA_URL = `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/engines_over_time/raw_data.json`
 const METADATA_URL = `${import.meta.env.BASE_URL}engine_metadata.json`
 
 export interface EngineLaunch {

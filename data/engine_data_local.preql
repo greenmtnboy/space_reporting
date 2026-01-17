@@ -2,7 +2,7 @@ import raw.launch;
 import raw.engine as engine;
 
 copy into json `../src/public/raw_engine_data.json` from
-where launch_date is not null and launch_date.year=2025
+where launch_date is not null
 select
     launch_date,
     launch_tag,

@@ -41,6 +41,9 @@ jobs:
             trilogy run data/satellite_data.preql \
               --env GOOGLE_HMAC_KEY=${{ secrets.GOOGLE_HMAC_KEY }} \
               --env GOOGLE_HMAC_SECRET=${{ secrets.GOOGLE_HMAC_SECRET }}
+            trilogy run data/engine_data.preql \
+              --env GOOGLE_HMAC_KEY=${{ secrets.GOOGLE_HMAC_KEY }} \
+              --env GOOGLE_HMAC_SECRET=${{ secrets.GOOGLE_HMAC_SECRET }}
           elif [ $EXIT_CODE -eq 2 ]; then
             echo "Data is already fresh. Skipping downstream run."
           else

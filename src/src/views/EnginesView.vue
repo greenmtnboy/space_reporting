@@ -61,7 +61,7 @@ watch(isComplete, (complete) => {
 
 // Flare config - wide aspect ratio to match container
 const flareWidth = 1000
-const flareHeight = 200
+const flareHeight = 250
 const flareCenter = flareHeight / 2 // vertical center
 
 // How long flares slide across (in animation time ms)
@@ -361,40 +361,61 @@ interface FlareDot {
   name: string
 }
 
-// Generate flare dots with time-based positioning
+// Generate flare dots with time-based positioning and vertical offsets for simultaneous firings
 function generateFlareDots(flares: ActiveFlare[]): FlareDot[] {
   const dots: FlareDot[] = []
   
+  // Group flares by timestamp to handle simultaneous firings
+  const flaresByTime = new Map<number, ActiveFlare[]>()
   for (const flare of flares) {
-    const age = currentTime.value - flare.launchTimestamp
+    if (!flaresByTime.has(flare.launchTimestamp)) {
+      flaresByTime.set(flare.launchTimestamp, [])
+    }
+    flaresByTime.get(flare.launchTimestamp)!.push(flare)
+  }
+
+  // Sort timestamps so we process them consistently
+  const sortedTimestamps = Array.from(flaresByTime.keys()).sort((a, b) => b - a)
+
+  for (const timestamp of sortedTimestamps) {
+    const concurrentFlares = flaresByTime.get(timestamp)!
+    const age = currentTime.value - timestamp
     const progress = Math.min(1, age / FLARE_SLIDE_DURATION) // 0 = just appeared, 1 = gone
     
     // Position: slide across full SVG viewBox width
-    // Leave small margin for cluster radius on each side
     const clusterMargin = 60 // room for engine cluster dots
     const startX = flareWidth - clusterMargin // start at right edge
     const endX = clusterMargin // end at left edge
     const xPos = startX - progress * (startX - endX)
     
-    // Opacity: bright at start, slow fade
-    const opacity = Math.max(0, 1 - progress * progress) // quadratic fade for slower start
+    // Opacity: quadratic fade for slower start
+    const opacity = Math.max(0, 1 - progress * progress)
     
     // Scale: start big, shrink slightly
     const scale = 1 - progress * 0.3
     
-    // Get cluster positions
-    const positions = getHeroClusterPositions(flare.count)
-    
-    for (let i = 0; i < positions.length; i++) {
-      dots.push({
-        key: `${flare.launchKey}-${i}`,  // unique per flare + dot position
-        x: xPos + positions[i].dx * scale,
-        y: flareCenter + positions[i].dy * scale,
-        color: flare.color,
-        opacity,
-        scale,
-        name: flare.name
-      })
+    // Vertical offset for simultaneous firings
+    // Spread them out centered around flareCenter
+    const verticalGap = 65 // distance between concurrent engine clusters
+    const totalHeight = (concurrentFlares.length - 1) * verticalGap
+    const startYOffset = -totalHeight / 2
+
+    for (let fIdx = 0; fIdx < concurrentFlares.length; fIdx++) {
+      const flare = concurrentFlares[fIdx]
+      const yBaseOffset = startYOffset + fIdx * verticalGap
+      const positions = getHeroClusterPositions(flare.count)
+      
+      for (let i = 0; i < positions.length; i++) {
+        dots.push({
+          key: `${flare.launchKey}-${i}`,
+          x: xPos + positions[i].dx * scale,
+          y: flareCenter + yBaseOffset + positions[i].dy * scale,
+          color: flare.color,
+          opacity,
+          scale,
+          name: flare.name
+        })
+      }
     }
   }
   
@@ -406,10 +427,25 @@ const coreFlareDots = computed(() => generateFlareDots(coreActiveFlares.value))
 const secondFlareDots = computed(() => generateFlareDots(secondActiveFlares.value))
 const upperFlareDots = computed(() => generateFlareDots(upperActiveFlares.value))
 
-// Most recent flare name per stage (for label)
-const coreCurrentName = computed(() => coreActiveFlares.value[0]?.name || '')
-const secondCurrentName = computed(() => secondActiveFlares.value[0]?.name || '')
-const upperCurrentName = computed(() => upperActiveFlares.value[0]?.name || '')
+// Most recent flare name per stage (for label) - combines simultaneous ones with counts
+function formatCurrentName(flares: ActiveFlare[]) {
+  if (flares.length === 0) return ''
+  
+  // Get the most recent timestamp among active flares
+  const maxTimestamp = Math.max(...flares.map(f => f.launchTimestamp))
+  
+  // Filter for all flares at that timestamp
+  const latestFlares = flares.filter(f => f.launchTimestamp === maxTimestamp)
+  
+  // Format as "Name - Count" and join with dashes
+  return latestFlares
+    .map(f => `${f.name} - ${f.count}`)
+    .join(' - ')
+}
+
+const coreCurrentName = computed(() => formatCurrentName(coreActiveFlares.value))
+const secondCurrentName = computed(() => formatCurrentName(secondActiveFlares.value))
+const upperCurrentName = computed(() => formatCurrentName(upperActiveFlares.value))
 
 // Kill marker - grouped by engine type for performance
 interface EngineTypeMarker {
@@ -549,7 +585,7 @@ function updateTooltipPosition(event: MouseEvent) {
                 <text
                   v-if="coreCurrentName"
                   :x="flareWidth / 2"
-                  :y="flareHeight - 10"
+                  :y="flareHeight - 15"
                   text-anchor="middle"
                   class="flare-engine-name"
                 >
@@ -608,7 +644,7 @@ function updateTooltipPosition(event: MouseEvent) {
                 <text
                   v-if="secondCurrentName"
                   :x="flareWidth / 2"
-                  :y="flareHeight - 10"
+                  :y="flareHeight - 15"
                   text-anchor="middle"
                   class="flare-engine-name"
                 >
@@ -666,7 +702,7 @@ function updateTooltipPosition(event: MouseEvent) {
                 <text
                   v-if="upperCurrentName"
                   :x="flareWidth / 2"
-                  :y="flareHeight - 10"
+                  :y="flareHeight - 15"
                   text-anchor="middle"
                   class="flare-engine-name"
                 >
@@ -911,7 +947,7 @@ function updateTooltipPosition(event: MouseEvent) {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  height: 180px;
+  height: 250px;
   margin-bottom: 0.5rem;
   overflow: hidden;
   padding-right: 10px;
@@ -919,7 +955,7 @@ function updateTooltipPosition(event: MouseEvent) {
 
 .flare-display {
   width: 100%;
-  height: 180px;
+  height: 250px;
 }
 
 .flare-dot {
@@ -928,9 +964,10 @@ function updateTooltipPosition(event: MouseEvent) {
 }
 
 .flare-engine-name {
-  font-size: 14px;
+  font-size: 1.1rem;
   font-weight: 600;
   fill: var(--color-text);
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
 }
 
 /* Kill Grid - engine clusters */
@@ -1143,6 +1180,11 @@ function updateTooltipPosition(event: MouseEvent) {
   .flare-area {
     height: 80px;
   }
+  .kill-grid {
+    display: none;
+  }
+
+
 }
 
 @media (max-width: 600px) {
