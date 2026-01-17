@@ -24,7 +24,54 @@ property jcat.parent string; # Parent object or central body the object is attac
 property jcat.s_date string; # Separation Date; start time for the current phase in UTC.
 property jcat.primary string; # Central body for the current phase; usually Earth.
 
-property jcat.status string; # Event that ends the current phase.
+property jcat.status string; #O        In orbit (free-flying, still tracked)
+#OX       In orbit but lost (no recent tracking)
+#AO       Attached to parent in orbit (external)
+#AO IN    Attached inside parent in orbit (internal)
+#UDK      Undocked from parent
+#REL      Released from parent (orbital)
+#DEP      Deployed from parent on surface
+#TO       Takeoff from small body (not a world)
+#TOA      Attached at takeoff from small body
+#R        Natural reentry (orbital decay)
+#D        Active deorbit
+#S        Targeted suborbital impact or reentry
+#L        Landed intact
+#LF       Failed landing (intended landing, destroyed)
+#E        Exploded in orbit
+#C        Collided with another object
+#F        Launch failure (free)
+#AF       Launch failure while attached
+#TX       Transmission ended (surface operation complete)
+#AS       Suborbital reentry while attached
+#AR       Reentered while attached
+#AR IN    Reentered while inside parent
+#AL       Landed while attached
+#AL IN    Landed while inside parent
+#N        Renamed or ownership changed (free)
+#NA       Renamed while attached
+#LEASE    Temporarily leased to another operator
+#DK       Docked to another object
+#GRP      Grappled by another object
+#ATT      Attached to new parent
+#TFR      Internal transfer between parents
+#TFR E    Transfer from internal to external
+#TFR IN   Transfer from external to internal
+#EVA DP   EVA depressurization began
+#EVA RP   EVA repressurization completed
+#DSO      Entered deep space (free)
+#DSA      Entered deep space while attached
+#DSA IN   Entered deep space inside parent
+#REFLT    Reflight (reassigned to new catalog number)
+#LO       Liftoff from a world (new catalog assignment)
+#LOA      Liftoff while attached (new catalog assignment)
+#EO       Escape from one body's SOI to another
+#EAO      Escape while attached
+#EN       Single flyby encounter
+#OI       Orbit insertion
+#OE       Orbit escape
+#ERR      Catalog or tracking error (no real object)
+
 property jcat.dest string; # Destination of the current phase, could be a reentry location or JCAT identifier of a new parent.
 # property jcat.state string; # OrgCode for the country/state of the owner/operator.
 
