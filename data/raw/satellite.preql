@@ -56,14 +56,14 @@ property jcat.alt_names string; # Comma-delimited list of alternative names for 
 
 
 auto base_category <- substring(split(type, ' ')[1],1,1); #P	Payload (for orbital attempt)
-
-# auto is_decommed <- decom_date is not null;
 #C	Component
 #R	Launch vehicle stage
 #D	Fragmentation debris
 #S	Suborbital payload (e.g. sounding rocket payload or missile reentry vehicle)
 #X	Catalog entry that has been deleted (used in auxcat etc.)
 #Z	Spurious catalog entry (was in SATCAT, perhaps in TLEs, but there was no real object)
+
+property jcat.is_decommed <- decom_date is not null; # if a satellite has been decommissioned as of latest data update. Use decom date to filter by what was active a historicp oint.
 
 
 root datasource satcat_raw (
@@ -162,5 +162,5 @@ datasource satcat (
     data_update_date: data_updated_through
     )
 grain (jcat)
-file `gcs://trilogy_public_models/duckdb/launch_report/satcat.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/satcat.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/satcat.parquet`
 freshness by data_updated_through;

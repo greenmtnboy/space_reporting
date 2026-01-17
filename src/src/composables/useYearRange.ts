@@ -15,7 +15,7 @@ export const YEAR_RANGE_OPTIONS: YearRangeOption[] = [
   { id: '1950+', label: '1950+', startYear: 1950, endYear: 2026 }
 ]
 
-export function useYearRange() {
+export function useYearRange(baseDurationPerYear: number = 40000) {
   const selectedRangeId = ref('2025')
 
   const selectedRange = computed(() => {
@@ -34,13 +34,13 @@ export function useYearRange() {
     return rangeEnd.value - rangeStart.value
   })
 
-  // Animation duration scales with number of years (40 seconds per year)
+  // Animation duration scales with number of years
   const yearCount = computed(() => {
     return selectedRange.value.endYear - selectedRange.value.startYear + 1
   })
 
   const animationDurationMs = computed(() => {
-    return yearCount.value * 40000
+    return yearCount.value * baseDurationPerYear
   })
 
   const title = computed(() => {

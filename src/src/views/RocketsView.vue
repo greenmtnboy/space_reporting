@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import type { ActiveLaunch, LaunchFilters } from '../composables/useLaunches'
 
 // Composables
@@ -16,10 +16,10 @@ import MapTiles from '../components/MapTiles.vue'
 import LaunchMarkers from '../components/LaunchMarkers.vue'
 import LaunchTooltip from '../components/LaunchTooltip.vue'
 import ControlPanel from '../components/ControlPanel.vue'
+import ViewHeader from '../components/ViewHeader.vue'
 import BarChart from '../components/BarChart.vue'
 import ChartLegend from '../components/ChartLegend.vue'
 import CompletionModal from '../components/CompletionModal.vue'
-import YearRangeButtons from '../components/YearRangeButtons.vue'
 import FilterChips from '../components/FilterChips.vue'
 
 // Reactive dimensions for responsiveness
@@ -104,6 +104,12 @@ const {
 // Data loading status
 const { isLoading: isDataLoading, loadError } = useLaunchDataStatus()
 
+// Completion modal visibility (separate from isComplete to allow closing without resetting)
+const showCompletionModal = ref(false)
+watch(isComplete, (complete) => {
+  if (complete) showCompletionModal.value = true
+})
+
 // Hover state for launch tooltips
 const hoveredLaunch = ref<{ launch: ActiveLaunch; x: number; y: number } | null>(null)
 
@@ -134,11 +140,17 @@ function handlePlayPause() {
 }
 
 function handlePlayAgain() {
+  showCompletionModal.value = false
   resetSeenLaunches()
   startAnimation()
 }
 
+function handleCloseModal() {
+  showCompletionModal.value = false
+}
+
 function handleYearRangeSelect(rangeId: string) {
+  showCompletionModal.value = false
   selectRange(rangeId)
   // Animation reset is handled by watch in useAnimation
   resetSeenLaunches()
@@ -212,20 +224,13 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <header class="header">
-      <div class="header-left">
-        <div class="header-top-row">
-          <h1>{{ title }} Rocket Launches</h1>
-          <div class="date-display mobile-only">{{ currentDateDisplay }}</div>
-        </div>
-        <YearRangeButtons
-          :options="yearRangeOptions"
-          :selected-id="selectedRangeId"
-          @select="handleYearRangeSelect"
-        />
-      </div>
-      <div class="date-display desktop-only">{{ currentDateDisplay }}</div>
-    </header>
+    <ViewHeader
+      :title="`${title} Rocket Launches`"
+      :current-date-display="currentDateDisplay"
+      :year-range-options="yearRangeOptions"
+      :selected-range-id="selectedRangeId"
+      @select-range="handleYearRangeSelect"
+    />
 
     <!-- Filter Chips -->
     <FilterChips
@@ -286,10 +291,11 @@ onUnmounted(() => {
         />
 
         <CompletionModal
-          v-if="isComplete"
+          v-if="showCompletionModal"
           :launch-count="accumulatedLaunches.length"
           :year-range-label="selectedRange.label"
           @play-again="handlePlayAgain"
+          @close="handleCloseModal"
         />
       </div>
 

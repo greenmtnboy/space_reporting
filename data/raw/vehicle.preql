@@ -92,7 +92,7 @@ datasource lv_info (
     data_updated_through
     )
 grain (name,variant)
-file `gcs://trilogy_public_models/duckdb/launch_report/lv_info.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/lv_info.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/lv_info.parquet`
 freshness by data_updated_through;
 
 
@@ -140,5 +140,5 @@ datasource lvs_info (
     data_updated_through
     )
 grain (name,stage_no,variant)
-file `gcs://trilogy_public_models/duckdb/launch_report/lvs_info.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/lvs_info.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/lvs_info.parquet`
 freshness by data_updated_through;

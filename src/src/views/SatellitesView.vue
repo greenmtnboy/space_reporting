@@ -18,7 +18,7 @@ import { useSatelliteSound } from '../composables/useSatelliteSound'
 import ControlPanel from '../components/ControlPanel.vue'
 import BarChart from '../components/BarChart.vue'
 import CompletionModal from '../components/CompletionModal.vue'
-import YearRangeButtons from '../components/YearRangeButtons.vue'
+import ViewHeader from '../components/ViewHeader.vue'
 import SatelliteLegend from '../components/SatelliteLegend.vue'
 import FilterChips from '../components/FilterChips.vue'
 // TODO: Satellite tooltip - disabled pending debugging
@@ -108,6 +108,12 @@ const {
 // Data loading status
 const { isLoading: isDataLoading, loadError } = useSatelliteDataStatus()
 
+// Completion modal visibility (separate from isComplete to allow closing without resetting)
+const showCompletionModal = ref(false)
+watch(isComplete, (complete) => {
+  if (complete) showCompletionModal.value = true
+})
+
 // Initialize sound
 const {
   isMuted,
@@ -167,10 +173,16 @@ function handlePlayPause() {
 }
 
 function handlePlayAgain() {
+  showCompletionModal.value = false
   startAnimation()
 }
 
+function handleCloseModal() {
+  showCompletionModal.value = false
+}
+
 function handleYearRangeSelect(rangeId: string) {
+  showCompletionModal.value = false
   selectRange(rangeId)
 }
 
@@ -230,20 +242,13 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <header class="header">
-      <div class="header-left">
-        <div class="header-top-row">
-          <h1>{{ title }}</h1>
-          <div class="date-display mobile-only">{{ currentDateDisplay }}</div>
-        </div>
-        <YearRangeButtons
-          :options="yearRangeOptions"
-          :selected-id="selectedRangeId"
-          @select="handleYearRangeSelect"
-        />
-      </div>
-      <div class="date-display desktop-only">{{ currentDateDisplay }}</div>
-    </header>
+    <ViewHeader
+      :title="title"
+      :current-date-display="currentDateDisplay"
+      :year-range-options="yearRangeOptions"
+      :selected-range-id="selectedRangeId"
+      @select-range="handleYearRangeSelect"
+    />
 
     <!-- Filter Chips -->
     <FilterChips
@@ -284,11 +289,12 @@ onUnmounted(() => {
         />
 
         <CompletionModal
-          v-if="isComplete"
+          v-if="showCompletionModal"
           :launch-count="accumulatedSatellites.length"
           :year-range-label="selectedRange.label"
           :item-label="'satellites launched'"
           @play-again="handlePlayAgain"
+          @close="handleCloseModal"
         />
       </div>
 

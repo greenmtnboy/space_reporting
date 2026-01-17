@@ -1,7 +1,7 @@
 import std.geography;
 import etl;
 
-key code string;
+key code string; # the code of a launch platform. A platform is a mobile structures which don't have a fixed geographical location. Most launches are from sites, not platforms.
 property code.u_code string;
 property code.state_code string::country_code;
 property code.type string;
@@ -75,5 +75,5 @@ datasource platform_info (
     data_updated_through
     )
 grain (code)
-file `gcs://trilogy_public_models/duckdb/launch_report/platform_info.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/platform_info.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/platform_info.parquet`
 freshness by data_updated_through;

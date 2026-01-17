@@ -1,0 +1,6 @@
+
+import raw.launch;
+
+select 
+    launch_tag.count
+;

@@ -1,7 +1,7 @@
 import std.geography;
 import etl;
 
-key key string;
+key key string; # the code of a launch site. A launch site is a fixed geographical location from which launches occur. Most launches are from sites, not platforms. Platforms which have been used to launch rockets include surface ships, submarines and aircraft.  
 property key.code string;
 property key.u_code string;
 property key.type string;
@@ -62,5 +62,5 @@ datasource sites (
     data_updated_through
     )
 grain (key)
-file `gcs://trilogy_public_models/duckdb/launch_report/sites.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/sites.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/sites.parquet`
 freshness by data_updated_through;

@@ -16,6 +16,24 @@ const navItems = [
     path: '/satellites',
     label: 'Satellite',
     icon: 'satellite'
+  },
+  {
+    name: 'engines',
+    path: '/engines',
+    label: 'Engines',
+    icon: 'engine'
+  },
+  {
+    name: 'chat',
+    path: '/chat',
+    label: 'Chat',
+    icon: 'chat'
+  },
+  {
+    name: 'info',
+    path: '/info',
+    label: 'Info',
+    icon: 'info'
   }
 ]
 
@@ -51,6 +69,34 @@ const currentRoute = computed(() => route.name)
           alt="Satellites"
           class="nav-icon"
         />
+        <img
+          v-else-if="item.icon === 'engine'"
+          src="/engine.svg"
+          alt="Engines"
+          class="nav-icon"
+        />
+        <svg
+          v-else-if="item.icon === 'chat'"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          class="nav-icon nav-icon-svg"
+        >
+          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+        </svg>
+        <svg
+          v-else-if="item.icon === 'info'"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="nav-icon nav-icon-svg"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
 
         <span class="nav-label">{{ item.label }}</span>
       </router-link>
@@ -127,6 +173,21 @@ const currentRoute = computed(() => route.name)
 
 .nav-item.active .nav-icon {
   filter: invert(65%) sepia(70%) saturate(500%) hue-rotate(170deg) brightness(105%);
+}
+
+.nav-icon-svg {
+  width: 22px;
+  height: 22px;
+  color: #9ca3af;
+  transition: color 0.15s ease;
+}
+
+.nav-item:hover .nav-icon-svg {
+  color: #e5e7eb;
+}
+
+.nav-item.active .nav-icon-svg {
+  color: var(--color-accent-bright, #38bdf8);
 }
 
 .nav-item:hover {

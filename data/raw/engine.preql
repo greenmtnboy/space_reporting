@@ -25,6 +25,40 @@ property name.usage string; # example of usage, includes stage number in bracket
 key group string; # general grouping of engines
 
 
+auto group_hex_color <- CASE
+        # Top tier (very high volume, maximal contrast)
+        WHEN COALESCE(group, 'Unspecified') = 'NTO/UDMH'     THEN '#D62728' # strong red
+        WHEN COALESCE(group, 'Unspecified') = 'LOX/Kero'     THEN '#1F77B4' # strong blue
+        WHEN COALESCE(group, 'Unspecified') = 'NA/Kero'      THEN '#FF7F0E' # orange
+        WHEN COALESCE(group, 'Unspecified') = 'NA/UDMH'      THEN '#9467BD' # purple
+        WHEN COALESCE(group, 'Unspecified') = 'NA/AA'        THEN '#2CA02C' # green
+
+        # High–mid tier
+        WHEN COALESCE(group, 'Unspecified') = 'LOX/Alcohol'  THEN '#17BECF' # cyan
+        WHEN COALESCE(group, 'Unspecified') = 'LOX/LH2'       THEN '#8C564B' # brown
+        WHEN COALESCE(group, 'Unspecified') = 'NTO/Hyd'       THEN '#E377C2' # pink
+        WHEN COALESCE(group, 'Unspecified') = 'NA/Amine'     THEN '#BCBD22' # olive
+        WHEN COALESCE(group, 'Unspecified') = 'Hybrid'       THEN '#7F7F7F' # dark gray
+
+        # Mid tier
+        WHEN COALESCE(group, 'Unspecified') = 'LOX/UDMH'     THEN '#AEC7E8' # light blue
+        WHEN COALESCE(group, 'Unspecified') = 'LOX/NH3'      THEN '#98DF8A' # light green
+        WHEN COALESCE(group, 'Unspecified') = 'NA/Turps'     THEN '#FFBB78' # light orange
+        WHEN COALESCE(group, 'Unspecified') = 'NA/UDMH'      THEN '#C5B0D5' # light purple
+        WHEN COALESCE(group, 'Unspecified') = 'Green'        THEN '#C49C94' # muted green-brown
+
+        # Low volume / tail
+        WHEN COALESCE(group, 'Unspecified') = 'H2O2/Kero'    THEN '#DBDB8D'
+        WHEN COALESCE(group, 'Unspecified') = 'LOX/Methane'  THEN '#F7B6D2'
+        WHEN COALESCE(group, 'Unspecified') = 'MonoHyd'      THEN '#C7C7C7'
+        WHEN COALESCE(group, 'Unspecified') = 'N2'           THEN '#E0E0E0'
+        WHEN COALESCE(group, 'Unspecified') = 'LOX/Propane'  THEN '#EEEEEE'
+
+        # Electric / rare / unspecified
+        WHEN COALESCE(group, 'Unspecified') = 'EP'           THEN '#BDBDBD'
+        ELSE '#BDBDBD'
+    END;
+
 root datasource engines_raw (
     Name: name,
     Manufacturer: manufacturer,
@@ -77,6 +111,6 @@ datasource engine (
     data_updated_through
     )
 grain (name)
-file `gcs://trilogy_public_models/duckdb/launch_report/engine.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/engine.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/engine.parquet`
 freshness by data_updated_through;
 

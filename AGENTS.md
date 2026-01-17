@@ -15,7 +15,9 @@ McDowell, Jonathan C., 2020. General Catalog of Artificial Space Objects,
 
 Vite, vue, typescript
 
-Use pnpm not NPM for all management
+Use pnpm not NPM for all management. 
+
+This is critical - NO NPM.
 
 ## Project Tracking
 

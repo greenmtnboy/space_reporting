@@ -5,14 +5,14 @@ import etl;
 
 key code string;
 property code.u_code string;
-property code.state_code string;
+property code.state_code string; #OrgCode for organzation's host state.
 property code.type string;
-property code.class string;
+property code.class string; # Organization class: A, B, C, or D (Nonprofit, commercial, civil or defence)
 property code.t_start string;
 property code.t_stop string;
 property code.short_name string;
 property code.name string;
-property code.location string;
+property code.location string; # Approximate location (e.g. city)
 property code.longitude float;
 property code.latitude float;
 property code.error float;
@@ -24,7 +24,7 @@ property flag <- CAST(CASE WHEN state_code in ('SU', 'RU') THEN 'https://upload.
 WHEN state_code = 'US' THEN 'https://upload.wikimedia.org/wikipedia/commons/5/55/Flag_of_the_United_States_%283-2_aspect_ratio%29.svg'
 WHEN state_code = 'CN' THEN 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Flag_of_the_People%27s_Republic_of_China.svg/2880px-Flag_of_the_People%27s_Republic_of_China.svg.png'
 ELSE 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Flag_of_the_United_Nations.svg/2880px-Flag_of_the_United_Nations.svg.png'
-END AS string::url_image);
+END AS string::url_image); # wikipedia flag image url; only for US/Russia/China for now
 
 property code.color <- 
   CASE
@@ -85,10 +85,10 @@ property code.color <-
     WHEN state_code = 'X' THEN '#7FB7FF'          # UN light blue
 
     ELSE '#7FB7FF'
-  END::string::hex;
+  END::string::hex; # a representative hex code
 
 
-auto e_name <- coalesce(CASE WHEN _e_name = '-' then NULL else _e_name end, u_name);
+auto e_name <- coalesce(CASE WHEN _e_name = '-' then NULL else _e_name end, u_name); # the default English name of an "organization" - a company, state, or other body. Examples "European Space Agency", "US Air Force Space and Missile Center", "Beijing Interstellar Glory Space Tech. Co. Ltd." Best search with wildcards; abbreviations typically expanded.
 
 
 root datasource organizations_raw (
@@ -138,5 +138,5 @@ datasource organizations (
     color
     )
 grain (code)
-file `gcs://trilogy_public_models/duckdb/launch_report/organizations.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/organizations.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/organizations.parquet`
 freshness by data_updated_through;

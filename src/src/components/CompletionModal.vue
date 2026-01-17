@@ -7,6 +7,7 @@ defineProps<{
 
 const emit = defineEmits<{
   playAgain: []
+  close: []
 }>()
 </script>
 
@@ -15,7 +16,10 @@ const emit = defineEmits<{
     <div class="modal-content">
       <h2>That's a wrap!</h2>
       <p>{{ launchCount }} {{ itemLabel || 'launches' }} in {{ yearRangeLabel }}</p>
-      <button @click="emit('playAgain')" class="control-btn primary">Watch Again</button>
+      <div class="button-group">
+        <button @click="emit('close')" class="control-btn secondary">Close</button>
+        <button @click="emit('playAgain')" class="control-btn primary">Watch Again</button>
+      </div>
     </div>
   </div>
 </template>
@@ -67,5 +71,21 @@ const emit = defineEmits<{
 
 .control-btn.primary:hover {
   background: #2563eb;
+}
+
+.control-btn.secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.control-btn.secondary:hover {
+  background: #e5e7eb;
+}
+
+.button-group {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
 }
 </style>
