@@ -47,21 +47,20 @@ export function useEngineSound(
         const now = ctx.currentTime
 
         // Normalize thrust (10-2500 kN typical range) to 0-1
-        const normalizedThrust = Math.min(Math.max(thrust, 10), 2500) / 2500
-
+        const normalizedThrust = Math.min(Math.max(thrust, 10), 20000) / 2500
         // Stage-based harmonic offset (creates chord-like effect)
         // Core: root note, Second: 5th, Upper: octave
-        const stageHarmonicMultiplier = stage <= 1 ? 1.0 : stage === 2 ? 1.5 : 2.0
+        const stageHarmonicMultiplier = stage <= 1 ? 1.0 : stage === 2 ? 2.0 : 3.0
 
         // Base frequency: high thrust = DEEP (low frequency)
         // Range: 400Hz (small) to 80Hz (massive like Raptor)
-        const baseFreq = (350 - normalizedThrust * 270) / stageHarmonicMultiplier
+        const baseFreq = Math.max((250 - normalizedThrust * 270),50) / stageHarmonicMultiplier
 
         // Duration: bigger engines sustain longer
-        const duration = 0.8 + normalizedThrust * 0.6 + count * 0.03
+        const duration = 1.2 + Math.pow(normalizedThrust, 1.2) * 0.5 + count * 0.03
 
         // Volume: bigger = louder
-        const gainLevel = (0.06 + normalizedThrust * 0.25) * volume.value
+        const gainLevel = (0.03 + Math.pow(normalizedThrust, 2.0) * 0.9) * volume.value
 
         // Count-based detune spread for chorus effect
         const detuneSpread = Math.min(count, 9) * 5 // cents
@@ -116,7 +115,7 @@ export function useEngineSound(
         noise.stop(now + duration)
 
         // === RUMBLE LAYER (low oscillator for big engines) ===
-        if (normalizedThrust > 0.2) {
+        if (normalizedThrust > 0.5) {
             const rumble = ctx.createOscillator()
             rumble.type = 'sawtooth'
             rumble.frequency.setValueAtTime(35 + normalizedThrust * 30, now)

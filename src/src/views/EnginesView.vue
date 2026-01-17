@@ -21,7 +21,7 @@ const {
   progressEndLabel,
   selectRange,
   options: yearRangeOptions
-} = useYearRange()
+} = useYearRange(120000)
 
 const {
   isPlaying,
