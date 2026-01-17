@@ -4,7 +4,6 @@
   "description": "Animated visualization of 2025 rocket launches",
   "type": "module",
   "scripts": {
-    "predev": "pnpm -C ../../trilogy-studio-core/lib build",
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview"
@@ -17,7 +16,7 @@
     "@duckdb/duckdb-wasm": "1.29.1-dev269.0",
     "pinia": "^2.3.1",
     "three": "^0.182.0",
-    "trilogy-studio-components": "link:../../trilogy-studio-core/lib",
+    "@trilogy-data/trilogy-studio-components":"0.1.0",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
   },

@@ -37,7 +37,7 @@ const availableProviders = [
   { id: 'anthropic', name: 'Anthropic (Claude)' },
   { id: 'openai', name: 'OpenAI' },
   { id: 'google', name: 'Google (Gemini)' },
-  { id: 'mistral', name: 'Mistral' },
+  // { id: 'mistral', name: 'Mistral' },
 ]
 
 const hasActiveLLMConnection = computed(() => {
@@ -184,10 +184,10 @@ const loadModels = async () => {
     const chatModels = modelIds.filter((id: string) => {
       const lower = id.toLowerCase()
       if (selectedProvider.value === 'openai') {
-        return (lower.includes('gpt') || lower.includes('o1') || lower.includes('o3')) && !lower.includes('instruct')
+        return lower.startsWith('gpt-5.')
       }
       if (selectedProvider.value === 'google') {
-        return lower.includes('gemini')
+        return lower.includes('-flash')
       }
       return true
     })
@@ -220,12 +220,11 @@ function getDefaultModels(provider: string) {
     case 'openai':
       return [
         { id: 'gpt-5.2', name: 'GPT-5.2' }, 
-        { id: 'gpt-4o', name: 'GPT-4o' }
       ]
     case 'google':
-      return [{ id: 'gemini-2.5-pro-preview-05-06', name: 'Gemini 2.5 Pro' }]
-    case 'mistral':
-      return [{ id: 'mistral-large-latest', name: 'Mistral Large' }]
+      return [{ id: 'models/gemini-2.5-flash', name: 'models/gemini-2.5-flash' }]
+    // case 'mistral':
+    //   return [{ id: 'mistral-large-latest', name: 'Mistral Large' }]
     default:
       return []
   }
@@ -1000,7 +999,7 @@ const activeDatasets = computed(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible; /* Allow overflow for padding/breathing room */
 }
 
 .chat-container :deep(.visualization-container) {
@@ -1010,7 +1009,7 @@ const activeDatasets = computed(() => {
   min-height: 0 !important;
   height: 100% !important;
   background-color: var(--color-bg-primary);
-  padding: 16px 16px 32px 16px;
+  padding: 16px 16px 60px 16px !important; /* Significant breathing room */
   border-radius: 4px;
 }
 
@@ -2058,6 +2057,7 @@ const activeDatasets = computed(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding-bottom: 60px;
 }
 
 /* Panel resizer - draggable boundary between chat and sidebar */
