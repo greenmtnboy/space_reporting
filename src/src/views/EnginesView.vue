@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, computed, ref, watch } from 'vue'
-import { useEngines, loadEngineData, useEngineDataStatus, type EngineLaunch } from '../composables/useEngines'
+import { onMounted, computed, ref, watch, type Ref } from 'vue'
+import { useEngines, loadEngineData, useEngineDataStatus, type EngineLaunch, type EngineMetadata } from '../composables/useEngines'
+import { useEngineSound } from '../composables/useEngineSound'
 import { useAnimation } from '../composables/useAnimation'
 import { useYearRange } from '../composables/useYearRange'
 import ControlPanel from '../components/ControlPanel.vue'
@@ -35,7 +36,7 @@ const {
   seekTo,
 } = useAnimation(rangeStart, rangeDuration, animationDurationMs)
 
-const { isLoading, loadError } = useEngineDataStatus()
+const { isLoading, loadError, engineMetadata } = useEngineDataStatus()
 const {
   engineGroups,
   firstStageOnlyVisible,
@@ -52,36 +53,136 @@ onMounted(async () => {
   startAnimation()
 })
 
-// Spiral chart config - larger spirals
-const spiralSize = 550
-const spiralCenter = spiralSize / 2
-const maxRadius = spiralSize / 2 - 50
-const minRadius = 10 // Start very close to center
-const boosterRadius = maxRadius + 30 // Boosters render outside
+// Completion modal visibility (separate from isComplete to allow closing without resetting)
+const showCompletionModal = ref(false)
+watch(isComplete, (complete) => {
+  if (complete) showCompletionModal.value = true
+})
 
-// How long it takes for an engine to spiral from center to edge (in animation ms)
-const SPIRAL_OUT_DURATION = 1000 * 60 * 60 * 24 * 60 // 60 days in animation time
+// Flare config - wide aspect ratio to match container
+const flareWidth = 1000
+const flareHeight = 200
+const flareCenter = flareHeight / 2 // vertical center
 
-// Interface for individual dots on the spiral
-interface SpiralDot {
-  launch: EngineLaunch
-  engineIndex: number
-  x: number
-  y: number
+// How long flares slide across (in animation time ms)
+const FLARE_SLIDE_DURATION = 1000 * 60 * 60 * 24 * 14 // 14 days in animation time (slower)
+
+// Interface for active flares with animation-time tracking
+interface ActiveFlare {
+  launchKey: string
+  launchTimestamp: number // animation time when engine appeared
   color: string
-  opacity: number
-  isNew: boolean
+  name: string
+  count: number
 }
 
-// Special case engine layouts
+// Track seen launches per stage (to detect new ones)
+const coreSeenLaunches = ref<Set<string>>(new Set())
+const secondSeenLaunches = ref<Set<string>>(new Set())
+const upperSeenLaunches = ref<Set<string>>(new Set())
+
+// Generate active flares for a stage based on recent launches
+function getActiveFlares(launches: EngineLaunch[], seenSet: Ref<Set<string>>): ActiveFlare[] {
+  const flares: ActiveFlare[] = []
+  
+  for (const launch of launches) {
+    const launchKey = `${launch.launch_tag}-${launch.vehicle_stage_engine_name}-${launch.vehicle_stage_number}`
+    
+    // Track if we've seen this launch
+    if (!seenSet.value.has(launchKey)) {
+      seenSet.value.add(launchKey)
+    }
+    
+    // Calculate age in animation time
+    const age = currentTime.value - launch.timestamp
+    
+    // Only show flares for recent engines (within slide duration)
+    if (age >= 0 && age < FLARE_SLIDE_DURATION) {
+      flares.push({
+        launchKey,
+        launchTimestamp: launch.timestamp,
+        color: launch.group_hex_color,
+        name: launch.vehicle_stage_engine_name,
+        count: launch.vehicle_stage_engine_count || 1
+      })
+    }
+  }
+  
+  return flares
+}
+
+// Combined core visible
+const allCoreVisible = computed(() => [...firstStageOnlyVisible.value, ...boostersVisible.value])
+
+// Active flares per stage (computed from animation time)
+const coreActiveFlares = computed(() => getActiveFlares(allCoreVisible.value, coreSeenLaunches))
+const secondActiveFlares = computed(() => getActiveFlares(secondStageVisible.value, secondSeenLaunches))
+const upperActiveFlares = computed(() => getActiveFlares(upperStageVisible.value, upperSeenLaunches))
+
+// Reset tracking when animation resets
+watch(() => currentTime.value, (newTime, oldTime) => {
+  if (newTime < oldTime) {
+    coreSeenLaunches.value.clear()
+    secondSeenLaunches.value.clear()
+    upperSeenLaunches.value.clear()
+    resetSeenFlares() // Also reset sound tracking
+  }
+})
+
+// Initialize engine sound
+const {
+  isMuted,
+  volume,
+  toggleMute,
+  setVolume,
+  resetSeenFlares,
+  resumeAudioContext
+} = useEngineSound(coreActiveFlares, secondActiveFlares, upperActiveFlares, engineMetadata, isPlaying)
+
+// Handlers for play/pause that also handle audio context
+function handlePlayPause() {
+  resumeAudioContext()
+  togglePlayPause()
+}
+
+function handleReset() {
+  resetAnimation()
+  resetSeenFlares()
+}
+
+function handlePlayAgain() {
+  showCompletionModal.value = false
+  resetSeenFlares()
+  startAnimation()
+}
+
+function handleCloseModal() {
+  showCompletionModal.value = false
+}
+
+function handleSelectRange(rangeId: string) {
+  showCompletionModal.value = false
+  selectRange(rangeId)
+}
+
+// Special case engine layouts - tight clustering for kill markers
 function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx: number; dy: number }> {
-  const spacing = dotRadius * 2.2
+  const spacing = dotRadius * 2.0 // tighter spacing
   const positions: Array<{ dx: number; dy: number }> = []
 
   if (engineCount === 1) {
     positions.push({ dx: 0, dy: 0 })
-  } else if (engineCount <= 4) {
-    // Square/diamond pattern for 2-4 engines
+  } else if (engineCount === 2) {
+    // 2 engines: horizontal line
+    positions.push({ dx: -spacing/2, dy: 0 })
+    positions.push({ dx: spacing/2, dy: 0 })
+  } else if (engineCount === 3) {
+    // 3 engines: horizontal line
+    positions.push({ dx: -spacing, dy: 0 })
+    positions.push({ dx: 0, dy: 0 })
+    positions.push({ dx: spacing, dy: 0 })
+  } else if (engineCount === 4) {
+    // 4 engines: square
     const offsets = [
       { dx: -spacing/2, dy: -spacing/2 },
       { dx: spacing/2, dy: -spacing/2 },
@@ -92,9 +193,9 @@ function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx
       positions.push(offsets[i])
     }
   } else if (engineCount === 9) {
-    // Falcon 9 octaweb: 1 center + 8 around
+    // Falcon 9: 1 center + 8 around - tight
     positions.push({ dx: 0, dy: 0 })
-    const ringRadius = spacing * 1.2
+    const ringRadius = spacing * 1.0
     for (let i = 0; i < 8; i++) {
       const angle = (i / 8) * Math.PI * 2 - Math.PI / 2
       positions.push({
@@ -103,17 +204,16 @@ function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx
       })
     }
   } else if (engineCount === 33) {
-    // Starship Raptor: 3 center + 10 middle + 20 outer
-    // Inner 3 in triangle
+    // Starship: 3 inner + 10 middle + 20 outer - compact
+    const innerRadius = spacing * 0.45
     for (let i = 0; i < 3; i++) {
       const angle = (i / 3) * Math.PI * 2 - Math.PI / 2
       positions.push({
-        dx: Math.cos(angle) * spacing * 0.6,
-        dy: Math.sin(angle) * spacing * 0.6
+        dx: Math.cos(angle) * innerRadius,
+        dy: Math.sin(angle) * innerRadius
       })
     }
-    // Middle ring of 10
-    const middleRadius = spacing * 1.8
+    const middleRadius = spacing * 1.2
     for (let i = 0; i < 10; i++) {
       const angle = (i / 10) * Math.PI * 2 - Math.PI / 2
       positions.push({
@@ -121,8 +221,7 @@ function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx
         dy: Math.sin(angle) * middleRadius
       })
     }
-    // Outer ring of 20
-    const outerRadius = spacing * 3.2
+    const outerRadius = spacing * 2.0
     for (let i = 0; i < 20; i++) {
       const angle = (i / 20) * Math.PI * 2 - Math.PI / 2
       positions.push({
@@ -131,7 +230,6 @@ function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx
       })
     }
   } else if (engineCount <= 8) {
-    // Single ring for 5-8 engines
     for (let i = 0; i < engineCount; i++) {
       const angle = (i / engineCount) * Math.PI * 2 - Math.PI / 2
       positions.push({
@@ -140,21 +238,12 @@ function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx
       })
     }
   } else {
-    // Default: center + concentric rings (7 in first ring for octaweb-style)
     positions.push({ dx: 0, dy: 0 })
     let remaining = engineCount - 1
     let ring = 1
-
     while (remaining > 0) {
-      const ringRadius = spacing * ring * 1.1
-      // First ring: use 7 or 8 based on remaining, then scale up
-      let enginesInRing: number
-      if (ring === 1) {
-        enginesInRing = Math.min(remaining, remaining <= 8 ? remaining : 8)
-      } else {
-        enginesInRing = Math.min(remaining, ring * 6 + 2)
-      }
-
+      const ringRadius = spacing * ring * 1.0
+      let enginesInRing = ring === 1 ? Math.min(remaining, 8) : Math.min(remaining, ring * 6 + 2)
       for (let i = 0; i < enginesInRing; i++) {
         const angle = (i / enginesInRing) * Math.PI * 2 - Math.PI / 2
         positions.push({
@@ -162,218 +251,207 @@ function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx
           dy: Math.sin(angle) * ringRadius
         })
       }
-
       remaining -= enginesInRing
       ring++
     }
   }
-
   return positions
 }
 
-// Track recently appeared engines for flare effect
-const recentLaunches = ref<Set<string>>(new Set())
-const seenLaunches = ref<Set<string>>(new Set())
-const FLARE_DURATION = 300 // ms
+// Generate HERO flare dots - larger spacing for visibility
+function getHeroClusterPositions(engineCount: number): Array<{ dx: number; dy: number }> {
+  const dotRadius = 12 // larger for hero display
+  const spacing = dotRadius * 2.2
+  const positions: Array<{ dx: number; dy: number }> = []
 
-// Generate dots for a spiral - engines spawn at center and spiral outward based on age
-function generateSpiralDots(
-  launches: EngineLaunch[],
-  spiralCenterX: number
-): SpiralDot[] {
-  const dots: SpiralDot[] = []
-  const turns = 4
-  const decayMs = 1000 * 60 * 60 * 24 * 30 // 1 month brightness decay
-
-  for (const launch of launches) {
-    // Age = time since this engine appeared (in animation time)
-    const age = currentTime.value - launch.timestamp
-    if (age < 0) continue // Not yet visible
-
-    // Progress through spiral: 0 = just appeared (center), 1 = fully spiraled out
-    const spiralProgress = Math.min(1, age / SPIRAL_OUT_DURATION)
-    
-    // Skip engines that have fully spiraled out (they disappear)
-    if (spiralProgress >= 1) continue
-    
-    // Angle increases as engine spirals outward (multiple turns)
-    const baseAngle = spiralProgress * turns * Math.PI * 2 - Math.PI / 2
-    
-    // Radius: start near center, move outward
-    const r = minRadius + spiralProgress * (maxRadius - minRadius)
-
-    // Brightness: recent engines are brighter, fade out near edge
-    let opacity = 0.4
-    if (age >= 0 && age < decayMs) {
-      opacity = 0.4 + 0.6 * (1 - age / decayMs)
+  if (engineCount === 1) {
+    positions.push({ dx: 0, dy: 0 })
+  } else if (engineCount === 2) {
+    // 2 engines: horizontal line
+    positions.push({ dx: -spacing/2, dy: 0 })
+    positions.push({ dx: spacing/2, dy: 0 })
+  } else if (engineCount === 3) {
+    // 3 engines: horizontal line
+    positions.push({ dx: -spacing, dy: 0 })
+    positions.push({ dx: 0, dy: 0 })
+    positions.push({ dx: spacing, dy: 0 })
+  } else if (engineCount === 4) {
+    // 4 engines: square
+    const offsets = [
+      { dx: -spacing/2, dy: -spacing/2 },
+      { dx: spacing/2, dy: -spacing/2 },
+      { dx: -spacing/2, dy: spacing/2 },
+      { dx: spacing/2, dy: spacing/2 }
+    ]
+    for (let i = 0; i < engineCount; i++) {
+      positions.push(offsets[i])
     }
+  } else if (engineCount === 9) {
+    positions.push({ dx: 0, dy: 0 })
+    const ringRadius = spacing * 1.0
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * ringRadius,
+        dy: Math.sin(angle) * ringRadius
+      })
+    }
+  } else if (engineCount === 33) {
+    const innerRadius = spacing * 0.45
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * innerRadius,
+        dy: Math.sin(angle) * innerRadius
+      })
+    }
+    const middleRadius = spacing * 1.2
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * middleRadius,
+        dy: Math.sin(angle) * middleRadius
+      })
+    }
+    const outerRadius = spacing * 2.0
+    for (let i = 0; i < 20; i++) {
+      const angle = (i / 20) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * outerRadius,
+        dy: Math.sin(angle) * outerRadius
+      })
+    }
+  } else if (engineCount <= 8) {
+    for (let i = 0; i < engineCount; i++) {
+      const angle = (i / engineCount) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * spacing,
+        dy: Math.sin(angle) * spacing
+      })
+    }
+  } else {
+    positions.push({ dx: 0, dy: 0 })
+    let remaining = engineCount - 1
+    let ring = 1
+    while (remaining > 0) {
+      const ringRadius = spacing * ring * 1.0
+      let enginesInRing = ring === 1 ? Math.min(remaining, 8) : Math.min(remaining, ring * 6 + 2)
+      for (let i = 0; i < enginesInRing; i++) {
+        const angle = (i / enginesInRing) * Math.PI * 2 - Math.PI / 2
+        positions.push({
+          dx: Math.cos(angle) * ringRadius,
+          dy: Math.sin(angle) * ringRadius
+        })
+      }
+      remaining -= enginesInRing
+      ring++
+    }
+  }
+  return positions
+}
+
+// Flare dot interface with computed position/opacity
+interface FlareDot {
+  key: string  // unique key for Vue
+  x: number
+  y: number
+  color: string
+  opacity: number
+  scale: number
+  name: string
+}
+
+// Generate flare dots with time-based positioning
+function generateFlareDots(flares: ActiveFlare[]): FlareDot[] {
+  const dots: FlareDot[] = []
+  
+  for (const flare of flares) {
+    const age = currentTime.value - flare.launchTimestamp
+    const progress = Math.min(1, age / FLARE_SLIDE_DURATION) // 0 = just appeared, 1 = gone
     
-    // Fade out as approaching end of spiral
-    if (spiralProgress > 0.8) {
-      const fadeProgress = (spiralProgress - 0.8) / 0.2 // 0 to 1 in last 20%
-      opacity = opacity * (1 - fadeProgress)
-    }
-
-    const engineCount = launch.vehicle_stage_engine_count || 1
-    const color = launch.group_hex_color
-    const dotRadius = 2.5
-
-    // Position on spiral
-    const baseX = spiralCenterX + Math.cos(baseAngle) * r
-    const baseY = spiralCenter + Math.sin(baseAngle) * r
-
-    // Check for flare effect (newly appearing)
-    const launchKey = `${launch.launch_tag}-${launch.vehicle_stage_engine_name}-${launch.vehicle_stage_number}`
-    let isNew = false
-    if (!seenLaunches.value.has(launchKey)) {
-      seenLaunches.value.add(launchKey)
-      recentLaunches.value.add(launchKey)
-      isNew = true
-      setTimeout(() => {
-        recentLaunches.value.delete(launchKey)
-      }, FLARE_DURATION)
-    } else if (recentLaunches.value.has(launchKey)) {
-      isNew = true
-    }
-
-    // Create dots arranged like rocket engine clusters
-    const positions = getClusterPositions(engineCount, dotRadius)
-
-    for (let i = 0; i < engineCount && i < positions.length; i++) {
+    // Position: slide across full SVG viewBox width
+    // Leave small margin for cluster radius on each side
+    const clusterMargin = 60 // room for engine cluster dots
+    const startX = flareWidth - clusterMargin // start at right edge
+    const endX = clusterMargin // end at left edge
+    const xPos = startX - progress * (startX - endX)
+    
+    // Opacity: bright at start, slow fade
+    const opacity = Math.max(0, 1 - progress * progress) // quadratic fade for slower start
+    
+    // Scale: start big, shrink slightly
+    const scale = 1 - progress * 0.3
+    
+    // Get cluster positions
+    const positions = getHeroClusterPositions(flare.count)
+    
+    for (let i = 0; i < positions.length; i++) {
       dots.push({
-        launch,
-        engineIndex: i,
-        x: baseX + positions[i].dx,
-        y: baseY + positions[i].dy,
-        color,
+        key: `${flare.launchKey}-${i}`,  // unique per flare + dot position
+        x: xPos + positions[i].dx * scale,
+        y: flareCenter + positions[i].dy * scale,
+        color: flare.color,
         opacity,
-        isNew
+        scale,
+        name: flare.name
       })
     }
   }
-
-  return dots
-}
-
-// Generate booster dots (outside main spiral, also spiral out)
-function generateBoosterDots(launches: EngineLaunch[], spiralCenterX: number): SpiralDot[] {
-  const dots: SpiralDot[] = []
   
-  const boostersByLaunch = new Map<string, EngineLaunch[]>()
-  for (const launch of launches) {
-    const key = launch.launch_tag
-    if (!boostersByLaunch.has(key)) {
-      boostersByLaunch.set(key, [])
-    }
-    boostersByLaunch.get(key)!.push(launch)
-  }
-
-  const decayMs = 1000 * 60 * 60 * 24 * 30
-  const turns = 4
-
-  for (const [launchTag, boosters] of boostersByLaunch) {
-    const firstBooster = boosters[0]
-    const age = currentTime.value - firstBooster.timestamp
-    if (age < 0) continue
-
-    const spiralProgress = Math.min(1, age / SPIRAL_OUT_DURATION)
-    
-    // Skip boosters that have fully spiraled out
-    if (spiralProgress >= 1) continue
-    
-    const baseAngle = spiralProgress * turns * Math.PI * 2 - Math.PI / 2
-    
-    let opacity = 0.4
-    if (age >= 0 && age < decayMs) {
-      opacity = 0.4 + 0.6 * (1 - age / decayMs)
-    }
-    
-    // Fade out as approaching end of spiral
-    if (spiralProgress > 0.8) {
-      const fadeProgress = (spiralProgress - 0.8) / 0.2
-      opacity = opacity * (1 - fadeProgress)
-    }
-
-    // Position boosters at opposing angles around the booster ring
-    const totalBoosters = boosters.reduce((sum, b) => sum + (b.vehicle_stage_engine_count || 1), 0)
-    const angleSpread = totalBoosters <= 2 ? Math.PI : (Math.PI * 2) / totalBoosters
-
-    // Flare effect
-    const launchKey = `booster-${launchTag}`
-    let isNew = false
-    if (!seenLaunches.value.has(launchKey)) {
-      seenLaunches.value.add(launchKey)
-      recentLaunches.value.add(launchKey)
-      isNew = true
-      setTimeout(() => {
-        recentLaunches.value.delete(launchKey)
-      }, FLARE_DURATION)
-    } else if (recentLaunches.value.has(launchKey)) {
-      isNew = true
-    }
-
-    // Boosters also spiral out but stay on the outer ring
-    const boosterR = minRadius + spiralProgress * (boosterRadius - minRadius)
-
-    let boosterIdx = 0
-    for (const booster of boosters) {
-      const count = booster.vehicle_stage_engine_count || 1
-
-      for (let i = 0; i < count; i++) {
-        const angle = baseAngle + (boosterIdx + i) * angleSpread
-        
-        dots.push({
-          launch: booster,
-          engineIndex: i,
-          x: spiralCenterX + Math.cos(angle) * boosterR,
-          y: spiralCenter + Math.sin(angle) * boosterR,
-          color: booster.group_hex_color,
-          opacity,
-          isNew
-        })
-      }
-      boosterIdx += count
-    }
-  }
-
   return dots
 }
 
-// Reset tracking when animation resets or seeks backward
-watch(() => currentTime.value, (newTime, oldTime) => {
-  if (newTime < oldTime) {
-    seenLaunches.value.clear()
-    recentLaunches.value.clear()
-  }
-})
+// Computed flare dots per stage
+const coreFlareDots = computed(() => generateFlareDots(coreActiveFlares.value))
+const secondFlareDots = computed(() => generateFlareDots(secondActiveFlares.value))
+const upperFlareDots = computed(() => generateFlareDots(upperActiveFlares.value))
 
-// Spiral dots for each stage
-const coreSpiral = computed(() => generateSpiralDots(firstStageOnlyVisible.value, spiralCenter))
-const boosterDots = computed(() => generateBoosterDots(boostersVisible.value, spiralCenter))
-const secondSpiral = computed(() => generateSpiralDots(secondStageVisible.value, spiralCenter))
-const upperSpiral = computed(() => generateSpiralDots(upperStageVisible.value, spiralCenter))
+// Most recent flare name per stage (for label)
+const coreCurrentName = computed(() => coreActiveFlares.value[0]?.name || '')
+const secondCurrentName = computed(() => secondActiveFlares.value[0]?.name || '')
+const upperCurrentName = computed(() => upperActiveFlares.value[0]?.name || '')
 
-// Generate spiral guide path (faint background line)
-function generateSpiralPath(centerX: number): string {
-  const points: string[] = []
-  const turns = 4
-  const steps = 300
-
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps
-    const angle = t * turns * Math.PI * 2 - Math.PI / 2
-    const r = minRadius + t * (maxRadius - minRadius)
-    const x = centerX + Math.cos(angle) * r
-    const y = spiralCenter + Math.sin(angle) * r
-    points.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`)
-  }
-
-  return points.join(' ')
+// Kill marker - grouped by engine type for performance
+interface EngineTypeMarker {
+  engineName: string
+  engineCount: number  // engines per launch
+  launchCount: number  // number of launches with this engine
+  totalEngines: number // engineCount * launchCount
+  color: string
+  positions: Array<{ dx: number; dy: number }>
 }
 
-const spiralGuidePath = computed(() => generateSpiralPath(spiralCenter))
+// Group launches by engine type
+function groupByEngineType(launches: EngineLaunch[]): EngineTypeMarker[] {
+  const groups = new Map<string, { launches: EngineLaunch[]; color: string; count: number }>()
+  
+  for (const launch of launches) {
+    const key = launch.vehicle_stage_engine_name
+    if (!groups.has(key)) {
+      groups.set(key, { 
+        launches: [], 
+        color: launch.group_hex_color,
+        count: launch.vehicle_stage_engine_count || 1
+      })
+    }
+    groups.get(key)!.launches.push(launch)
+  }
+  
+  return Array.from(groups.entries()).map(([name, data]) => ({
+    engineName: name,
+    engineCount: data.count,
+    launchCount: data.launches.length,
+    totalEngines: data.count * data.launches.length,
+    color: data.color,
+    positions: getClusterPositions(data.count, 4)
+  })).sort((a, b) => b.totalEngines - a.totalEngines)
+}
 
-// Count engines per spiral
+const coreEngineTypes = computed(() => groupByEngineType(allCoreVisible.value))
+const secondEngineTypes = computed(() => groupByEngineType(secondStageVisible.value))
+const upperEngineTypes = computed(() => groupByEngineType(upperStageVisible.value))
+
+// Count engines per stage
 const coreStageCounts = computed(() => 
   firstStageOnlyVisible.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0) +
   boostersVisible.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0)
@@ -384,6 +462,30 @@ const secondStageCounts = computed(() =>
 const upperStageCounts = computed(() => 
   upperStageVisible.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0)
 )
+
+// Tooltip state
+interface TooltipData {
+  engineType: EngineTypeMarker
+  meta: EngineMetadata | undefined
+}
+const hoveredEngine = ref<TooltipData | null>(null)
+const tooltipPosition = ref({ x: 0, y: 0 })
+
+function showTooltip(engineType: EngineTypeMarker, event: MouseEvent) {
+  const meta = engineMetadata.value.get(engineType.engineName)
+  hoveredEngine.value = { engineType, meta }
+  tooltipPosition.value = { x: event.clientX + 10, y: event.clientY - 10 }
+}
+
+function hideTooltip() {
+  hoveredEngine.value = null
+}
+
+function updateTooltipPosition(event: MouseEvent) {
+  if (hoveredEngine.value) {
+    tooltipPosition.value = { x: event.clientX + 10, y: event.clientY - 10 }
+  }
+}
 </script>
 
 <template>
@@ -414,132 +516,194 @@ const upperStageCounts = computed(() =>
         <YearRangeButtons
           :options="yearRangeOptions"
           :selected-id="selectedRangeId"
-          @select="selectRange"
+          @select="handleSelectRange"
         />
       </div>
       <div class="date-display desktop-only">{{ currentDateDisplay }}</div>
     </header>
 
     <main class="main-content">
-      <div class="spirals-section">
-        <div class="spirals-container">
-          <!-- Core Stage Spiral (Stage 0+1) -->
-          <div class="spiral-wrapper">
-            <h3 class="spiral-label">Core Stage</h3>
-            <svg :viewBox="`0 0 ${spiralSize} ${spiralSize}`" class="spiral-chart">
-              <!-- Spiral guide line (faint background) -->
-              <path
-                :d="spiralGuidePath"
-                fill="none"
-                stroke="rgba(255,255,255,0.08)"
-                stroke-width="2"
-                class="spiral-guide"
-              />
-              
-              <!-- Booster outer ring guide -->
-              <circle
-                :cx="spiralCenter"
-                :cy="spiralCenter"
-                :r="boosterRadius"
-                fill="none"
-                stroke="rgba(255,255,255,0.05)"
-                stroke-width="1"
-                stroke-dasharray="4 4"
-              />
-
-              <!-- Booster dots (outside spiral) -->
-              <circle
-                v-for="dot in boosterDots"
-                :key="`booster-${dot.launch.launch_tag}-${dot.engineIndex}`"
-                :cx="dot.x"
-                :cy="dot.y"
-                :r="3"
-                :fill="dot.color"
-                :opacity="dot.opacity"
-                class="engine-dot"
-                :class="{ 'is-new': dot.isNew }"
+      <div class="display-section">
+        <!-- Stage Sections with Flare + Kill Markers -->
+        <div class="stages-container">
+          <!-- Core Stage -->
+          <div class="stage-section">
+            <div class="stage-header">
+              <h3>Core Stage</h3>
+              <span class="stage-count">{{ coreStageCounts }}</span>
+            </div>
+            
+            <!-- Flare Display -->
+            <div class="flare-area">
+              <svg :viewBox="`0 0 ${flareWidth} ${flareHeight}`" class="flare-display">
+                <circle
+                  v-for="dot in coreFlareDots"
+                  :key="dot.key"
+                  :cx="dot.x"
+                  :cy="dot.y"
+                  :r="10 * dot.scale"
+                  :fill="dot.color"
+                  :opacity="dot.opacity"
+                  class="flare-dot"
+                />
+                <text
+                  v-if="coreCurrentName"
+                  :x="flareWidth / 2"
+                  :y="flareHeight - 10"
+                  text-anchor="middle"
+                  class="flare-engine-name"
+                >
+                  {{ coreCurrentName }}
+                </text>
+              </svg>
+            </div>
+            
+            <!-- Kill Markers Grid (engine types with counts) -->
+            <div class="kill-grid">
+              <div
+                v-for="engineType in coreEngineTypes"
+                :key="`core-type-${engineType.engineName}`"
+                class="engine-type-card"
+                @mouseenter="showTooltip(engineType, $event)"
+                @mousemove="updateTooltipPosition($event)"
+                @mouseleave="hideTooltip"
               >
-                <title>{{ dot.launch.vehicle_stage_engine_name }} (Booster) - {{ dot.launch.launch_date }}</title>
-              </circle>
-
-              <!-- Core engine dots -->
-              <circle
-                v-for="dot in coreSpiral"
-                :key="`core-${dot.launch.launch_tag}-${dot.launch.vehicle_stage_engine_name}-${dot.engineIndex}`"
-                :cx="dot.x"
-                :cy="dot.y"
-                :r="2.5"
-                :fill="dot.color"
-                :opacity="dot.opacity"
-                class="engine-dot"
-                :class="{ 'is-new': dot.isNew }"
-              >
-                <title>{{ dot.launch.vehicle_stage_engine_name }} - {{ dot.launch.launch_date }}</title>
-              </circle>
-            </svg>
-            <div class="spiral-count">{{ coreStageCounts }}</div>
+                <svg viewBox="-25 -25 50 50" class="cluster-svg">
+                  <circle
+                    v-for="(pos, pIdx) in engineType.positions"
+                    :key="`core-${engineType.engineName}-${pIdx}`"
+                    :cx="pos.dx"
+                    :cy="pos.dy"
+                    r="3"
+                    :fill="engineType.color"
+                  />
+                </svg>
+                <div class="engine-type-info">
+                  <span class="engine-type-name">{{ engineType.engineName }}</span>
+                  <span class="engine-type-count">×{{ engineType.launchCount }}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- Second Stage Spiral -->
-          <div class="spiral-wrapper">
-            <h3 class="spiral-label">Second Stage</h3>
-            <svg :viewBox="`0 0 ${spiralSize} ${spiralSize}`" class="spiral-chart">
-              <path
-                :d="spiralGuidePath"
-                fill="none"
-                stroke="rgba(255,255,255,0.08)"
-                stroke-width="2"
-                class="spiral-guide"
-              />
-
-              <circle
-                v-for="dot in secondSpiral"
-                :key="`second-${dot.launch.launch_tag}-${dot.launch.vehicle_stage_engine_name}-${dot.engineIndex}`"
-                :cx="dot.x"
-                :cy="dot.y"
-                :r="2.5"
-                :fill="dot.color"
-                :opacity="dot.opacity"
-                class="engine-dot"
-                :class="{ 'is-new': dot.isNew }"
+          <!-- Second Stage -->
+          <div class="stage-section">
+            <div class="stage-header">
+              <h3>Second Stage</h3>
+              <span class="stage-count">{{ secondStageCounts }}</span>
+            </div>
+            
+            <div class="flare-area">
+              <svg :viewBox="`0 0 ${flareWidth} ${flareHeight}`" class="flare-display">
+                <circle
+                  v-for="dot in secondFlareDots"
+                  :key="dot.key"
+                  :cx="dot.x"
+                  :cy="dot.y"
+                  :r="10 * dot.scale"
+                  :fill="dot.color"
+                  :opacity="dot.opacity"
+                  class="flare-dot"
+                />
+                <text
+                  v-if="secondCurrentName"
+                  :x="flareWidth / 2"
+                  :y="flareHeight - 10"
+                  text-anchor="middle"
+                  class="flare-engine-name"
+                >
+                  {{ secondCurrentName }}
+                </text>
+              </svg>
+            </div>
+            
+            <div class="kill-grid">
+              <div
+                v-for="engineType in secondEngineTypes"
+                :key="`second-type-${engineType.engineName}`"
+                class="engine-type-card"
+                @mouseenter="showTooltip(engineType, $event)"
+                @mousemove="updateTooltipPosition($event)"
+                @mouseleave="hideTooltip"
               >
-                <title>{{ dot.launch.vehicle_stage_engine_name }} - {{ dot.launch.launch_date }}</title>
-              </circle>
-            </svg>
-            <div class="spiral-count">{{ secondStageCounts }}</div>
+                <svg viewBox="-25 -25 50 50" class="cluster-svg">
+                  <circle
+                    v-for="(pos, pIdx) in engineType.positions"
+                    :key="`second-${engineType.engineName}-${pIdx}`"
+                    :cx="pos.dx"
+                    :cy="pos.dy"
+                    r="3"
+                    :fill="engineType.color"
+                  />
+                </svg>
+                <div class="engine-type-info">
+                  <span class="engine-type-name">{{ engineType.engineName }}</span>
+                  <span class="engine-type-count">×{{ engineType.launchCount }}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- Upper Stages Spiral -->
-          <div class="spiral-wrapper">
-            <h3 class="spiral-label">Upper Stages</h3>
-            <svg :viewBox="`0 0 ${spiralSize} ${spiralSize}`" class="spiral-chart">
-              <path
-                :d="spiralGuidePath"
-                fill="none"
-                stroke="rgba(255,255,255,0.08)"
-                stroke-width="2"
-                class="spiral-guide"
-              />
-
-              <circle
-                v-for="dot in upperSpiral"
-                :key="`upper-${dot.launch.launch_tag}-${dot.launch.vehicle_stage_engine_name}-${dot.engineIndex}`"
-                :cx="dot.x"
-                :cy="dot.y"
-                :r="2.5"
-                :fill="dot.color"
-                :opacity="dot.opacity"
-                class="engine-dot"
-                :class="{ 'is-new': dot.isNew }"
+          <!-- Upper Stages -->
+          <div class="stage-section">
+            <div class="stage-header">
+              <h3>Upper Stages</h3>
+              <span class="stage-count">{{ upperStageCounts }}</span>
+            </div>
+            
+            <div class="flare-area">
+              <svg :viewBox="`0 0 ${flareWidth} ${flareHeight}`" class="flare-display">
+                <circle
+                  v-for="dot in upperFlareDots"
+                  :key="dot.key"
+                  :cx="dot.x"
+                  :cy="dot.y"
+                  :r="10 * dot.scale"
+                  :fill="dot.color"
+                  :opacity="dot.opacity"
+                  class="flare-dot"
+                />
+                <text
+                  v-if="upperCurrentName"
+                  :x="flareWidth / 2"
+                  :y="flareHeight - 10"
+                  text-anchor="middle"
+                  class="flare-engine-name"
+                >
+                  {{ upperCurrentName }}
+                </text>
+              </svg>
+            </div>
+            
+            <div class="kill-grid">
+              <div
+                v-for="engineType in upperEngineTypes"
+                :key="`upper-type-${engineType.engineName}`"
+                class="engine-type-card"
+                @mouseenter="showTooltip(engineType, $event)"
+                @mousemove="updateTooltipPosition($event)"
+                @mouseleave="hideTooltip"
               >
-                <title>{{ dot.launch.vehicle_stage_engine_name }} - {{ dot.launch.launch_date }}</title>
-              </circle>
-            </svg>
-            <div class="spiral-count">{{ upperStageCounts }}</div>
+                <svg viewBox="-25 -25 50 50" class="cluster-svg">
+                  <circle
+                    v-for="(pos, pIdx) in engineType.positions"
+                    :key="`upper-${engineType.engineName}-${pIdx}`"
+                    :cx="pos.dx"
+                    :cy="pos.dy"
+                    r="3"
+                    :fill="engineType.color"
+                  />
+                </svg>
+                <div class="engine-type-info">
+                  <span class="engine-type-name">{{ engineType.engineName }}</span>
+                  <span class="engine-type-count">×{{ engineType.launchCount }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Total counter below spirals -->
+        <!-- Total Counter -->
         <div class="total-counter">
           <span class="total-count">{{ totalEngineFireings }}</span>
           <span class="total-label">total engine firings</span>
@@ -550,22 +714,24 @@ const upperStageCounts = computed(() =>
           :is-paused="isPaused"
           :is-complete="isComplete"
           :progress="progress"
-          :is-muted="false"
-          :volume="0"
+          :is-muted="isMuted"
+          :volume="volume"
           :progress-start-label="progressStartLabel"
           :progress-end-label="progressEndLabel"
-          :hide-sound="true"
-          @toggle-play-pause="togglePlayPause"
+          @toggle-play-pause="handlePlayPause"
           @seek="seekTo"
-          @reset="resetAnimation"
+          @reset="handleReset"
+          @toggle-mute="toggleMute"
+          @set-volume="setVolume"
         />
 
         <CompletionModal
-          v-if="isComplete"
+          v-if="showCompletionModal"
           :launch-count="totalEngineFireings"
           :year-range-label="selectedRange.label"
           item-label="engine firings"
-          @play-again="resetAnimation"
+          @play-again="handlePlayAgain"
+          @close="handleCloseModal"
         />
       </div>
 
@@ -577,7 +743,6 @@ const upperStageCounts = computed(() =>
           :show-failures="false"
         />
 
-        <!-- Legend -->
         <div class="legend-card">
           <h3 class="legend-title">Propellant Groups</h3>
           <div class="legend">
@@ -597,6 +762,39 @@ const upperStageCounts = computed(() =>
     <footer class="footer">
       <p>Data source: McDowell, Jonathan C., 2020. General Catalog of Artificial Space Objects</p>
     </footer>
+    
+    <!-- Engine Tooltip -->
+    <Teleport to="body">
+      <div
+        v-if="hoveredEngine"
+        class="engine-tooltip"
+        :style="{ left: tooltipPosition.x + 'px', top: tooltipPosition.y + 'px' }"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-engine-name">{{ hoveredEngine.engineType.engineName }}</span>
+        </div>
+        <div class="tooltip-row">
+          <span class="tooltip-label">Maker:</span>
+          <span class="tooltip-value">{{ hoveredEngine.meta?.engine_manufacturer || 'Unknown' }}</span>
+        </div>
+        <div class="tooltip-row">
+          <span class="tooltip-label">Fuel:</span>
+          <span class="tooltip-value">{{ hoveredEngine.meta?.engine_group || 'Unknown' }}</span>
+        </div>
+        <div v-if="hoveredEngine.meta?.engine_thrust" class="tooltip-row">
+          <span class="tooltip-label">Thrust:</span>
+          <span class="tooltip-value">{{ hoveredEngine.meta.engine_thrust }} kN</span>
+        </div>
+        <div class="tooltip-row">
+          <span class="tooltip-label">Launches:</span>
+          <span class="tooltip-value">{{ hoveredEngine.engineType.launchCount }}</span>
+        </div>
+        <div class="tooltip-row">
+          <span class="tooltip-label">Total Engines:</span>
+          <span class="tooltip-value">{{ hoveredEngine.engineType.totalEngines }}</span>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -645,13 +843,8 @@ const upperStageCounts = computed(() =>
   font-weight: 500;
 }
 
-.date-display.mobile-only {
-  display: none;
-}
-
-.date-display.desktop-only {
-  display: block;
-}
+.date-display.mobile-only { display: none; }
+.date-display.desktop-only { display: block; }
 
 .main-content {
   display: flex;
@@ -661,7 +854,7 @@ const upperStageCounts = computed(() =>
   padding: 0 1.5rem;
 }
 
-.spirals-section {
+.display-section {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -669,28 +862,35 @@ const upperStageCounts = computed(() =>
   position: relative;
 }
 
-.spirals-container {
+/* Stages Container */
+.stages-container {
   flex: 1;
   display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: 0.5rem;
+  gap: 1rem;
   min-height: 0;
-  padding: 0;
 }
 
-.spiral-wrapper {
+.stage-section {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
-  max-width: 450px;
+  background: var(--color-bg-secondary);
+  border-radius: 12px;
+  padding: 1rem;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.spiral-label {
-  font-size: 0.75rem;
+.stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.stage-header h3 {
+  font-size: 0.8rem;
   font-weight: 500;
   color: var(--color-text-muted);
   text-transform: uppercase;
@@ -698,55 +898,116 @@ const upperStageCounts = computed(() =>
   margin: 0;
 }
 
-.spiral-chart {
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-  flex: 1;
-}
-
-.spiral-guide {
-  opacity: 0.5;
-}
-
-.spiral-count {
-  font-size: 1.5rem;
+.stage-count {
+  font-size: 1.25rem;
   font-weight: 600;
   color: var(--color-text);
   font-family: var(--font-mono);
 }
 
-.engine-dot {
-  transition: opacity 0.1s ease;
+/* Flare Display - Hero size, time-based animation */
+.flare-area {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 180px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  padding-right: 10px;
 }
 
-.engine-dot.is-new {
-  animation: flare 0.4s ease-out;
+.flare-display {
+  width: 100%;
+  height: 180px;
 }
 
-@keyframes flare {
-  0% {
-    filter: brightness(3) drop-shadow(0 0 6px currentColor);
-    r: 6;
-  }
-  50% {
-    filter: brightness(2) drop-shadow(0 0 3px currentColor);
-  }
-  100% {
-    filter: brightness(1) drop-shadow(0 0 0 transparent);
-  }
+.flare-dot {
+  filter: drop-shadow(0 0 8px currentColor) brightness(1.5);
+  transition: cx 0.1s linear, opacity 0.1s linear;
 }
 
-.total-counter {
+.flare-engine-name {
+  font-size: 14px;
+  font-weight: 600;
+  fill: var(--color-text);
+}
+
+/* Kill Grid - engine clusters */
+.kill-grid {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  overflow-y: auto;
+  align-content: flex-start;
+  padding: 4px;
+}
+
+.engine-type-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  padding: 1rem 0;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  min-width: 60px;
+  animation: cardAppear 0.3s ease-out;
+}
+
+.cluster-svg {
+  width: 36px;
+  height: 36px;
+}
+
+.engine-type-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.engine-type-name {
+  font-size: 8px;
+  color: var(--color-text-muted);
+  text-align: center;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.engine-type-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+@keyframes cardAppear {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Total Counter */
+.total-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  flex-shrink: 0;
 }
 
 .total-count {
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: 700;
   color: var(--color-text);
   font-family: var(--font-mono);
@@ -833,9 +1094,7 @@ const upperStageCounts = computed(() =>
   background: rgba(0, 0, 0, 0.9);
 }
 
-.loading-content {
-  text-align: center;
-}
+.loading-content { text-align: center; }
 
 .loading-spinner {
   width: 40px;
@@ -854,40 +1113,20 @@ const upperStageCounts = computed(() =>
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 /* Responsive */
-@media (max-width: 1100px) {
-  .spirals-container {
-    flex-wrap: wrap;
-  }
-
-  .spiral-chart {
-    max-width: 200px;
-  }
-}
-
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
   .main-content {
     flex-direction: column;
   }
-
-  .spirals-container {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
   .chart-section {
     width: 100%;
     flex-direction: row;
     flex-wrap: wrap;
     overflow-y: visible;
   }
-
   .legend-card {
     flex: 1;
     min-width: 200px;
@@ -895,47 +1134,73 @@ const upperStageCounts = computed(() =>
 }
 
 @media (max-width: 700px) {
-  .spirals-container {
+  .stages-container {
     flex-direction: column;
   }
-
-  .spiral-chart {
-    max-width: 280px;
+  .stage-section {
+    max-height: 200px;
+  }
+  .flare-area {
+    height: 80px;
   }
 }
 
 @media (max-width: 600px) {
-  .header {
-    padding: 0.75rem 1rem;
-  }
+  .header { padding: 0.75rem 1rem; }
+  .header h1 { font-size: 1.25rem; }
+  .date-display.mobile-only { display: block; font-size: 1rem; }
+  .date-display.desktop-only { display: none; }
+  .main-content { padding: 0 1rem; }
+  .footer { padding: 0.5rem 1rem; }
+}
+</style>
 
-  .header h1 {
-    font-size: 1.25rem;
-  }
+<style>
+/* Global tooltip styles (teleported to body) */
+.engine-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: linear-gradient(135deg, rgba(30, 30, 40, 0.98), rgba(20, 20, 30, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 12px 16px;
+  min-width: 180px;
+  max-width: 280px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(100, 150, 255, 0.1);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+  font-family: inherit;
+}
 
-  .date-display.mobile-only {
-    display: block;
-    font-size: 1rem;
-  }
+.tooltip-header {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
 
-  .date-display.desktop-only {
-    display: none;
-  }
+.tooltip-engine-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
 
-  .main-content {
-    padding: 0 1rem;
-  }
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0;
+}
 
-  .footer {
-    padding: 0.5rem 1rem;
-  }
+.tooltip-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
 
-  .spiral-chart {
-    max-width: 250px;
-  }
-
-  .total-count {
-    font-size: 2rem;
-  }
+.tooltip-value {
+  font-size: 0.85rem;
+  color: #fff;
+  font-weight: 500;
+  text-align: right;
 }
 </style>

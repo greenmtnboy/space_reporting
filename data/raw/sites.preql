@@ -1,7 +1,7 @@
 import std.geography;
 import etl;
 
-key key string;
+key key string; # the code of a launch site. A launch site is a fixed geographical location from which launches occur. Most launches are from sites, not platforms. Platforms which have been used to launch rockets include surface ships, submarines and aircraft.  
 property key.code string;
 property key.u_code string;
 property key.type string;

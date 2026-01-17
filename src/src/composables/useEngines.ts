@@ -2,6 +2,7 @@ import { computed, ref, type Ref } from 'vue'
 import type { Stats } from '../types'
 
 const DATA_URL = `${import.meta.env.BASE_URL}raw_engine_data.json`
+const METADATA_URL = `${import.meta.env.BASE_URL}engine_metadata.json`
 
 export interface EngineLaunch {
   launch_date: string
@@ -31,8 +32,20 @@ export interface SpiralDot {
   color: string
 }
 
+// Engine metadata interface (for tooltips)
+export interface EngineMetadata {
+  engine_name: string
+  engine_manufacturer: string
+  engine_group: string
+  engine_fuel: string
+  engine_thrust: number | null
+  engine_isp: number | null
+  group_hex_color: string
+}
+
 // Shared state
 const engineData = ref<EngineLaunch[]>([])
+const engineMetadata = ref<Map<string, EngineMetadata>>(new Map())
 const isLoading = ref(true)
 const loadError = ref<string | null>(null)
 let loadPromise: Promise<void> | null = null
@@ -51,11 +64,21 @@ export async function loadEngineData(): Promise<void> {
     try {
       isLoading.value = true
       loadError.value = null
-      const response = await fetch(DATA_URL)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`)
+
+      // Load both data files in parallel
+      const [dataResponse, metaResponse] = await Promise.all([
+        fetch(DATA_URL),
+        fetch(METADATA_URL)
+      ])
+
+      if (!dataResponse.ok) {
+        throw new Error(`Failed to fetch data: ${dataResponse.status} ${dataResponse.statusText}`)
       }
-      const data = await response.json()
+      if (!metaResponse.ok) {
+        console.warn('Could not load engine metadata - tooltips will have limited info')
+      }
+
+      const data = await dataResponse.json()
 
       engineData.value = data.map((d: any) => ({
         ...d,
@@ -66,6 +89,24 @@ export async function loadEngineData(): Promise<void> {
         vehicle_stage_engine_count: d.vehicle_stage_engine_count || 1,
         group_hex_color: d.group_hex_color || '#9ca3af'
       })).sort((a: any, b: any) => a.timestamp - b.timestamp)
+
+      // Process engine metadata into keyed lookup
+      if (metaResponse.ok) {
+        const metaData: any[] = await metaResponse.json()
+        const metaMap = new Map<string, EngineMetadata>()
+        for (const engine of metaData) {
+          metaMap.set(engine.engine_name, {
+            engine_name: engine.engine_name,
+            engine_manufacturer: engine.engine_manufacturer || 'Unknown',
+            engine_group: engine.engine_group || 'Unknown',
+            engine_fuel: engine.engine_fuel || 'Unknown',
+            engine_thrust: engine.engine_thrust,
+            engine_isp: engine.engine_isp,
+            group_hex_color: engine.group_hex_color || '#9ca3af'
+          })
+        }
+        engineMetadata.value = metaMap
+      }
 
     } catch (err) {
       loadError.value = err instanceof Error ? err.message : 'Unknown error loading data'
@@ -79,7 +120,7 @@ export async function loadEngineData(): Promise<void> {
 }
 
 export function useEngineDataStatus() {
-  return { isLoading, loadError }
+  return { isLoading, loadError, engineMetadata }
 }
 
 export function useEngines(

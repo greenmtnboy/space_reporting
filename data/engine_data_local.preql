@@ -1,4 +1,5 @@
 import raw.launch;
+import raw.engine as engine;
 
 copy into json `../src/public/raw_engine_data.json` from
 where launch_date is not null and launch_date.year=2025
@@ -11,6 +12,7 @@ select
     when vehicle.stage_no::int = 2 then 'Second Stage'
     when vehicle.stage_no::int >=3 then 'Upper/Kick Stage'
     END as stage_label,
+    vehicle.name,
     vehicle.stage.engine.name,
     vehicle.stage.engine.chambers,
     vehicle.stage.engine_count,
@@ -57,3 +59,49 @@ select
 ;
 
 
+copy into json `../src/public/engine_metadata.json` from
+select
+    engine.name,
+    
+    engine.chambers,
+    engine.date,
+    engine.family,
+    engine.fuel,
+    engine.group,
+    engine.manufacturer,
+    engine.isp,
+    engine.thrust,
+     CASE
+        # Top tier (very high volume, maximal contrast)
+        WHEN COALESCE(engine.group, 'Unspecified') = 'NTO/UDMH'     THEN '#D62728' # strong red
+        WHEN COALESCE(engine.group, 'Unspecified') = 'LOX/Kero'     THEN '#1F77B4' # strong blue
+        WHEN COALESCE(engine.group, 'Unspecified') = 'NA/Kero'      THEN '#FF7F0E' # orange
+        WHEN COALESCE(engine.group, 'Unspecified') = 'NA/UDMH'      THEN '#9467BD' # purple
+        WHEN COALESCE(engine.group, 'Unspecified') = 'NA/AA'        THEN '#2CA02C' # green
+
+        # High–mid tier
+        WHEN COALESCE(engine.group, 'Unspecified') = 'LOX/Alcohol'  THEN '#17BECF' # cyan
+        WHEN COALESCE(engine.group, 'Unspecified') = 'LOX/LH2'       THEN '#8C564B' # brown
+        WHEN COALESCE(engine.group, 'Unspecified') = 'NTO/Hyd'       THEN '#E377C2' # pink
+        WHEN COALESCE(engine.group, 'Unspecified') = 'NA/Amine'     THEN '#BCBD22' # olive
+        WHEN COALESCE(engine.group, 'Unspecified') = 'Hybrid'       THEN '#7F7F7F' # dark gray
+
+        # Mid tier
+        WHEN COALESCE(engine.group, 'Unspecified') = 'LOX/UDMH'     THEN '#AEC7E8' # light blue
+        WHEN COALESCE(engine.group, 'Unspecified') = 'LOX/NH3'      THEN '#98DF8A' # light green
+        WHEN COALESCE(engine.group, 'Unspecified') = 'NA/Turps'     THEN '#FFBB78' # light orange
+        WHEN COALESCE(engine.group, 'Unspecified') = 'NA/UDMH'      THEN '#C5B0D5' # light purple
+        WHEN COALESCE(engine.group, 'Unspecified') = 'Green'        THEN '#C49C94' # muted green-brown
+
+        # Low volume / tail
+        WHEN COALESCE(engine.group, 'Unspecified') = 'H2O2/Kero'    THEN '#DBDB8D'
+        WHEN COALESCE(engine.group, 'Unspecified') = 'LOX/Methane'  THEN '#F7B6D2'
+        WHEN COALESCE(engine.group, 'Unspecified') = 'MonoHyd'      THEN '#C7C7C7'
+        WHEN COALESCE(engine.group, 'Unspecified') = 'N2'           THEN '#E0E0E0'
+        WHEN COALESCE(engine.group, 'Unspecified') = 'LOX/Propane'  THEN '#EEEEEE'
+
+        # Electric / rare / unspecified
+        WHEN COALESCE(engine.group, 'Unspecified') = 'EP'           THEN '#BDBDBD'
+        ELSE '#BDBDBD'
+    END AS group_hex_color
+;

@@ -108,6 +108,12 @@ const {
 // Data loading status
 const { isLoading: isDataLoading, loadError } = useSatelliteDataStatus()
 
+// Completion modal visibility (separate from isComplete to allow closing without resetting)
+const showCompletionModal = ref(false)
+watch(isComplete, (complete) => {
+  if (complete) showCompletionModal.value = true
+})
+
 // Initialize sound
 const {
   isMuted,
@@ -167,10 +173,16 @@ function handlePlayPause() {
 }
 
 function handlePlayAgain() {
+  showCompletionModal.value = false
   startAnimation()
 }
 
+function handleCloseModal() {
+  showCompletionModal.value = false
+}
+
 function handleYearRangeSelect(rangeId: string) {
+  showCompletionModal.value = false
   selectRange(rangeId)
 }
 
@@ -284,11 +296,12 @@ onUnmounted(() => {
         />
 
         <CompletionModal
-          v-if="isComplete"
+          v-if="showCompletionModal"
           :launch-count="accumulatedSatellites.length"
           :year-range-label="selectedRange.label"
           :item-label="'satellites launched'"
           @play-again="handlePlayAgain"
+          @close="handleCloseModal"
         />
       </div>
 

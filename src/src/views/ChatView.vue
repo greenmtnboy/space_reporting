@@ -59,6 +59,14 @@ onMounted(async () => {
     
     console.log('DuckDB connection ready')
     dbStatus.value = 'ready'
+
+    // Ensure dark theme is set for Vega-Lite and other components
+    trilogy.userSettingsStore.loadSettings()
+    if (!trilogy.userSettingsStore.settings.theme) {
+      trilogy.userSettingsStore.updateSetting('theme', 'dark')
+      trilogy.userSettingsStore.saveSettings()
+    }
+    trilogy.userSettingsStore.toggleTheme()
     
     // Create a chat with this data connection if none exists
     if (!trilogy.chatStore.activeChatId) {
@@ -104,6 +112,17 @@ onMounted(async () => {
 
 const handlePaste = () => {
   setTimeout(loadModels, 0)
+}
+
+// Reset chat - clear messages and start fresh
+function resetChat() {
+  if (trilogy.chatStore.activeChatId) {
+    // Clear existing chat data
+    trilogy.chatStore.clearChatMessages(trilogy.chatStore.activeChatId)
+  } else {
+    // Create new chat if none exists
+    trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat')
+  }
 }
 
 // Use the chat composable with tools
@@ -245,7 +264,7 @@ const activeDatasets = computed(() => {
           <span v-else-if="dbStatus === 'ready'">DuckDB Ready</span>
           <span v-else>DuckDB Error</span>
         </div>
-        <p>Select a provider to start chatting about your space data.</p>
+        <p>Select an AI provider to start chatting about space data.</p>
       </div>
 
       <div class="setup-form">
@@ -318,9 +337,11 @@ const activeDatasets = computed(() => {
 
     <!-- Chat Interface -->
     <div v-else class="chat-interface">
-      <div class="chat-header-bar">
-        <div class="header-main">
-          <h2>{{ chat.activeChatTitle.value }}</h2>
+      <header class="header chat-header-bar">
+        <div class="header-left">
+          <div class="header-top-row">
+            <h1>{{ chat.activeChatTitle.value }}</h1>
+          </div>
           <div v-if="activeDatasets.length > 0" class="looking-at">
             <span class="looking-at-label">Looking at:</span>
             <div class="dataset-tags">
@@ -330,6 +351,11 @@ const activeDatasets = computed(() => {
         </div>
 
         <div class="header-actions">
+          <button class="header-action-btn primary" @click="resetChat" title="New Chat">
+            <i class="mdi mdi-refresh"></i>
+            <span class="desktop-only">New Chat</span>
+          </button>
+          
           <div class="db-status mini" :class="dbStatus" :title="dbError || dbStatus">
             <span class="status-dot"></span>
             <span class="status-text desktop-only">DuckDB</span>
@@ -343,7 +369,7 @@ const activeDatasets = computed(() => {
             <i class="mdi mdi-cog-outline"></i>
           </button>
         </div>
-      </div>
+      </header>
 
       <div class="chat-container">
         <LLMChatSplitView
@@ -402,13 +428,25 @@ const activeDatasets = computed(() => {
   gap: 16px;
 }
 
-.chat-header-bar h2 {
-  font-size: 0.9375rem;
-  font-weight: 700;
+.chat-header-bar h1 {
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--color-text);
   margin: 0;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
+}
+
+.chat-header-bar .header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-header-bar .header-top-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .db-status {
@@ -450,6 +488,104 @@ const activeDatasets = computed(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.header-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  line-height: 1;
+  height: 36px;
+}
+
+.header-action-btn span {
+  display: inline-flex !important;
+  align-items: center;
+}
+
+.header-action-btn:hover {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text);
+  border-color: var(--color-border-bright);
+}
+
+.header-action-btn.primary {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dim));
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+  padding: 8px 18px;
+  min-width: 110px;
+}
+
+.header-action-btn.primary:hover {
+  background: linear-gradient(135deg, var(--color-accent-bright), var(--color-accent));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.3);
+}
+
+.header-action-btn.primary:active {
+  transform: translateY(0);
+}
+
+.header-action-btn i {
+  font-size: 1.1rem;
+}
+
+.connection-badge {
+  padding: 4px 10px;
+  background-color: rgba(14, 165, 233, 0.1);
+  color: var(--color-accent-bright);
+  border: 1px solid var(--color-accent-dim);
+  border-radius: 20px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.looking-at {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.looking-at-label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.dataset-tags {
+  display: flex;
+  gap: 6px;
+}
+
+.dataset-tag {
+  padding: 2px 8px;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.6875rem;
+  border: 1px solid var(--color-border);
+}
+
+.mini.db-status {
+  padding: 4px 10px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
 }
 
 /* Debug Button */
@@ -907,6 +1043,113 @@ const activeDatasets = computed(() => {
   outline: none;
 }
 
+/* Symbol list container */
+.chat-container :deep(.symbols-list),
+.chat-container :deep(.symbol-list) {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+/* Individual symbol items */
+.chat-container :deep(.symbol-item) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.chat-container :deep(.symbol-item:hover) {
+  background-color: var(--color-bg-tertiary);
+}
+
+.chat-container :deep(.symbol-item:last-child) {
+  border-bottom: none;
+}
+
+/* Symbol icon styling */
+.chat-container :deep(.symbol-icon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-size: 0.875rem;
+}
+
+.chat-container :deep(.symbol-icon i),
+.chat-container :deep(.symbol-icon .mdi) {
+  font-size: 1rem;
+}
+
+/* Icon type colors */
+.chat-container :deep(.symbol-icon.property) {
+  background-color: rgba(139, 149, 165, 0.15);
+  color: var(--color-text-muted);
+}
+
+.chat-container :deep(.symbol-icon.key) {
+  background-color: rgba(14, 165, 233, 0.15);
+  color: var(--color-accent-bright);
+}
+
+.chat-container :deep(.symbol-icon.metric) {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--color-success-bright);
+}
+
+/* Symbol details section */
+.chat-container :deep(.symbol-details) {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Symbol label (name) */
+.chat-container :deep(.symbol-label) {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+/* Symbol description */
+.chat-container :deep(.symbol-description) {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  word-break: break-word;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* Multiple descriptions - show as code for derivation formulas */
+.chat-container :deep(.symbol-description + .symbol-description) {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--color-accent);
+  background-color: rgba(14, 165, 233, 0.08);
+  padding: 4px 6px;
+  border-radius: 3px;
+  margin-top: 4px;
+  max-height: 80px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  -webkit-line-clamp: unset;
+}
+
 /* Filter buttons */
 .chat-container :deep(.filter-container) {
   padding: 6px 12px;
@@ -958,52 +1201,688 @@ const activeDatasets = computed(() => {
 }
 
 .chat-container :deep(.sidebar-tabs) {
-  height: 36px;
+  display: flex;
+  height: 40px;
   background-color: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
+  padding: 0 8px;
+  gap: 4px;
 }
 
 .chat-container :deep(.sidebar-tab) {
-  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 100%;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-family: inherit;
+  letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.sidebar-tab:hover) {
+  color: var(--color-text-secondary);
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
 .chat-container :deep(.sidebar-tab.active) {
-  color: var(--color-accent);
+  color: var(--color-accent-bright);
+  border-bottom-color: var(--color-accent);
+  background-color: rgba(14, 165, 233, 0.05);
 }
 
+/* Sidebar panel border/outline */
+.chat-container :deep(.sidebar-panel),
+.chat-container :deep(.symbols-panel) {
+  border-left: 1px solid var(--color-border);
+  background-color: var(--color-bg-primary);
+}
+
+/* Artifact count badge */
+.chat-container :deep(.artifact-count) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: linear-gradient(135deg, var(--color-accent-dim), var(--color-accent));
+  color: white;
+  border-radius: 10px;
+}
+
+/* Sidebar content area */
+.chat-container :deep(.sidebar-content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--color-bg-primary);
+}
+
+.chat-container :deep(.artifacts-content) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Artifacts list */
+.chat-container :deep(.artifacts-list) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  overflow-y: auto;
+  max-height: 200px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.artifact-list-item) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.artifact-list-item:hover) {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-bright);
+}
+
+.chat-container :deep(.artifact-list-item.active) {
+  background-color: rgba(14, 165, 233, 0.1);
+  border-color: var(--color-accent-dim);
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.15);
+}
+
+.chat-container :deep(.artifact-list-item i) {
+  font-size: 1.1rem;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.chat-container :deep(.artifact-item-content) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.chat-container :deep(.artifact-label) {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-container :deep(.artifact-meta) {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Expanded artifact area */
+.chat-container :deep(.artifact-expanded) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Loading Spinner - modern pulsing design */
+.chat-container :deep(.loading-spinner) {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.3);
+}
+
+.chat-container :deep(.loading-indicator),
+.chat-container :deep(.loading-container) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin: 8px 20px;
+}
+
+.chat-container :deep(.loading-text),
+.chat-container :deep(.loading-message) {
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  color: var(--color-accent-bright);
+  letter-spacing: 0.02em;
+}
+
+/* Tool execution indicator */
+.chat-container :deep(.tool-indicator),
+.chat-container :deep(.active-tool) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(14, 165, 233, 0.05));
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-accent-bright);
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Bottom Input Bar - refined design */
 .chat-container :deep(.input-container) {
-  padding: 16px;
+  padding: 12px 20px 16px;
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
-  background: transparent;
-  border: none;
+  background: linear-gradient(to top, var(--color-bg-primary) 80%, transparent);
+  border-top: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.input-wrapper),
+.chat-container :deep(.chat-input-wrapper) {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+}
+
+.chat-container :deep(.input-wrapper:focus-within),
+.chat-container :deep(.chat-input-wrapper:focus-within) {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15), 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .chat-container :deep(textarea) {
-  background-color: var(--color-bg-tertiary) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: 12px !important;
-  padding: 12px 16px !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 4px 0 !important;
   font-size: 0.9375rem !important;
   font-family: inherit;
   color: var(--color-text) !important;
   resize: none !important;
   width: 100% !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-height: 24px;
+  max-height: 200px;
+  line-height: 1.5;
+  box-shadow: none !important;
+}
+
+.chat-container :deep(textarea::placeholder) {
+  color: var(--color-text-muted);
+}
+
+.chat-container :deep(textarea:focus) {
+  outline: none !important;
 }
 
 .chat-container :deep(.send-button) {
-  height: 36px;
+  height: 32px;
+  min-width: 32px;
   border-radius: 8px;
-  padding: 0 16px;
+  padding: 0 12px;
   font-weight: 700;
   font-size: 0.75rem;
-  margin-left: 8px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, var(--color-accent-dim), var(--color-accent));
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.chat-container :deep(.send-button:hover) {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-bright));
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.4);
+  transform: translateY(-1px);
+}
+
+.chat-container :deep(.send-button:active) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.chat-container :deep(.send-button:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.chat-container :deep(.send-button i),
+.chat-container :deep(.send-button .mdi) {
+  font-size: 1rem;
+}
+
+/* Input actions row (if present) */
+.chat-container :deep(.input-actions) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.input-hint) {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.chat-container :deep(.input-hint kbd) {
+  padding: 2px 5px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+}
+
+/* Soften overall text colors */
+.chat-container :deep(.message-content) {
+  color: #d0d4dc;
+}
+
+.chat-container :deep(.message-content p) {
+  color: #d0d4dc;
+}
+
+/* Code blocks in messages */
+.chat-container :deep(.code-block),
+.chat-container :deep(pre) {
+  position: relative;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+
+.chat-container :deep(.code-block code),
+.chat-container :deep(pre code) {
+  display: block;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #c8ccd4;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Copy button styling */
+.chat-container :deep(.markdown-copy-button),
+.chat-container :deep(.copy-button) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.code-block:hover .markdown-copy-button),
+.chat-container :deep(pre:hover .markdown-copy-button),
+.chat-container :deep(.code-block:hover .copy-button),
+.chat-container :deep(pre:hover .copy-button) {
+  opacity: 1;
+}
+
+.chat-container :deep(.markdown-copy-button:hover),
+.chat-container :deep(.copy-button:hover) {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-accent-dim);
+  color: var(--color-accent-bright);
+}
+
+.chat-container :deep(.markdown-copy-button:active),
+.chat-container :deep(.copy-button:active) {
+  transform: scale(0.95);
+}
+
+.chat-container :deep(.markdown-copy-button svg),
+.chat-container :deep(.copy-button svg) {
+  width: 14px;
+  height: 14px;
+}
+
+.chat-container :deep(.markdown-copy-button .copy-icon),
+.chat-container :deep(.copy-button .copy-icon) {
+  stroke: currentColor;
+}
+
+.chat-container :deep(.markdown-copy-button .check-icon),
+.chat-container :deep(.copy-button .check-icon) {
+  stroke: var(--color-success);
+}
+
+/* Filter/toggle button improvements */
+.chat-container :deep(.filter-btn),
+.chat-container :deep(.toggle-btn) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.filter-btn:hover),
+.chat-container :deep(.toggle-btn:hover) {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-border-bright);
+  color: var(--color-text);
+}
+
+.chat-container :deep(.filter-btn.active),
+.chat-container :deep(.toggle-btn.active) {
+  background-color: rgba(14, 165, 233, 0.15);
+  border-color: var(--color-accent-dim);
+  color: var(--color-accent-bright);
+}
+
+/* Results/Visualize/Generated SQL tab buttons */
+.chat-container :deep(.tabs) {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.tab-button) {
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.tab-button:hover) {
+  color: var(--color-text);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.chat-container :deep(.tab-button.active) {
+  color: var(--color-accent-bright);
+  background-color: rgba(14, 165, 233, 0.1);
+  border-color: var(--color-accent-dim);
+}
+
+/* Tabulator dark mode overrides - complete rewrite for proper layout */
+.chat-container :deep(.tabulator) {
+  background-color: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  overflow: hidden;
+}
+
+.chat-container :deep(.tabulator *) {
+  box-sizing: border-box;
+}
+
+.chat-container :deep(.tabulator-table) {
+  background-color: var(--color-bg-primary) !important;
+  color: var(--color-text) !important;
+  width: 100% !important;
+  padding: 0 !important;
+}
+
+.chat-container :deep(.tabulator-headers) {
+  background-color: var(--color-bg-secondary) !important;
+  position: relative !important;
+}
+
+.chat-container :deep(.tabulator-header) {
+  background-color: var(--color-bg-secondary) !important;
+  border-bottom: 2px solid var(--color-border) !important;
+  position: relative !important;
+  z-index: 1;
+}
+
+.chat-container :deep(.tabulator-header .tabulator-col) {
+  background-color: var(--color-bg-secondary) !important;
+  border-right: 1px solid var(--color-border) !important;
+  display: inline-flex !important;
+  align-items: center;
+}
+
+.chat-container :deep(.tabulator-col) {
+  background-color: var(--color-bg-secondary) !important;
+  border-right: 1px solid var(--color-border) !important;
+}
+
+.chat-container :deep(.tabulator-col-title) {
+  color: var(--color-text-muted) !important;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 12px !important;
+}
+
+/* Hide column resize handles in header too */
+.chat-container :deep(.tabulator-header .tabulator-col-resize-handle) {
+  display: none !important;
+}
+
+.chat-container :deep(.tabulator-col-content) {
+  color: var(--color-text) !important;
+}
+
+.chat-container :deep(.tabulator-row) {
+  display: flex !important;
+  background-color: var(--color-bg-primary) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  min-height: 32px;
+}
+
+.chat-container :deep(.tabulator-row:hover) {
+  background-color: var(--color-bg-tertiary) !important;
+}
+
+.chat-container :deep(.tabulator-row.tabulator-row-even) {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+.chat-container :deep(.tabulator-row.tabulator-row-even:hover) {
+  background-color: var(--color-bg-tertiary) !important;
+}
+
+.chat-container :deep(.tabulator-cell) {
+  display: inline-block !important;
+  color: var(--color-text) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding: 6px 12px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hide the resize handles that are causing layout issues */
+.chat-container :deep(.tabulator-col-resize-handle) {
+  display: none !important;
+}
+
+.chat-container :deep(.tabulator-footer) {
+  background-color: var(--color-bg-secondary) !important;
+  border-top: 1px solid var(--color-border) !important;
+  color: var(--color-text-muted) !important;
+}
+
+.chat-container :deep(.tabulator-footer .tabulator-page) {
+  color: var(--color-text-muted) !important;
+}
+
+.chat-container :deep(.tabulator-footer .tabulator-page.active) {
+  color: var(--color-accent-bright) !important;
+}
+
+.chat-container :deep(.tabulator-tableholder) {
+  background-color: var(--color-bg-primary) !important;
+}
+
+/* Tabulator scrollbar */
+.chat-container :deep(.tabulator-tableholder::-webkit-scrollbar) {
+  width: 6px;
+  height: 6px;
+}
+
+.chat-container :deep(.tabulator-tableholder::-webkit-scrollbar-track) {
+  background: var(--color-bg-secondary);
+}
+
+.chat-container :deep(.tabulator-tableholder::-webkit-scrollbar-thumb) {
+  background: var(--color-border-bright);
+  border-radius: 3px;
+}
+
+/* Results container styling */
+.chat-container :deep(.results-container) {
+  background-color: var(--color-bg-primary);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-container :deep(.tab-content) {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+
+.chat-container :deep(.sql-view) {
+  padding: 12px;
+}
+
+/* Panel resizer - draggable boundary between chat and sidebar */
+.chat-container :deep(.panel-resizer) {
+  width: 4px;
+  background-color: var(--color-border);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.chat-container :deep(.panel-resizer:hover),
+.chat-container :deep(.chat-split-container.is-resizing .panel-resizer) {
+  background-color: var(--color-accent);
+}
+
+.chat-container :deep(.chat-split-container.is-resizing) {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* Vega-Lite dark mode overrides */
+.chat-container :deep(.vega-embed) {
+  background-color: transparent !important;
+}
+
+.chat-container :deep(.vega-embed .chart-wrapper) {
+  background-color: transparent !important;
+}
+
+.chat-container :deep(.vega-embed svg) {
+  background-color: transparent !important;
+}
+
+.chat-container :deep(.vega-embed .vega-actions a) {
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}
+
+.chat-container :deep(.vega-embed .vega-actions a:hover) {
+  color: var(--color-accent-bright);
+  border-color: var(--color-accent-dim);
+}
+
+/* Chart container */
+.chat-container :deep(.chart-container),
+.chat-container :deep(.visualization-container) {
+  background-color: var(--color-bg-primary);
+  padding: 16px;
+  border-radius: 4px;
 }
 </style>
+

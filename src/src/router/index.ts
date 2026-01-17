@@ -3,6 +3,7 @@ import RocketsView from '../views/RocketsView.vue'
 import SatellitesView from '../views/SatellitesView.vue'
 import EnginesView from '../views/EnginesView.vue'
 import ChatView from '../views/ChatView.vue'
+import InfoView from '../views/InfoView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -26,6 +27,11 @@ const router = createRouter({
       path: '/chat',
       name: 'chat',
       component: ChatView
+    },
+    {
+      path: '/info',
+      name: 'info',
+      component: InfoView
     }
   ]
 })
