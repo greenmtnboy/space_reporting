@@ -18,7 +18,7 @@ import { useSatelliteSound } from '../composables/useSatelliteSound'
 import ControlPanel from '../components/ControlPanel.vue'
 import BarChart from '../components/BarChart.vue'
 import CompletionModal from '../components/CompletionModal.vue'
-import YearRangeButtons from '../components/YearRangeButtons.vue'
+import ViewHeader from '../components/ViewHeader.vue'
 import SatelliteLegend from '../components/SatelliteLegend.vue'
 import FilterChips from '../components/FilterChips.vue'
 // TODO: Satellite tooltip - disabled pending debugging
@@ -242,20 +242,13 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <header class="header">
-      <div class="header-left">
-        <div class="header-top-row">
-          <h1>{{ title }}</h1>
-          <div class="date-display mobile-only">{{ currentDateDisplay }}</div>
-        </div>
-        <YearRangeButtons
-          :options="yearRangeOptions"
-          :selected-id="selectedRangeId"
-          @select="handleYearRangeSelect"
-        />
-      </div>
-      <div class="date-display desktop-only">{{ currentDateDisplay }}</div>
-    </header>
+    <ViewHeader
+      :title="title"
+      :current-date-display="currentDateDisplay"
+      :year-range-options="yearRangeOptions"
+      :selected-range-id="selectedRangeId"
+      @select-range="handleYearRangeSelect"
+    />
 
     <!-- Filter Chips -->
     <FilterChips

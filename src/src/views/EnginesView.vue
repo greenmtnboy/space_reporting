@@ -4,8 +4,8 @@ import { useEngines, loadEngineData, useEngineDataStatus, type EngineLaunch, typ
 import { useEngineSound } from '../composables/useEngineSound'
 import { useAnimation } from '../composables/useAnimation'
 import { useYearRange } from '../composables/useYearRange'
+import ViewHeader from '../components/ViewHeader.vue'
 import ControlPanel from '../components/ControlPanel.vue'
-import YearRangeButtons from '../components/YearRangeButtons.vue'
 import CompletionModal from '../components/CompletionModal.vue'
 import BarChart from '../components/BarChart.vue'
 
@@ -543,20 +543,13 @@ function updateTooltipPosition(event: MouseEvent) {
       </div>
     </div>
 
-    <header class="header">
-      <div class="header-left">
-        <div class="header-top-row">
-          <h1>{{ title }} Engine Firings</h1>
-          <div class="date-display mobile-only">{{ currentDateDisplay }}</div>
-        </div>
-        <YearRangeButtons
-          :options="yearRangeOptions"
-          :selected-id="selectedRangeId"
-          @select="handleSelectRange"
-        />
-      </div>
-      <div class="date-display desktop-only">{{ currentDateDisplay }}</div>
-    </header>
+    <ViewHeader
+      :title="`${title} Engine Firings`"
+      :current-date-display="currentDateDisplay"
+      :year-range-options="yearRangeOptions"
+      :selected-range-id="selectedRangeId"
+      @select-range="handleSelectRange"
+    />
 
     <main class="main-content">
       <div class="display-section">
@@ -845,42 +838,6 @@ function updateTooltipPosition(event: MouseEvent) {
   min-height: 0;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1rem 1.5rem;
-  flex-shrink: 0;
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.header-top-row {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-}
-
-.header h1 {
-  font-size: 1.5rem;
-  font-weight: 300;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.date-display {
-  font-family: var(--font-mono);
-  font-size: 1.25rem;
-  color: var(--color-accent);
-  font-weight: 500;
-}
-
-.date-display.mobile-only { display: none; }
-.date-display.desktop-only { display: block; }
 
 .main-content {
   display: flex;
@@ -1188,8 +1145,6 @@ function updateTooltipPosition(event: MouseEvent) {
 }
 
 @media (max-width: 600px) {
-  .header { padding: 0.75rem 1rem; }
-  .header h1 { font-size: 1.25rem; }
   .date-display.mobile-only { display: block; font-size: 1rem; }
   .date-display.desktop-only { display: none; }
   .main-content { padding: 0 1rem; }

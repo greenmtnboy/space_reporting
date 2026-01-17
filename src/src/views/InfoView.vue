@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import ViewHeader from '../components/ViewHeader.vue'
 
 const currentYear = new Date().getFullYear()
 
@@ -51,10 +52,9 @@ onMounted(() => {
 <template>
   <div class="info-view" :class="{ 'is-visible': isMounted }">
     <div class="info-container">
-      <header class="info-header">
-        <h1 class="glitch-text">Information</h1>
-        <p class="subtitle">This is for fun.</p>
-      </header>
+    <ViewHeader title="Information">
+      <p class="subtitle">This is for fun.</p>
+    </ViewHeader>
 
       <div class="info-grid">
         <div 
@@ -141,20 +141,6 @@ onMounted(() => {
   gap: 3rem;
 }
 
-.info-header {
-  text-align: center;
-}
-
-.info-header h1 {
-  font-size: 3rem;
-  font-weight: 800;
-  margin-bottom: 0.5rem;
-  background: linear-gradient(135deg, var(--color-text) 0%, var(--color-accent-bright) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -0.02em;
-  text-transform: uppercase;
-}
 
 .subtitle {
   font-family: var(--font-mono);

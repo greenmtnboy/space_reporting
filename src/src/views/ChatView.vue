@@ -5,6 +5,7 @@ import {
   useTrilogyCore,
   LLMChatSplitView,
 } from 'trilogy-studio-components'
+import ViewHeader from '../components/ViewHeader.vue'
 
 // Initialize Trilogy core (all stores/services)
 const trilogy = useTrilogyCore()
@@ -70,7 +71,7 @@ onMounted(async () => {
     
     // Create a chat with this data connection if none exists
     if (!trilogy.chatStore.activeChatId) {
-      trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat')
+      trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
     }
 
     // Ensure production resolver is used
@@ -337,45 +338,42 @@ const activeDatasets = computed(() => {
 
     <!-- Chat Interface -->
     <div v-else class="chat-interface">
-      <header class="header chat-header-bar">
-        <div class="header-left">
-          <div class="header-top-row">
-            <h1>{{ chat.activeChatTitle.value }}</h1>
-          </div>
-          <div v-if="activeDatasets.length > 0" class="looking-at">
-            <span class="looking-at-label">Looking at:</span>
-            <div class="dataset-tags">
-              <span v-for="name in activeDatasets" :key="name" class="dataset-tag">{{ name }}</span>
-            </div>
+      <ViewHeader :title="chat.activeChatTitle.value">
+        <div v-if="activeDatasets.length > 0" class="looking-at">
+          <span class="looking-at-label">Looking at:</span>
+          <div class="dataset-tags">
+            <span v-for="name in activeDatasets" :key="name" class="dataset-tag">{{ name }}</span>
           </div>
         </div>
 
-        <div class="header-actions">
-          <button class="header-action-btn primary" @click="resetChat" title="New Chat">
-            <i class="mdi mdi-refresh"></i>
-            <span class="desktop-only">New Chat</span>
-          </button>
-          
-          <div class="db-status mini" :class="dbStatus" :title="dbError || dbStatus">
-            <span class="status-dot"></span>
-            <span class="status-text desktop-only">DuckDB</span>
+        <template #actions>
+          <div class="header-actions">
+            <button class="header-action-btn primary" @click="resetChat" title="New Chat">
+              <i class="mdi mdi-refresh"></i>
+              <span class="desktop-only">New Chat</span>
+            </button>
+            
+            <div class="db-status mini" :class="dbStatus" :title="dbError || dbStatus">
+              <span class="status-dot"></span>
+              <span class="status-text desktop-only">DuckDB</span>
+            </div>
+            
+            <span v-if="connectionInfo" class="connection-badge">
+              {{ connectionInfo }}
+            </span>
+            
+            <button class="header-action-btn" @click="showProviderSelector = true; llmStore.activeConnection = ''" title="Change LLM">
+              <i class="mdi mdi-cog-outline"></i>
+            </button>
           </div>
-          
-          <span v-if="connectionInfo" class="connection-badge">
-            {{ connectionInfo }}
-          </span>
-          
-          <button class="header-action-btn" @click="showProviderSelector = true; llmStore.activeConnection = ''" title="Change LLM">
-            <i class="mdi mdi-cog-outline"></i>
-          </button>
-        </div>
-      </header>
+        </template>
+      </ViewHeader>
 
       <div class="chat-container">
         <LLMChatSplitView
           :editableTitle="true"
           :showHeader="false"
-          placeholder="Ask about your space data... (Enter to send)"
+          placeholder="Ask about launch data... (Enter to send)"
           :systemPrompt="chat.chatSystemPrompt.value"
           :connectionInfo="connectionInfo"
           :symbols="chat.chatSymbols.value"
@@ -412,38 +410,6 @@ const activeDatasets = computed(() => {
   overflow: hidden;
 }
 
-.chat-header-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1rem 1.5rem;
-  flex-shrink: 0;
-}
-
-.header-main {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.chat-header-bar h1 {
-  font-size: 1.5rem;
-  font-weight: 300;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.chat-header-bar .header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.chat-header-bar .header-top-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
 
 
 
@@ -493,23 +459,20 @@ const activeDatasets = computed(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 0.3rem 1rem;
   background-color: var(--color-bg-tertiary);
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   white-space: nowrap;
   line-height: 1;
-  height: 36px;
-}
-
-.header-action-btn span {
-  display: inline-flex !important;
-  align-items: center;
+  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
 }
 
 .header-action-btn:hover {
@@ -519,22 +482,20 @@ const activeDatasets = computed(() => {
 }
 
 .header-action-btn.primary {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dim));
+  background: linear-gradient(135deg, var(--color-accent-dim) 0%, var(--color-accent) 100%);
   color: white;
-  border: none;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
-  padding: 8px 18px;
-  min-width: 110px;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
 }
 
 .header-action-btn.primary:hover {
-  background: linear-gradient(135deg, var(--color-accent-bright), var(--color-accent));
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-bright) 100%);
+  box-shadow: 0 0 16px rgba(14, 165, 233, 0.4);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.3);
 }
 
 .header-action-btn.primary:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.96);
 }
 
 .header-action-btn i {
@@ -821,6 +782,70 @@ const activeDatasets = computed(() => {
   flex-direction: column !important;
 }
 
+/* Send button styling */
+.chat-container :deep(.input-container) {
+  display: flex !important;
+  flex-direction: column !important; /* Stack vertically */
+  align-items: flex-end !important; /* Align button to the right */
+  gap: 8px !important;
+  padding: 12px 16px !important;
+  background-color: var(--color-bg-secondary) !important;
+  border-top: 1px solid var(--color-border) !important;
+}
+
+.chat-container :deep(.input-container textarea) {
+  width: 100% !important;
+  background-color: var(--color-bg-tertiary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px !important;
+  padding: 10px !important;
+  font-family: inherit !important;
+  font-size: 0.875rem !important;
+  min-height: 60px !important;
+  color: var(--color-text) !important;
+  resize: none !important;
+}
+
+.chat-container :deep(.send-button) {
+  padding: 0.4rem 2rem !important;
+  background: linear-gradient(135deg, var(--color-accent-dim) 0%, var(--color-accent) 100%) !important;
+  color: white !important;
+  border: 1px solid var(--color-accent) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.625rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+  height: 32px !important;
+  /* Floats to right due to parent flex-end */
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px) !important;
+}
+
+.chat-container :deep(.send-button:hover:not(:disabled)) {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-bright) 100%) !important;
+  box-shadow: 0 0 16px rgba(14, 165, 233, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+.chat-container :deep(.send-button:active:not(:disabled)) {
+  transform: translateY(0) scale(0.96) !important;
+}
+
+.chat-container :deep(.send-button:disabled) {
+  background: var(--color-bg-tertiary) !important;
+  color: var(--color-text-muted) !important;
+  border: 1px solid var(--color-border) !important;
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
+  box-shadow: none !important;
+  transform: none !important;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px) !important;
+}
+
 /* Header Controls */
 .chat-header-controls {
   display: flex;
@@ -828,26 +853,6 @@ const activeDatasets = computed(() => {
   gap: 8px;
 }
 
-.header-action-btn {
-  background-color: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s ease;
-}
-
-.header-action-btn:hover {
-  background-color: var(--color-bg-secondary);
-  border-color: var(--color-accent);
-  color: var(--color-text);
-}
 
 .db-status.mini {
   display: flex;
@@ -953,6 +958,226 @@ const activeDatasets = computed(() => {
   min-height: 450px !important;
   height: 100% !important;
   width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.chat-container :deep(.sql-view) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 24px;
+}
+
+.chat-container :deep(.vega-lite-chart) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.chat-container :deep(.chart-content-area) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-container :deep(.vega-swap-container) {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.chat-container :deep(.vega-container) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chat-container :deep(.visualization-container) {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  background-color: var(--color-bg-primary);
+  padding: 16px 16px 32px 16px;
+  border-radius: 4px;
+}
+
+.chat-container :deep(.vega-embed) {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.chat-container :deep(.vega-embed canvas),
+.chat-container :deep(.vega-embed svg) {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* Vega Dark Mode SVG Overrides */
+.chat-container :deep(.vega-embed svg .mark-text.role-axis-label),
+.chat-container :deep(.vega-embed svg .mark-text.role-axis-title),
+.chat-container :deep(.vega-embed svg .mark-text.role-legend-label),
+.chat-container :deep(.vega-embed svg .mark-text.role-legend-title) {
+  fill: var(--color-text-muted) !important;
+  font-family: inherit !important;
+}
+
+.chat-container :deep(.vega-embed svg .mark-rule.role-axis-grid),
+.chat-container :deep(.vega-embed svg .mark-rule.role-axis-domain),
+.chat-container :deep(.vega-embed svg .mark-rule.role-axis-tick) {
+  stroke: var(--color-border) !important;
+}
+
+/* Chart Config Panel Styling (Scoped to Sidebar) */
+.chat-container :deep(.sidebar-panel .inner-padding) {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chat-container :deep(.sidebar-panel .control-section) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 20px;
+}
+
+.chat-container :deep(.sidebar-panel .control-section:last-child) {
+  border-bottom: none;
+}
+
+.chat-container :deep(.sidebar-panel .control-section-label) {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.chat-container :deep(.sidebar-panel .chart-type-icons) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 8px;
+}
+
+.chat-container :deep(.sidebar-panel .chart-icon) {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.chat-container :deep(.sidebar-panel .chart-icon:hover) {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-border-bright);
+  color: var(--color-text);
+}
+
+.chat-container :deep(.sidebar-panel .chart-icon.selected) {
+  background-color: rgba(14, 165, 233, 0.1);
+  border-color: var(--color-accent);
+  color: var(--color-accent-bright);
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.2);
+}
+
+.chat-container :deep(.sidebar-panel .chart-icon i) {
+  font-size: 1.25rem;
+}
+
+.chat-container :deep(.sidebar-panel .control-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-container :deep(.sidebar-panel .control-group:has(input[type="checkbox"])) {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-container :deep(.sidebar-panel .chart-label) {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.chat-container :deep(.sidebar-panel .form-select) {
+  width: 100%;
+  padding: 6px 10px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chat-container :deep(.sidebar-panel .form-select:focus) {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.chat-container :deep(.sidebar-panel input[type="checkbox"]) {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.chat-container :deep(.sidebar-panel .editor-btn) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.sidebar-panel .editor-btn:hover) {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-border-bright);
+  transform: translateY(-1px);
+}
+
+.chat-container :deep(.sidebar-panel .editor-btn i) {
+  font-size: 1rem;
+  color: var(--color-accent);
 }
 
 .chat-container :deep(.chat-split-container) {
@@ -1823,10 +2048,16 @@ const activeDatasets = computed(() => {
   flex: 1;
   overflow: auto;
   padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-container :deep(.sql-view) {
   padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* Panel resizer - draggable boundary between chat and sidebar */
@@ -1875,12 +2106,5 @@ const activeDatasets = computed(() => {
   border-color: var(--color-accent-dim);
 }
 
-/* Chart container */
-.chat-container :deep(.chart-container),
-.chat-container :deep(.visualization-container) {
-  background-color: var(--color-bg-primary);
-  padding: 16px;
-  border-radius: 4px;
-}
 </style>
 
