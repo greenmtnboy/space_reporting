@@ -1236,8 +1236,10 @@ const activeDatasets = computed(() => {
 /* Symbols Pane Custom Styling */
 .chat-container :deep(.symbols-pane) {
   background-color: var(--color-bg-primary) !important;
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
 }
 
 .chat-container :deep(.search-container) {
@@ -1268,9 +1270,10 @@ const activeDatasets = computed(() => {
 /* Symbol list container */
 .chat-container :deep(.symbols-list),
 .chat-container :deep(.symbol-list) {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 0;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding: 4px 0 !important;
 }
 
 /* Individual symbol items */
@@ -1463,7 +1466,7 @@ const activeDatasets = computed(() => {
 
 /* Sidebar panel border/outline */
 .chat-container :deep(.sidebar-panel),
-.chat-container :deep(.symbols-panel) {
+.chat-container :deep(.symbols-pane) {
   border-left: 1px solid var(--color-border);
   background-color: var(--color-bg-primary);
 }
