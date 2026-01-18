@@ -1294,6 +1294,61 @@ const activeDatasets = computed(() => {
   flex-direction: column !important;
   flex: 1 !important;
   min-height: 0 !important;
+  overflow: hidden !important; /* Hide overflow here to stabilize tooltip positioning */
+  position: relative !important;
+}
+
+.chat-container :deep(.filter-container) {
+  background-color: var(--color-bg-primary) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  padding: 6px 8px !important;
+}
+
+/* Color-coded filter icons to match row items */
+.chat-container :deep(.filter-label) {
+  padding: 4px !important;
+  border-radius: 4px !important;
+  margin-right: 6px !important;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-container :deep(.filter-label:hover) {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Map filter icons to their type colors and backgrounds */
+.chat-container :deep(.filter-label i.mdi-key-outline) {
+  color: var(--color-accent-bright) !important;
+  background-color: rgba(14, 165, 233, 0.15);
+  padding: 4px;
+  border-radius: 3px;
+}
+
+.chat-container :deep(.filter-label i.mdi-tag-outline) {
+  color: var(--color-text-muted) !important;
+  background-color: rgba(139, 149, 165, 0.15) !important;
+  padding: 4px;
+  border-radius: 3px;
+}
+
+.chat-container :deep(.filter-label i.mdi-cube-outline) {
+  color: var(--color-success-bright) !important;
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  padding: 4px;
+  border-radius: 3px;
+}
+
+/* Active states (assuming the library adds a class or we target the checked state if possible, 
+   but for now we reinforce the icon appearance) */
+.chat-container :deep(.filter-label input:checked + i) {
+  opacity: 1 !important;
+  filter: saturate(1.2) brightness(1.2);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.05);
 }
 
 .chat-container :deep(.search-container) {
@@ -1516,6 +1571,16 @@ const activeDatasets = computed(() => {
   color: var(--color-accent-bright);
   border-bottom-color: var(--color-accent);
   background-color: rgba(14, 165, 233, 0.05);
+}
+
+/* Tooltip Styles (Reinforce local rendering) */
+.chat-container :deep(.custom-tooltip) {
+  background-color: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  z-index: 1000 !important;
+  position: absolute !important;
+  padding: 2px;
 }
 
 /* Sidebar panel border/outline */
