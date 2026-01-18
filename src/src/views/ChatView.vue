@@ -1043,15 +1043,53 @@ const activeDatasets = computed(() => {
   stroke: var(--color-border) !important;
 }
 
-/* Chart Config Panel Styling (Scoped to Sidebar) */
-.chat-container :deep(.sidebar-panel .inner-padding) {
+/* Inline artifact in chat messages */
+.chat-container :deep(.inline-artifact) {
+  width: 100%;
+  min-height: 400px;
+  height: 450px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--color-bg-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  margin: 12px 0;
+}
+
+/* Message layouts for artifacts */
+.chat-container :deep(.message.has-artifact) {
+  align-self: center !important;
+  max-width: 1000px !important;
+  width: 100% !important;
+  background-color: transparent !important;
+  padding: 10px 20px !important;
+}
+
+.chat-container :deep(.message.has-artifact .message-content) {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+.chat-container :deep(.vega-container.vega-active) {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.chat-container :deep(.vega-container.vega-transitioning) {
+  opacity: 1 !important;
+}
+
+/* Chart Config Panel Styling (Scoped to Sidebar and Inline Artifacts) */
+.chat-container :deep(.sidebar-panel .inner-padding),
+.chat-container :deep(.inline-artifact .inner-padding) {
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.chat-container :deep(.sidebar-panel .control-section) {
+.chat-container :deep(.sidebar-panel .control-section),
+.chat-container :deep(.inline-artifact .control-section) {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1059,11 +1097,13 @@ const activeDatasets = computed(() => {
   padding-bottom: 20px;
 }
 
-.chat-container :deep(.sidebar-panel .control-section:last-child) {
+.chat-container :deep(.sidebar-panel .control-section:last-child),
+.chat-container :deep(.inline-artifact .control-section:last-child) {
   border-bottom: none;
 }
 
-.chat-container :deep(.sidebar-panel .control-section-label) {
+.chat-container :deep(.sidebar-panel .control-section-label),
+.chat-container :deep(.inline-artifact .control-section-label) {
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1072,13 +1112,15 @@ const activeDatasets = computed(() => {
   margin-bottom: 4px;
 }
 
-.chat-container :deep(.sidebar-panel .chart-type-icons) {
+.chat-container :deep(.sidebar-panel .chart-type-icons),
+.chat-container :deep(.inline-artifact .chart-type-icons) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
   gap: 8px;
 }
 
-.chat-container :deep(.sidebar-panel .chart-icon) {
+.chat-container :deep(.sidebar-panel .chart-icon),
+.chat-container :deep(.inline-artifact .chart-icon) {
   width: 40px;
   height: 40px;
   display: flex;
@@ -1093,42 +1135,49 @@ const activeDatasets = computed(() => {
   padding: 0;
 }
 
-.chat-container :deep(.sidebar-panel .chart-icon:hover) {
+.chat-container :deep(.sidebar-panel .chart-icon:hover),
+.chat-container :deep(.inline-artifact .chart-icon:hover) {
   background-color: var(--color-bg-secondary);
   border-color: var(--color-border-bright);
   color: var(--color-text);
 }
 
-.chat-container :deep(.sidebar-panel .chart-icon.selected) {
+.chat-container :deep(.sidebar-panel .chart-icon.selected),
+.chat-container :deep(.inline-artifact .chart-icon.selected) {
   background-color: rgba(14, 165, 233, 0.1);
   border-color: var(--color-accent);
   color: var(--color-accent-bright);
   box-shadow: 0 0 8px rgba(14, 165, 233, 0.2);
 }
 
-.chat-container :deep(.sidebar-panel .chart-icon i) {
+.chat-container :deep(.sidebar-panel .chart-icon i),
+.chat-container :deep(.inline-artifact .chart-icon i) {
   font-size: 1.25rem;
 }
 
-.chat-container :deep(.sidebar-panel .control-group) {
+.chat-container :deep(.sidebar-panel .control-group),
+.chat-container :deep(.inline-artifact .control-group) {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.chat-container :deep(.sidebar-panel .control-group:has(input[type="checkbox"])) {
+.chat-container :deep(.sidebar-panel .control-group:has(input[type="checkbox"])),
+.chat-container :deep(.inline-artifact .control-group:has(input[type="checkbox"])) {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
 }
 
-.chat-container :deep(.sidebar-panel .chart-label) {
+.chat-container :deep(.sidebar-panel .chart-label),
+.chat-container :deep(.inline-artifact .chart-label) {
   font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-text-secondary);
 }
 
-.chat-container :deep(.sidebar-panel .form-select) {
+.chat-container :deep(.sidebar-panel .form-select),
+.chat-container :deep(.inline-artifact .form-select) {
   width: 100%;
   padding: 6px 10px;
   background-color: var(--color-bg-tertiary);
@@ -1140,19 +1189,22 @@ const activeDatasets = computed(() => {
   cursor: pointer;
 }
 
-.chat-container :deep(.sidebar-panel .form-select:focus) {
+.chat-container :deep(.sidebar-panel .form-select:focus),
+.chat-container :deep(.inline-artifact .form-select:focus) {
   border-color: var(--color-accent);
   outline: none;
 }
 
-.chat-container :deep(.sidebar-panel input[type="checkbox"]) {
+.chat-container :deep(.sidebar-panel input[type="checkbox"]),
+.chat-container :deep(.inline-artifact input[type="checkbox"]) {
   width: 16px;
   height: 16px;
   accent-color: var(--color-accent);
   cursor: pointer;
 }
 
-.chat-container :deep(.sidebar-panel .editor-btn) {
+.chat-container :deep(.sidebar-panel .editor-btn),
+.chat-container :deep(.inline-artifact .editor-btn) {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1168,13 +1220,15 @@ const activeDatasets = computed(() => {
   transition: all 0.15s ease;
 }
 
-.chat-container :deep(.sidebar-panel .editor-btn:hover) {
+.chat-container :deep(.sidebar-panel .editor-btn:hover),
+.chat-container :deep(.inline-artifact .editor-btn:hover) {
   background-color: var(--color-bg-secondary);
   border-color: var(--color-border-bright);
   transform: translateY(-1px);
 }
 
-.chat-container :deep(.sidebar-panel .editor-btn i) {
+.chat-container :deep(.sidebar-panel .editor-btn i),
+.chat-container :deep(.inline-artifact .editor-btn i) {
   font-size: 1rem;
   color: var(--color-accent);
 }
@@ -1495,6 +1549,7 @@ const activeDatasets = computed(() => {
   flex-direction: column;
   overflow: hidden;
   background-color: var(--color-bg-primary);
+  max-height:100%;
 }
 
 .chat-container :deep(.artifacts-content) {
