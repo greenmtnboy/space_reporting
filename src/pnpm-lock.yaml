@@ -12,8 +12,8 @@ importers:
         specifier: 1.29.1-dev269.0
         version: 1.29.1-dev269.0
       '@trilogy-data/trilogy-studio-components':
-        specifier: 0.1.0
-        version: 0.1.0(pinia@2.3.1(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3)))(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3))
+        specifier: 0.1.1
+        version: 0.1.1(pinia@2.3.1(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3)))(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3))
       pinia:
         specifier: ^2.3.1
         version: 2.3.1(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3))
@@ -419,8 +419,8 @@ packages:
   '@swc/helpers@0.5.18':
     resolution: {integrity: sha512-TXTnIcNJQEKwThMMqBXsZ4VGAza6bvN4pa41Rkqoio6QBKMvo+5lexeTMScGCIxtzgQJzElcvIltani+adC5PQ==}
 
-  '@trilogy-data/trilogy-studio-components@0.1.0':
-    resolution: {integrity: sha512-d0LJvpFqjDHuAwS3mH421ab14R3pIn7Qq+eVi70YIDCaD2IC5i1XQfhoMnnix0uXJDBjBl0gN3AjZJaxX941qQ==}
+  '@trilogy-data/trilogy-studio-components@0.1.1':
+    resolution: {integrity: sha512-Yq2eGBIsLuJsi6z/vZCGs6HC6gpg7rlAvlHt8rCgKThhN9hhO7hEr5NfFNtLIB8AofTHs0U8ylvVaEP8nMKu+w==}
     peerDependencies:
       pinia: ^2.0.0
       vue: ^3.5.13
@@ -1962,7 +1962,7 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@trilogy-data/trilogy-studio-components@0.1.0(pinia@2.3.1(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3)))(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3))':
+  '@trilogy-data/trilogy-studio-components@0.1.1(pinia@2.3.1(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3)))(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3))':
     dependencies:
       '@duckdb/duckdb-wasm': 1.29.1-dev269.0
       '@google/genai': 0.12.0
