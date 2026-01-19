@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import {
   TILE_SIZE,
   DEFAULT_CENTER,
@@ -14,10 +14,34 @@ export function useCamera(
   mapWidth: Ref<number>,
   mapHeight: Ref<number>
 ) {
+  function getInitialZoom() {
+    // Determine if we are on a small screen (mobile)
+    const isMobile = window.innerWidth < 768
+
+    if (!isMobile) return 3 // Desktop is "gucci"
+
+    // On mobile, calculate zoom to fit the world map
+    if (mapWidth.value > 0) {
+      const zoomToFit = Math.log2(mapWidth.value / TILE_SIZE)
+      // We subtract a little bit for some padding, and clamp to MIN_ZOOM
+      return Math.max(MIN_ZOOM, zoomToFit - 0.5)
+    }
+    return 2 // Fallback for mobile if width not yet known
+  }
+
   const camera = ref({
-    zoom: 3,
+    zoom: getInitialZoom(),
     centerLat: DEFAULT_CENTER.lat,
     centerLng: DEFAULT_CENTER.lng
+  })
+
+  // Watch for mapWidth changes to adjust initial zoom on mobile
+  // (mapWidth starts at 2048 in RocketsView and gets updated by ResizeObserver)
+  watch(mapWidth, (newWidth) => {
+    if (window.innerWidth < 768 && newWidth < 2000) {
+      // Retrigger default zoom on resize for mobile
+      camera.value.zoom = getInitialZoom()
+    }
   })
 
   const pressedKeys = ref(new Set<string>())
@@ -254,7 +278,7 @@ export function useCamera(
   }
 
   function resetCamera() {
-    camera.value.zoom = 3
+    camera.value.zoom = getInitialZoom()
     camera.value.centerLat = DEFAULT_CENTER.lat
     camera.value.centerLng = DEFAULT_CENTER.lng
   }
