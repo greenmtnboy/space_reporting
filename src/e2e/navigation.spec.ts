@@ -22,7 +22,7 @@ test('navigation to all main pages', async ({ page }) => {
 
     // 5. Navigate back to Home
     await page.getByTestId('nav-link-rockets').click()
-    await expect(page).toHaveURL('/') // Exact match for home if base is correct, or just /
+    await expect(page).toHaveURL('/space_reporting/') // Exact match for home if base is correct, or just /
     await expect(page.getByTestId('rockets-view')).toBeVisible()
 })
 
