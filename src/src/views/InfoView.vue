@@ -53,7 +53,7 @@ onMounted(() => {
   <div class="info-view" :class="{ 'is-visible': isMounted }" data-testid="info-view">
     <div class="info-container">
     <ViewHeader title="Information">
-      <p class="subtitle">This is for fun.</p>
+      <p class="subtitle">This is for fun and maybe some discovery. Feedback and contributions are welcome!</p>
     </ViewHeader>
 
       <div class="info-grid">
@@ -104,7 +104,7 @@ onMounted(() => {
       </div>
 
       <footer class="info-footer">
-        <p>&copy; {{ currentYear }} Space Reporting Project. Built for exploration.</p>
+        <p>Powered by Trilogy</p>
       </footer>
     </div>
     

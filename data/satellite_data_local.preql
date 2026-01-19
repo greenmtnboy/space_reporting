@@ -7,7 +7,7 @@ select
     name,
     #launch_date,
     launch_date,
-    coalesce(decom_date, current_date()) as end_date,
+    coalesce(status_end_date, current_date()) as end_date,
     owner.e_name,
     owner.color,
     perigee,

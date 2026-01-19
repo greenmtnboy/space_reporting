@@ -10,10 +10,14 @@ key jcat string; # Alphanumeric identifier to uniquely tag space objects, consis
 property jcat.satcat string; # Corresponds to the US SATCAT number; an integer value or a descriptive string if not present in SATCAT.
 
 property jcat._launch_date string;
-property jcat._decom_date string;
+property jcat._status_end_date string;
+property jcat._status_start_date string;
+property jcat._orbit_date string;
 
-property jcat.launch_date <- @extract_date(_launch_date);
-property jcat.decom_date <- @extract_date(_decom_date);
+property jcat.launch_date <- @extract_date(_launch_date); # Date the object was launched into space. UTC.
+property jcat.status_end_date <- @extract_date(_status_end_date); # if the current state has ended, this is the time. For example, if a state is deorbited, this is the deorbit date. If blank, still in current state. UTC>
+property jcat.orbit_date <- @extract_date(_orbit_date); # Date of the orbital data provided for the object. UTC.
+property jcat.status_start_date <-@extract_date(_status_start_date); # Date the current status began; such as launch or separation from parent. UTC.
 
 property jcat.piece string; # Piece designation for the object; often matches the Launch Tag.
 property jcat.type string; # Contains SatType string; characterizes the object (P for payload, R for rocket stage, etc.).
@@ -21,8 +25,7 @@ property jcat.name string; # Recommended name based on that used by owner/operat
 property jcat.pl_name string; # An alternative name for the object; may indicate radar cross section or unidentified debris.
 
 property jcat.parent string; # Parent object or central body the object is attached to at the start of a phase.
-property jcat.s_date string; # Separation Date; start time for the current phase in UTC.
-property jcat.primary string; # Central body for the current phase; usually Earth.
+property jcat.primary string; # Central gravitation body the object is orbiting; usually Earth.
 
 property jcat.status string; #O        In orbit (free-flying, still tracked)
 #OX       In orbit but lost (no recent tracking)
@@ -90,7 +93,7 @@ property jcat.d_flag string; # Diameter estimation indication; '?' signifies gue
 property jcat.span float; # Largest dimension including all appendages, in metres; stay outside a sphere of Span diameter.
 property jcat.span_flag string; # Span estimation; '?' indicates a guess within ~20% accuracy.
 property jcat.shape string; # Approximate shape description; not a substitute for a CAD model.
-property jcat.o_date string; # Orbit Epoch Date; date format for canonical orbital data.
+
 property jcat.perigee int; # Perigee height in km of canonical orbit; if '?', value is estimated.
 property jcat.pf string; # Indicator if the perigee is a guess; uses '?' to symbolize.
 property jcat.apogee float; # Apogee height in km; if '?', it’s an estimate.
@@ -110,8 +113,7 @@ auto base_category <- substring(split(type, ' ')[1],1,1); #P	Payload (for orbita
 #X	Catalog entry that has been deleted (used in auxcat etc.)
 #Z	Spurious catalog entry (was in SATCAT, perhaps in TLEs, but there was no real object)
 
-property jcat.is_decommed <- decom_date is not null; # if a satellite or object is no longer in orbit as of latest data update. Use decom date to filter by what was active a historicp oint.
-
+property jcat.is_decommed <- status in ['R','D','C', 'E', 'F', 'OX'];
 
 root datasource satcat_raw (
     JCAT: jcat,
@@ -123,9 +125,9 @@ root datasource satcat_raw (
     PLName: pl_name,
     LDate: ?_launch_date,
     Parent: parent,
-    SDate: s_date,
+    SDate: _status_start_date,
     Primary: primary,
-    DDate: ?_decom_date,
+    DDate: ?_status_end_date,
     Status: status,
     Dest: dest,
     Owner: owner.code,
@@ -146,7 +148,7 @@ root datasource satcat_raw (
     Span: span,
     SpanFlag: ?span_flag,
     Shape: shape,
-    ODate: o_date,
+    ODate: ?_orbit_date,
     Perigee: perigee,
     PF: ?pf,
     Apogee: apogee,
@@ -173,9 +175,10 @@ datasource satcat (
     PLName: pl_name,
     LDate: ?launch_date,
     Parent: parent,
-    SDate: s_date,
     Primary: primary,
-    DDate: ?decom_date,
+    status_start_date: ?status_start_date,
+    status_end_date: ?status_end_date,
+    orbit_date: ?orbit_date,
     Status: status,
     Dest: dest,
     Owner: owner.code,
@@ -196,7 +199,6 @@ datasource satcat (
     Span: span,
     SpanFlag: ?span_flag,
     Shape: shape,
-    ODate: o_date,
     Perigee: perigee,
     PF: ?pf,
     Apogee: apogee,
@@ -209,5 +211,5 @@ datasource satcat (
     data_update_date: data_updated_through
     )
 grain (jcat)
-file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/satcat.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/satcat.parquet`
+file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/satcat_three.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/satcat_three.parquet`
 freshness by data_updated_through;
