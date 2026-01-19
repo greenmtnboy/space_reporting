@@ -176,23 +176,23 @@ function getClusterPositions(engineCount: number, dotRadius: number, isStarshipS
 
   if (isStarshipS2 && (engineCount === 6 || engineCount === 9)) {
     // Starship Stage 2: 3 inner tight triangle + 3 or 6 larger outer engines
-    const innerRadius = spacing * 0.5
+    const innerRadius = spacing * 0.25
     for (let i = 0; i < 3; i++) {
         const angle = (i / 3) * Math.PI * 2 - Math.PI / 2
         positions.push({
             dx: Math.cos(angle) * innerRadius,
             dy: Math.sin(angle) * innerRadius,
-            r: dotRadius * 0.64
+            r: dotRadius * 0.4
         })
     }
     const outerCount = engineCount - 3
-    const outerRadius = spacing * 1.6
+    const outerRadius = spacing * 0.8
     for (let i = 0; i < outerCount; i++) {
         const angle = (i / outerCount) * Math.PI * 2 - Math.PI / 2
         positions.push({
             dx: Math.cos(angle) * outerRadius,
             dy: Math.sin(angle) * outerRadius,
-            r: dotRadius * 1.44 // larger outer engines
+            r: dotRadius * 0.9 // larger outer engines
         })
     }
     return positions
@@ -305,23 +305,23 @@ function getHeroClusterPositions(engineCount: number, isStarshipS2: boolean = fa
 
   if (isStarshipS2 && (engineCount === 6 || engineCount === 9)) {
     // Starship Stage 2: 3 inner tight triangle + 3 or 6 larger outer engines
-    const innerRadius = spacing * 0.5
+    const innerRadius = spacing * 0.25
     for (let i = 0; i < 3; i++) {
         const angle = (i / 3) * Math.PI * 2 - Math.PI / 2
         positions.push({
             dx: Math.cos(angle) * innerRadius,
             dy: Math.sin(angle) * innerRadius,
-            r: dotRadius * 0.8
+            r: dotRadius * 0.4
         })
     }
     const outerCount = engineCount - 3
-    const outerRadius = spacing * 1.6
+    const outerRadius = spacing * .8
     for (let i = 0; i < outerCount; i++) {
         const angle = (i / outerCount) * Math.PI * 2 - Math.PI / 2
         positions.push({
             dx: Math.cos(angle) * outerRadius,
             dy: Math.sin(angle) * outerRadius,
-            r: dotRadius * 1.8 // larger outer engines
+            r: dotRadius * 0.9 // larger outer engines
         })
     }
     return positions
