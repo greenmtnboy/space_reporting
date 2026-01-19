@@ -9,7 +9,7 @@ export const TILE_SIZE = 256
 export const DEFAULT_CENTER = { lat: 0, lng: 10 }
 
 // Camera constraints
-export const MIN_ZOOM = 2
+export const MIN_ZOOM = .5
 export const MAX_ZOOM = 20
 export const ZOOM_SPEED = 0.002
 export const PAN_SPEED = 20
