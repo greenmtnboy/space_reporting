@@ -16,8 +16,8 @@ property jcat._orbit_date string;
 
 property jcat.launch_date <- @extract_date(_launch_date); # Date the object was launched into space. UTC.
 property jcat.status_end_date <- @extract_date(_status_end_date); # if the current state has ended, this is the time. For example, if a state is deorbited, this is the deorbit date. If blank, still in current state. UTC>
-property jcat.orbit_date <- @extract_date(_orbit_date); # Date of the orbital data provided for the object. UTC.
-property jcat.status_start_date <-@extract_date(_status_start_date); # Date the current status began; such as launch or separation from parent. UTC.
+property jcat.orbit_date <- @extract_date(_orbit_date); # Date of the orbital data provided for the object.
+property jcat.status_start_date <-@extract_date(_status_start_date); # Date the current phase began, typically a launch. UTC. For terminal phases, this is not the time of the status - use status_end_date for the time of an event.
 
 property jcat.piece string; # Piece designation for the object; often matches the Launch Tag.
 property jcat.type string; # Contains SatType string; characterizes the object (P for payload, R for rocket stage, etc.).
