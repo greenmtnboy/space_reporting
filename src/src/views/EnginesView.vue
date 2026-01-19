@@ -525,7 +525,7 @@ function updateTooltipPosition(event: MouseEvent) {
 </script>
 
 <template>
-  <div class="engines-view">
+  <div class="engines-view" data-testid="engines-view">
     <!-- Loading State -->
     <div v-if="isLoading" class="loading-overlay">
       <div class="loading-content">

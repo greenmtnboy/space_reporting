@@ -50,7 +50,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="info-view" :class="{ 'is-visible': isMounted }">
+  <div class="info-view" :class="{ 'is-visible': isMounted }" data-testid="info-view">
     <div class="info-container">
     <ViewHeader title="Information">
       <p class="subtitle">This is for fun.</p>

@@ -56,6 +56,7 @@ const currentRoute = computed(() => route.name)
         class="nav-item"
         :class="{ active: currentRoute === item.name }"
         :title="item.label"
+        :data-testid="`nav-link-${item.name}`"
       >
         <img
           v-if="item.icon === 'rocket'"

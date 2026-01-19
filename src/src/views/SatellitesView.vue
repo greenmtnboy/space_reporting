@@ -224,7 +224,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="satellites-view">
+  <div class="satellites-view" data-testid="satellites-view">
     <!-- Loading State -->
     <div v-if="isDataLoading" class="loading-overlay">
       <div class="loading-content">
