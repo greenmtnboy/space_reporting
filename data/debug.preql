@@ -1,8 +1,8 @@
-import raw.launch;
+import raw.satellite;
 
 
+where status in ['R','D','C', 'E', 'F', 'OX']
 select
-    vehicle.manufacturer.e_name,
-    launch_tag.count
-order by launch_tag.count desc
+    orbit_date,
+    status_end_date
 limit 1000;

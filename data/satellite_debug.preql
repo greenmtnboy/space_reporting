@@ -4,13 +4,13 @@ import raw.satellite;
 where base_category = 'P'   
 and apogee < 1000000
 and launch_date.year = 2025
-and decom_date is not null
+and status_end_date is not null
 select
     jcat,
     name,
     #launch_date,
     launch_date,
-    decom_date,
+    status_end_date,
     owner.e_name,
     owner.color,
     perigee,
@@ -18,5 +18,5 @@ select
     inc,
     launch.site.latitude,
     launch.site.longitude
-order by decom_date asc
+order by status_end_date asc
 limit 10;

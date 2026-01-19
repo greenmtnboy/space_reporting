@@ -207,6 +207,9 @@ onMounted(async () => {
   initGlobe()
 
   window.addEventListener('keydown', handleKeydown)
+  
+  // Auto-play on load
+  startAnimation()
 })
 
 onUnmounted(() => {
