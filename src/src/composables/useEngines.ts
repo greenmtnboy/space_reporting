@@ -173,12 +173,14 @@ export function useEngines(
       .sort((a, b) => a.timestamp - b.timestamp)
   })
 
-  // Visible launches up to current time (for spiral), filtered by propellant and manufacturer
-  const visibleLaunches = computed(() => {
-    return launchesInRange.value.filter(l => {
-      // Basic time filter
-      if (l.timestamp > currentTime.value) return false
+  // All visible launches up to current time (regardless of cross-filters)
+  const allVisibleLaunches = computed(() => {
+    return launchesInRange.value.filter(l => l.timestamp <= currentTime.value)
+  })
 
+  // Filtered visible launches for visualization (spiral, flares, counter)
+  const visibleLaunches = computed(() => {
+    return allVisibleLaunches.value.filter(l => {
       // Propellant filter
       if (filters.value.propellants.size > 0 && !filters.value.propellants.has(l.vehicle_stage_engine_group)) {
         return false
@@ -224,10 +226,11 @@ export function useEngines(
   })
 
   // Stats for bar chart - counts engine firings (engine_count) per group up to current time
+  // Computed from allVisibleLaunches so categories don't disappear when filtering
   const groupStats = computed<Stats[]>(() => {
     const counts: Record<string, number> = {}
 
-    for (const launch of visibleLaunches.value) {
+    for (const launch of allVisibleLaunches.value) {
       const group = launch.vehicle_stage_engine_group
       counts[group] = (counts[group] || 0) + launch.vehicle_stage_engine_count
     }
@@ -250,11 +253,11 @@ export function useEngines(
     return visibleLaunches.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0)
   })
 
-  // Manufacturer stats
+  // Manufacturer stats - computed from allVisibleLaunches
   const manufacturerStats = computed<Stats[]>(() => {
     const counts: Record<string, number> = {}
 
-    for (const launch of visibleLaunches.value) {
+    for (const launch of allVisibleLaunches.value) {
       const meta = engineMetadata.value.get(launch.vehicle_stage_engine_name)
       const mfr = meta?.engine_manufacturer || 'Unknown'
       counts[mfr] = (counts[mfr] || 0) + launch.vehicle_stage_engine_count
