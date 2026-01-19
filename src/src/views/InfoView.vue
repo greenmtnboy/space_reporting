@@ -2,8 +2,6 @@
 import { ref, onMounted } from 'vue'
 import ViewHeader from '../components/ViewHeader.vue'
 
-const currentYear = new Date().getFullYear()
-
 const infoBlocks = [
   {
     title: 'Data Sources',
