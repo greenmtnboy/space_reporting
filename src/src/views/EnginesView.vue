@@ -8,6 +8,9 @@ import ViewHeader from '../components/ViewHeader.vue'
 import ControlPanel from '../components/ControlPanel.vue'
 import CompletionModal from '../components/CompletionModal.vue'
 import BarChart from '../components/BarChart.vue'
+import FilterChips from '../components/FilterChips.vue'
+import { useCrossFilter } from '../composables/useCrossFilter'
+import type { EngineFilters } from '../composables/useEngines'
 
 const {
   selectedRangeId,
@@ -38,6 +41,20 @@ const {
 
 const { isLoading, loadError, engineMetadata } = useEngineDataStatus()
 const {
+  propellants: selectedPropellants,
+  manufacturers: selectedManufacturers,
+  activeFilters,
+  toggleFilter,
+  removeFilter,
+  clearAllFilters
+} = useCrossFilter()
+
+const engineFilters = computed<EngineFilters>(() => ({
+  propellants: selectedPropellants.value,
+  manufacturers: selectedManufacturers.value
+}))
+
+const {
   engineGroups,
   firstStageOnlyVisible,
   boostersVisible,
@@ -45,8 +62,10 @@ const {
   upperStageVisible,
   groupStats,
   maxGroupTotal,
+  manufacturerStats,
+  maxManufacturerTotal,
   totalEngineFireings
-} = useEngines(currentTime, rangeStart, rangeEnd)
+} = useEngines(currentTime, rangeStart, rangeEnd, engineFilters)
 
 onMounted(async () => {
   await loadEngineData()
@@ -167,6 +186,19 @@ function handleCloseModal() {
 function handleSelectRange(rangeId: string) {
   showCompletionModal.value = false
   selectRange(rangeId)
+}
+
+// Cross-filter handlers
+function handlePropellantClick(name: string) {
+  toggleFilter('propellant', name)
+}
+
+function handleManufacturerClick(name: string) {
+  toggleFilter('manufacturer', name)
+}
+
+function handleFilterRemove(type: any, value: string) {
+  removeFilter(type, value)
 }
 
 // Special case engine layouts - tight clustering for kill markers
@@ -636,6 +668,13 @@ function updateTooltipPosition(event: MouseEvent) {
       @select-range="handleSelectRange"
     />
 
+    <!-- Filter Chips -->
+    <FilterChips
+      :filters="activeFilters"
+      @remove="handleFilterRemove"
+      @clear-all="clearAllFilters"
+    />
+
     <main class="main-content">
       <div class="display-section">
         <!-- Stage Sections with Flare + Kill Markers -->
@@ -855,6 +894,21 @@ function updateTooltipPosition(event: MouseEvent) {
           :stats="groupStats"
           :max-total="maxGroupTotal"
           :show-failures="false"
+          :clickable="true"
+          :selected-items="selectedPropellants"
+          :limit="10"
+          @item-click="handlePropellantClick"
+        />
+
+        <BarChart
+          title="Engine Firings by Manufacturer"
+          :stats="manufacturerStats"
+          :max-total="maxManufacturerTotal"
+          :show-failures="false"
+          :clickable="true"
+          :selected-items="selectedManufacturers"
+          :limit="10"
+          @item-click="handleManufacturerClick"
         />
 
         <div class="legend-card">

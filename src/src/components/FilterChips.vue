@@ -21,6 +21,10 @@ function getTypeLabel(type: FilterType): string {
       return 'Owner'
     case 'orbitType':
       return 'Orbit'
+    case 'propellant':
+      return 'Fuel'
+    case 'manufacturer':
+      return 'Mfr'
     default:
       return type
   }
@@ -35,7 +39,10 @@ function getTypeColorClass(type: FilterType): string {
     case 'vehicle':
       return 'chip--secondary'
     case 'orbitType':
+    case 'propellant':
       return 'chip--tertiary'
+    case 'manufacturer':
+      return 'chip--primary'
     default:
       return ''
   }

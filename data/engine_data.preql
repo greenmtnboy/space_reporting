@@ -22,7 +22,7 @@ select
     vehicle.stage.engine.family,
     vehicle.stage.engine.fuel,
     vehicle.stage.engine.group,
-    vehicle.stage.engine.manufacturer,
+    vehicle.stage.engine.manufacturer.e_name as vehicle_stage_engine_manufacturer,
     vehicle.stage.engine.isp,
     vehicle.stage.engine.thrust,
     vehicle.stage.engine.group_hex_color as group_hex_color

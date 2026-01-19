@@ -121,6 +121,11 @@ export async function loadEngineData(): Promise<void> {
   return loadPromise
 }
 
+export interface EngineFilters {
+  propellants: Set<string>
+  manufacturers: Set<string>
+}
+
 export function useEngineDataStatus() {
   return { isLoading, loadError, engineMetadata }
 }
@@ -128,7 +133,8 @@ export function useEngineDataStatus() {
 export function useEngines(
   currentTime: Ref<number>,
   rangeStart: Ref<number>,
-  rangeEnd: Ref<number>
+  rangeEnd: Ref<number>,
+  filters: Ref<EngineFilters>
 ) {
   // Group data by engine group (LOX/Kero, Solid, etc.)
   const engineGroups = computed(() => {
@@ -167,9 +173,28 @@ export function useEngines(
       .sort((a, b) => a.timestamp - b.timestamp)
   })
 
-  // Visible launches up to current time (for spiral)
+  // Visible launches up to current time (for spiral), filtered by propellant and manufacturer
   const visibleLaunches = computed(() => {
-    return launchesInRange.value.filter(l => l.timestamp <= currentTime.value)
+    return launchesInRange.value.filter(l => {
+      // Basic time filter
+      if (l.timestamp > currentTime.value) return false
+
+      // Propellant filter
+      if (filters.value.propellants.size > 0 && !filters.value.propellants.has(l.vehicle_stage_engine_group)) {
+        return false
+      }
+
+      // Manufacturer filter
+      if (filters.value.manufacturers.size > 0) {
+        const meta = engineMetadata.value.get(l.vehicle_stage_engine_name)
+        const manufacturer = meta?.engine_manufacturer || 'Unknown'
+        if (!filters.value.manufacturers.has(manufacturer)) {
+          return false
+        }
+      }
+
+      return true
+    })
   })
 
   // Staged launches for multi-spiral display
@@ -225,6 +250,28 @@ export function useEngines(
     return visibleLaunches.value.reduce((sum, l) => sum + l.vehicle_stage_engine_count, 0)
   })
 
+  // Manufacturer stats
+  const manufacturerStats = computed<Stats[]>(() => {
+    const counts: Record<string, number> = {}
+
+    for (const launch of visibleLaunches.value) {
+      const meta = engineMetadata.value.get(launch.vehicle_stage_engine_name)
+      const mfr = meta?.engine_manufacturer || 'Unknown'
+      counts[mfr] = (counts[mfr] || 0) + launch.vehicle_stage_engine_count
+    }
+
+    return Object.entries(counts).map(([name, total]) => ({
+      name,
+      successes: total,
+      failures: 0,
+      total
+    })).sort((a, b) => b.total - a.total)
+  })
+
+  const maxManufacturerTotal = computed(() => {
+    return Math.max(...manufacturerStats.value.map(s => s.total), 1)
+  })
+
   return {
     engineGroups,
     groupColors,
@@ -237,6 +284,8 @@ export function useEngines(
     firstStageOnlyVisible,
     groupStats,
     maxGroupTotal,
+    manufacturerStats,
+    maxManufacturerTotal,
     totalEngineFireings
   }
 }

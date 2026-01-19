@@ -1,24 +1,25 @@
 #auto-generated datasource from table/view lv_info
 import stage as stage;
+import organization as manufacturer;
+import std.metric;
 import etl;
 
 key name string;
-key variant string;
+key variant string; # extra distinguishing field when two vehicles have same name; example H-1 variants.
 property <name,variant>.family string;
-property <name,variant>.manufacturer string;
 property <name,variant>.alias string;
-property <name,variant>.min_stage int;
+property <name,variant>.min_stage int; #
 property <name,variant>.max_stage int;
-property <name,variant>.length float;
+property <name,variant>.length float::m; # Approximate; will vary with fairings and other configuration.
 property <name,variant>.lflag string;
-property <name,variant>.diameter float;
+property <name,variant>.diameter float::m;
 property <name,variant>.dflag string;
-property <name,variant>.launch_mass float;
+property <name,variant>.launch_mass float::tonne;
 property <name,variant>.mflag string;
-property <name,variant>.leo_capacity float;
-property <name,variant>.gto_capacity float;
+property <name,variant>.leo_capacity float::kg; # in kg, approximate; only provided for some of the orbital vehicles. Values in these fields are especially tentative. 
+property <name,variant>.gto_capacity float::kg;
 property <name,variant>.to_thrust int;
-property <name,variant>.class string;
+property <name,variant>.class string; # Class code of launch vehicle; D=Deep Space, M=Missile, O=Orbital, R=Research, V=Reentry Test, X=Exoatmospheric Test, Y=Exoatmospheric Weather, A=Endoatmospheric Missile, C=Cruise Missile, Q=Endoatmospheric reentry test, T=Endoatmospheric test/research, W=Endoatmospheric weather rocket
 property <name,variant>.apogee int;
 property <name,variant>.range int;
 property class_name <- CASE
@@ -35,17 +36,18 @@ property class_name <- CASE
 	WHEN class = 'T' THEN 'Endoatmospheric test/research'
 	WHEN class = 'W' THEN 'Endoatmospheric weather rocket'
 	ELSE 'Unknown'
-END;
+END; # Class of the launc vehicle, interpreted into a readable label.
+
 property full_name <- CASE
 	WHEN variant != '-' THEN concat(name,' ',variant)
 	ELSE name
-END;
+END; # Full name of the launch vehicle, including variant if applicable.
 
 
 root datasource lv_info_raw (
     LV_Name: name,
     LV_Family: family,
-    LV_Manufacturer: manufacturer,
+    LV_Manufacturer: manufacturer.code,
     LV_Variant: variant,
     LV_Alias: alias,
     LV_Min_Stage: min_stage,
@@ -72,7 +74,7 @@ freshness by data_updated_through;
 datasource lv_info (
     name,
     family,
-    manufacturer,
+    manufacturer:manufacturer.code,
     variant,
     alias,
     min_stage,

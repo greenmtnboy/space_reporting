@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onUnmounted } from 'vue'
 import type { Stats } from '../types'
 
 const props = defineProps<{
@@ -9,6 +9,7 @@ const props = defineProps<{
   showFailures?: boolean
   selectedItems?: Set<string>
   clickable?: boolean
+  limit?: number
 }>()
 
 const emit = defineEmits<{
@@ -90,18 +91,58 @@ function handleTouchEnd() {
   }, 1500)
 }
 
-function handleBarClick(name: string) {
-  if (props.clickable) {
-    emit('itemClick', name)
+const displayStats = computed(() => {
+  if (!props.limit || props.stats.length <= props.limit) {
+    return props.stats
   }
-}
+
+  // Find items that are selected but would be hidden by the limit
+  const selectedIndices = new Set<number>()
+  if (props.selectedItems) {
+    props.stats.forEach((item, index) => {
+      if (props.selectedItems?.has(item.name)) {
+        selectedIndices.add(index)
+      }
+    })
+  }
+
+  const topItems: Stats[] = []
+  const otherItems: Stats[] = []
+
+  props.stats.forEach((item, index) => {
+    if (index < props.limit! || selectedIndices.has(index)) {
+      topItems.push(item)
+    } else {
+      otherItems.push(item)
+    }
+  })
+
+  if (otherItems.length === 0) return topItems
+
+  // Group the remaining items into "Others"
+  const others: Stats = otherItems.reduce((acc, curr) => ({
+    name: 'Others',
+    successes: acc.successes + curr.successes,
+    failures: acc.failures + curr.failures,
+    total: acc.total + curr.total
+  }), { name: 'Others', successes: 0, failures: 0, total: 0 })
+
+  return [...topItems, others]
+})
 
 function isSelected(name: string): boolean {
+  if (name === 'Others') return false
   return props.selectedItems?.has(name) ?? false
 }
 
 function hasAnySelected(): boolean {
   return (props.selectedItems?.size ?? 0) > 0
+}
+
+function handleBarClick(name: string) {
+  if (props.clickable && name !== 'Others') {
+    emit('itemClick', name)
+  }
 }
 
 onUnmounted(() => {
@@ -116,13 +157,14 @@ onUnmounted(() => {
     <h2>{{ title }}</h2>
     <div class="bar-chart">
       <div
-        v-for="item in stats"
+        v-for="item in displayStats"
         :key="item.name"
         class="bar-row"
         :class="{
-          'bar-row--clickable': clickable,
+          'bar-row--clickable': clickable && item.name !== 'Others',
           'bar-row--selected': isSelected(item.name),
-          'bar-row--dimmed': hasAnySelected() && !isSelected(item.name)
+          'bar-row--dimmed': hasAnySelected() && !isSelected(item.name) && item.name !== 'Others',
+          'bar-row--others': item.name === 'Others'
         }"
         @click="handleBarClick(item.name)"
       >
@@ -298,6 +340,21 @@ onUnmounted(() => {
   font-weight: 600;
   text-align: right;
   color: var(--color-text);
+}
+
+.bar-row--others .bar-label {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.bar-row--others .bar-container {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed var(--color-border);
+}
+
+.bar-row--others .bar-success {
+  background: var(--color-text-muted);
+  opacity: 0.3;
 }
 </style>
 

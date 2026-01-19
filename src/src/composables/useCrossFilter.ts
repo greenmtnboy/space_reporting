@@ -1,13 +1,15 @@
 import { ref, computed, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-export type FilterType = 'organization' | 'vehicle' | 'owner' | 'orbitType'
+export type FilterType = 'organization' | 'vehicle' | 'owner' | 'orbitType' | 'propellant' | 'manufacturer'
 
 export interface CrossFilterState {
   organizations: Set<string>
   vehicles: Set<string>
   owners: Set<string>
   orbitTypes: Set<string>
+  propellants: Set<string>
+  manufacturers: Set<string>
 }
 
 // URL query param keys
@@ -15,7 +17,9 @@ const QUERY_KEYS: Record<FilterType, string> = {
   organization: 'org',
   vehicle: 'vehicle',
   owner: 'owner',
-  orbitType: 'orbit'
+  orbitType: 'orbit',
+  propellant: 'fuel',
+  manufacturer: 'mfr'
 }
 
 export function useCrossFilter() {
@@ -27,6 +31,8 @@ export function useCrossFilter() {
   const vehicles = ref<Set<string>>(new Set())
   const owners = ref<Set<string>>(new Set())
   const orbitTypes = ref<Set<string>>(new Set())
+  const propellants = ref<Set<string>>(new Set())
+  const manufacturers = ref<Set<string>>(new Set())
 
   // Initialize from URL query params
   function initFromUrl() {
@@ -34,6 +40,8 @@ export function useCrossFilter() {
     const vehicleParam = route.query[QUERY_KEYS.vehicle]
     const ownerParam = route.query[QUERY_KEYS.owner]
     const orbitParam = route.query[QUERY_KEYS.orbitType]
+    const propellantParam = route.query[QUERY_KEYS.propellant]
+    const manufacturerParam = route.query[QUERY_KEYS.manufacturer]
 
     if (orgParam) {
       const values = Array.isArray(orgParam) ? orgParam : [orgParam]
@@ -50,6 +58,14 @@ export function useCrossFilter() {
     if (orbitParam) {
       const values = Array.isArray(orbitParam) ? orbitParam : [orbitParam]
       orbitTypes.value = new Set(values.filter((v): v is string => typeof v === 'string'))
+    }
+    if (propellantParam) {
+      const values = Array.isArray(propellantParam) ? propellantParam : [propellantParam]
+      propellants.value = new Set(values.filter((v): v is string => typeof v === 'string'))
+    }
+    if (manufacturerParam) {
+      const values = Array.isArray(manufacturerParam) ? manufacturerParam : [manufacturerParam]
+      manufacturers.value = new Set(values.filter((v): v is string => typeof v === 'string'))
     }
   }
 
@@ -76,6 +92,12 @@ export function useCrossFilter() {
     }
     if (orbitTypes.value.size > 0) {
       query[QUERY_KEYS.orbitType] = Array.from(orbitTypes.value)
+    }
+    if (propellants.value.size > 0) {
+      query[QUERY_KEYS.propellant] = Array.from(propellants.value)
+    }
+    if (manufacturers.value.size > 0) {
+      query[QUERY_KEYS.manufacturer] = Array.from(manufacturers.value)
     }
 
     router.replace({ query })
@@ -127,6 +149,8 @@ export function useCrossFilter() {
     vehicles.value = new Set()
     owners.value = new Set()
     orbitTypes.value = new Set()
+    propellants.value = new Set()
+    manufacturers.value = new Set()
     syncToUrl()
   }
 
@@ -141,6 +165,10 @@ export function useCrossFilter() {
         return owners
       case 'orbitType':
         return orbitTypes
+      case 'propellant':
+        return propellants
+      case 'manufacturer':
+        return manufacturers
     }
   }
 
@@ -152,9 +180,11 @@ export function useCrossFilter() {
   // Check if any filters are active
   const hasActiveFilters = computed(() => {
     return organizations.value.size > 0 ||
-           vehicles.value.size > 0 ||
-           owners.value.size > 0 ||
-           orbitTypes.value.size > 0
+      vehicles.value.size > 0 ||
+      owners.value.size > 0 ||
+      orbitTypes.value.size > 0 ||
+      propellants.value.size > 0 ||
+      manufacturers.value.size > 0
   })
 
   // Get all active filters as an array for display
@@ -173,6 +203,12 @@ export function useCrossFilter() {
     for (const orbitType of orbitTypes.value) {
       filters.push({ type: 'orbitType', value: orbitType, label: orbitType })
     }
+    for (const propellant of propellants.value) {
+      filters.push({ type: 'propellant', value: propellant, label: propellant })
+    }
+    for (const manufacturer of manufacturers.value) {
+      filters.push({ type: 'manufacturer', value: manufacturer, label: manufacturer })
+    }
 
     return filters
   })
@@ -186,6 +222,8 @@ export function useCrossFilter() {
     vehicles,
     owners,
     orbitTypes,
+    propellants,
+    manufacturers,
     hasActiveFilters,
     activeFilters,
 
