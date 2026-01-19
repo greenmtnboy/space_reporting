@@ -206,7 +206,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="rockets-view">
+  <div class="rockets-view" data-testid="rockets-view">
     <!-- Loading State -->
     <div v-if="isDataLoading" class="loading-overlay">
       <div class="loading-content">
