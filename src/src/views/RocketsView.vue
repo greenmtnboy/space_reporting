@@ -195,6 +195,9 @@ onMounted(async () => {
   resizeObserver.observe(mapContainer.value)
   setupEventListeners()
   window.addEventListener('keydown', handleKeydown)
+  
+  // Auto-play on load
+  startAnimation()
 })
 
 onUnmounted(() => {
