@@ -192,6 +192,17 @@ function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx
     for (let i = 0; i < engineCount; i++) {
       positions.push(offsets[i])
     }
+  } else if (engineCount === 7) {
+    // 7 engines: 1 center + 6 around
+    positions.push({ dx: 0, dy: 0 })
+    const ringRadius = spacing
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * ringRadius,
+        dy: Math.sin(angle) * ringRadius
+      })
+    }
   } else if (engineCount === 9) {
     // Falcon 9: 1 center + 8 around - tight
     positions.push({ dx: 0, dy: 0 })
@@ -285,6 +296,17 @@ function getHeroClusterPositions(engineCount: number): Array<{ dx: number; dy: n
     ]
     for (let i = 0; i < engineCount; i++) {
       positions.push(offsets[i])
+    }
+  } else if (engineCount === 7) {
+    // 7 engines: 1 center + 6 around
+    positions.push({ dx: 0, dy: 0 })
+    const ringRadius = spacing
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 - Math.PI / 2
+      positions.push({
+        dx: Math.cos(angle) * ringRadius,
+        dy: Math.sin(angle) * ringRadius
+      })
     }
   } else if (engineCount === 9) {
     positions.push({ dx: 0, dy: 0 })
