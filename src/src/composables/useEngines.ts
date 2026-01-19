@@ -7,6 +7,7 @@ const METADATA_URL = `${import.meta.env.BASE_URL}engine_metadata.json`
 export interface EngineLaunch {
   launch_date: string
   launch_tag: string
+  vehicle_name: string
   vehicle_stage_number: number
   vehicle_stage_engine_name: string
   vehicle_stage_engine_fuel: string
@@ -83,6 +84,7 @@ export async function loadEngineData(): Promise<void> {
       engineData.value = data.map((d: any) => ({
         ...d,
         timestamp: new Date(d.launch_date).getTime(),
+        vehicle_name: d.vehicle_name || 'Unknown',
         vehicle_stage_number: d.vehicle_stage_number ?? 1,
         vehicle_stage_engine_fuel: d.vehicle_stage_engine_fuel?.trim() || 'Unknown',
         vehicle_stage_engine_group: d.vehicle_stage_engine_group?.trim() || 'Unknown',
