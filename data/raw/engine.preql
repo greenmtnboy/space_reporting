@@ -2,6 +2,7 @@
 import std.metric;
 import std.color;
 import etl;
+import organization as manufacturer;
 
 key name string; # name of engine
 property name.manufacturer string; # manufacturer of the engine
@@ -61,7 +62,7 @@ auto group_hex_color <- CASE
 
 root datasource engines_raw (
     Name: name,
-    Manufacturer: manufacturer,
+    Manufacturer: manufacturer.code,
     Family: family,
     Alt_name: alt_name,
     Oxidizer: oxidizer,
@@ -89,7 +90,7 @@ freshness by data_updated_through;
 
 datasource engine (
     name,
-    manufacturer,
+    manufacturer:manufacturer.code,
     family,
     alt_name,
     oxidizer,

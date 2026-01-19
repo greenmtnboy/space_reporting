@@ -1,13 +1,8 @@
 import raw.launch;
 
-where vehicle.name = 'SE4400'
+
 select
-    state.code,
-    launch_tag,
-    org.code,
-    org.e_name,
-    state.e_name,
-    site.key,
-    site.name,
-    vehicle.name,
+    vehicle.manufacturer.e_name,
+    launch_tag.count
+order by launch_tag.count desc
 limit 1000;

@@ -8,6 +8,9 @@ import ViewHeader from '../components/ViewHeader.vue'
 import ControlPanel from '../components/ControlPanel.vue'
 import CompletionModal from '../components/CompletionModal.vue'
 import BarChart from '../components/BarChart.vue'
+import FilterChips from '../components/FilterChips.vue'
+import { useCrossFilter } from '../composables/useCrossFilter'
+import type { EngineFilters } from '../composables/useEngines'
 
 const {
   selectedRangeId,
@@ -38,6 +41,20 @@ const {
 
 const { isLoading, loadError, engineMetadata } = useEngineDataStatus()
 const {
+  propellants: selectedPropellants,
+  manufacturers: selectedManufacturers,
+  activeFilters,
+  toggleFilter,
+  removeFilter,
+  clearAllFilters
+} = useCrossFilter()
+
+const engineFilters = computed<EngineFilters>(() => ({
+  propellants: selectedPropellants.value,
+  manufacturers: selectedManufacturers.value
+}))
+
+const {
   engineGroups,
   firstStageOnlyVisible,
   boostersVisible,
@@ -45,8 +62,10 @@ const {
   upperStageVisible,
   groupStats,
   maxGroupTotal,
+  manufacturerStats,
+  maxManufacturerTotal,
   totalEngineFireings
-} = useEngines(currentTime, rangeStart, rangeEnd)
+} = useEngines(currentTime, rangeStart, rangeEnd, engineFilters)
 
 onMounted(async () => {
   await loadEngineData()
@@ -74,6 +93,8 @@ interface ActiveFlare {
   color: string
   name: string
   count: number
+  vehicleName: string
+  stageNumber: number
 }
 
 // Track seen launches per stage (to detect new ones)
@@ -103,7 +124,9 @@ function getActiveFlares(launches: EngineLaunch[], seenSet: Ref<Set<string>>): A
         launchTimestamp: launch.timestamp,
         color: launch.group_hex_color,
         name: launch.vehicle_stage_engine_name,
-        count: launch.vehicle_stage_engine_count || 1
+        count: launch.vehicle_stage_engine_count || 1,
+        vehicleName: launch.vehicle_name,
+        stageNumber: launch.vehicle_stage_number
       })
     }
   }
@@ -165,10 +188,47 @@ function handleSelectRange(rangeId: string) {
   selectRange(rangeId)
 }
 
+// Cross-filter handlers
+function handlePropellantClick(name: string) {
+  toggleFilter('propellant', name)
+}
+
+function handleManufacturerClick(name: string) {
+  toggleFilter('manufacturer', name)
+}
+
+function handleFilterRemove(type: any, value: string) {
+  removeFilter(type, value)
+}
+
 // Special case engine layouts - tight clustering for kill markers
-function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx: number; dy: number }> {
+function getClusterPositions(engineCount: number, dotRadius: number, isStarshipS2: boolean = false): Array<{ dx: number; dy: number; r?: number }> {
   const spacing = dotRadius * 2.0 // tighter spacing
-  const positions: Array<{ dx: number; dy: number }> = []
+  const positions: Array<{ dx: number; dy: number; r?: number }> = []
+
+  if (isStarshipS2 && (engineCount === 6 || engineCount === 9)) {
+    // Starship Stage 2: 3 inner tight triangle + 3 or 6 larger outer engines
+    const innerRadius = spacing * 0.25
+    for (let i = 0; i < 3; i++) {
+        const angle = (i / 3) * Math.PI * 2 - Math.PI / 2
+        positions.push({
+            dx: Math.cos(angle) * innerRadius,
+            dy: Math.sin(angle) * innerRadius,
+            r: dotRadius * 0.4
+        })
+    }
+    const outerCount = engineCount - 3
+    const outerRadius = spacing * 0.8
+    for (let i = 0; i < outerCount; i++) {
+        const angle = (i / outerCount) * Math.PI * 2 - Math.PI / 2
+        positions.push({
+            dx: Math.cos(angle) * outerRadius,
+            dy: Math.sin(angle) * outerRadius,
+            r: dotRadius * 0.9 // larger outer engines
+        })
+    }
+    return positions
+  }
 
   if (engineCount === 1) {
     positions.push({ dx: 0, dy: 0 })
@@ -270,10 +330,34 @@ function getClusterPositions(engineCount: number, dotRadius: number): Array<{ dx
 }
 
 // Generate HERO flare dots - larger spacing for visibility
-function getHeroClusterPositions(engineCount: number): Array<{ dx: number; dy: number }> {
+function getHeroClusterPositions(engineCount: number, isStarshipS2: boolean = false): Array<{ dx: number; dy: number; r?: number }> {
   const dotRadius = 12 // larger for hero display
   const spacing = dotRadius * 2.2
-  const positions: Array<{ dx: number; dy: number }> = []
+  const positions: Array<{ dx: number; dy: number; r?: number }> = []
+
+  if (isStarshipS2 && (engineCount === 6 || engineCount === 9)) {
+    // Starship Stage 2: 3 inner tight triangle + 3 or 6 larger outer engines
+    const innerRadius = spacing * 0.25
+    for (let i = 0; i < 3; i++) {
+        const angle = (i / 3) * Math.PI * 2 - Math.PI / 2
+        positions.push({
+            dx: Math.cos(angle) * innerRadius,
+            dy: Math.sin(angle) * innerRadius,
+            r: dotRadius * 0.4
+        })
+    }
+    const outerCount = engineCount - 3
+    const outerRadius = spacing * .8
+    for (let i = 0; i < outerCount; i++) {
+        const angle = (i / outerCount) * Math.PI * 2 - Math.PI / 2
+        positions.push({
+            dx: Math.cos(angle) * outerRadius,
+            dy: Math.sin(angle) * outerRadius,
+            r: dotRadius * 0.9 // larger outer engines
+        })
+    }
+    return positions
+  }
 
   if (engineCount === 1) {
     positions.push({ dx: 0, dy: 0 })
@@ -380,6 +464,7 @@ interface FlareDot {
   color: string
   opacity: number
   scale: number
+  r?: number
   name: string
 }
 
@@ -425,13 +510,17 @@ function generateFlareDots(flares: ActiveFlare[]): FlareDot[] {
     for (let fIdx = 0; fIdx < concurrentFlares.length; fIdx++) {
       const flare = concurrentFlares[fIdx]
       const yBaseOffset = startYOffset + fIdx * verticalGap
-      const positions = getHeroClusterPositions(flare.count)
+      const isStarshipS2 = flare.stageNumber === 2 && 
+        (flare.vehicleName.toLowerCase().includes('starship') || flare.name.toLowerCase().includes('starship'))
+      
+      const positions = getHeroClusterPositions(flare.count, isStarshipS2)
       
       for (let i = 0; i < positions.length; i++) {
         dots.push({
           key: `${flare.launchKey}-${i}`,
           x: xPos + positions[i].dx * scale,
           y: flareCenter + yBaseOffset + positions[i].dy * scale,
+          r: (positions[i].r || 10) * scale,
           color: flare.color,
           opacity,
           scale,
@@ -476,12 +565,14 @@ interface EngineTypeMarker {
   launchCount: number  // number of launches with this engine
   totalEngines: number // engineCount * launchCount
   color: string
-  positions: Array<{ dx: number; dy: number }>
+  vehicleName: string
+  stageNumber: number
+  positions: Array<{ dx: number; dy: number; r?: number }>
 }
 
 // Group launches by engine type
 function groupByEngineType(launches: EngineLaunch[]): EngineTypeMarker[] {
-  const groups = new Map<string, { launches: EngineLaunch[]; color: string; count: number }>()
+  const groups = new Map<string, { launches: EngineLaunch[]; color: string; count: number; vehicleName: string; stageNumber: number }>()
   
   for (const launch of launches) {
     const key = launch.vehicle_stage_engine_name
@@ -489,7 +580,9 @@ function groupByEngineType(launches: EngineLaunch[]): EngineTypeMarker[] {
       groups.set(key, { 
         launches: [], 
         color: launch.group_hex_color,
-        count: launch.vehicle_stage_engine_count || 1
+        count: launch.vehicle_stage_engine_count || 1,
+        vehicleName: launch.vehicle_name,
+        stageNumber: launch.vehicle_stage_number
       })
     }
     groups.get(key)!.launches.push(launch)
@@ -501,8 +594,10 @@ function groupByEngineType(launches: EngineLaunch[]): EngineTypeMarker[] {
     launchCount: data.launches.length,
     totalEngines: data.count * data.launches.length,
     color: data.color,
-    positions: getClusterPositions(data.count, 4)
-  })).sort((a, b) => b.totalEngines - a.totalEngines)
+    vehicleName: data.vehicleName,
+    stageNumber: data.stageNumber,
+    positions: getClusterPositions(data.count, 4, data.stageNumber === 2 && (data.vehicleName.toLowerCase().includes('starship') || name.toLowerCase().includes('starship')))
+  })).sort((a: any, b: any) => b.totalEngines - a.totalEngines)
 }
 
 const coreEngineTypes = computed(() => groupByEngineType(allCoreVisible.value))
@@ -573,6 +668,13 @@ function updateTooltipPosition(event: MouseEvent) {
       @select-range="handleSelectRange"
     />
 
+    <!-- Filter Chips -->
+    <FilterChips
+      :filters="activeFilters"
+      @remove="handleFilterRemove"
+      @clear-all="clearAllFilters"
+    />
+
     <main class="main-content">
       <div class="display-section">
         <!-- Stage Sections with Flare + Kill Markers -->
@@ -592,7 +694,7 @@ function updateTooltipPosition(event: MouseEvent) {
                   :key="dot.key"
                   :cx="dot.x"
                   :cy="dot.y"
-                  :r="10 * dot.scale"
+                  :r="dot.r"
                   :fill="dot.color"
                   :opacity="dot.opacity"
                   class="flare-dot"
@@ -625,7 +727,7 @@ function updateTooltipPosition(event: MouseEvent) {
                     :key="`core-${engineType.engineName}-${pIdx}`"
                     :cx="pos.dx"
                     :cy="pos.dy"
-                    r="3"
+                    :r="pos.r || 3"
                     :fill="engineType.color"
                   />
                 </svg>
@@ -651,7 +753,7 @@ function updateTooltipPosition(event: MouseEvent) {
                   :key="dot.key"
                   :cx="dot.x"
                   :cy="dot.y"
-                  :r="10 * dot.scale"
+                  :r="dot.r"
                   :fill="dot.color"
                   :opacity="dot.opacity"
                   class="flare-dot"
@@ -683,7 +785,7 @@ function updateTooltipPosition(event: MouseEvent) {
                     :key="`second-${engineType.engineName}-${pIdx}`"
                     :cx="pos.dx"
                     :cy="pos.dy"
-                    r="3"
+                    :r="pos.r || 3"
                     :fill="engineType.color"
                   />
                 </svg>
@@ -709,7 +811,7 @@ function updateTooltipPosition(event: MouseEvent) {
                   :key="dot.key"
                   :cx="dot.x"
                   :cy="dot.y"
-                  :r="10 * dot.scale"
+                  :r="dot.r"
                   :fill="dot.color"
                   :opacity="dot.opacity"
                   class="flare-dot"
@@ -741,7 +843,7 @@ function updateTooltipPosition(event: MouseEvent) {
                     :key="`upper-${engineType.engineName}-${pIdx}`"
                     :cx="pos.dx"
                     :cy="pos.dy"
-                    r="3"
+                    :r="pos.r || 3"
                     :fill="engineType.color"
                   />
                 </svg>
@@ -792,6 +894,21 @@ function updateTooltipPosition(event: MouseEvent) {
           :stats="groupStats"
           :max-total="maxGroupTotal"
           :show-failures="false"
+          :clickable="true"
+          :selected-items="selectedPropellants"
+          :limit="10"
+          @item-click="handlePropellantClick"
+        />
+
+        <BarChart
+          title="Engine Firings by Manufacturer"
+          :stats="manufacturerStats"
+          :max-total="maxManufacturerTotal"
+          :show-failures="false"
+          :clickable="true"
+          :selected-items="selectedManufacturers"
+          :limit="10"
+          @item-click="handleManufacturerClick"
         />
 
         <div class="legend-card">
