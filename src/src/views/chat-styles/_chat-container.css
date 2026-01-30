@@ -1,0 +1,154 @@
+/* ChatView Container Styles - Main chat area and CSS variables */
+
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+
+  /* Trilogy component theming variables */
+  --bg-color: var(--color-bg-primary);
+  --text-color: var(--color-text);
+  --text-faint: var(--color-text-muted);
+  --text-subtle: var(--color-text-muted);
+  --border: var(--color-border);
+  --border-light: var(--color-border);
+  --border-color: var(--color-border);
+  --sidebar-bg: var(--color-bg-secondary);
+  --sidebar-font: var(--color-text);
+  --sidebar-selector-selected-bg: var(--color-accent);
+  --sidebar-selector-font: white;
+  --query-window-bg: var(--color-bg-tertiary);
+  --query-window-font: var(--color-text);
+  --result-window-bg: var(--color-bg-primary);
+  --button-bg: var(--color-bg-tertiary);
+  --button-text: var(--color-text);
+  --button-mouseover: var(--color-bg-secondary);
+  --special-text: var(--color-accent);
+  --font-size: 0.875rem;
+  --small-font-size: 0.75rem;
+  --editor-bg: var(--color-bg-tertiary);
+}
+
+/* Split container layout */
+.chat-container :deep(.chat-split-container) {
+  display: flex !important;
+  flex-direction: row !important;
+  height: 100% !important;
+  width: 100% !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
+.chat-container :deep(.chat-panel) {
+  flex: 1 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+}
+
+.chat-container :deep(.llm-chat-container) {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Panel resizer */
+.chat-container :deep(.panel-resizer) {
+  width: 4px;
+  background-color: var(--color-border);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.chat-container :deep(.panel-resizer:hover),
+.chat-container :deep(.chat-split-container.is-resizing .panel-resizer) {
+  background-color: var(--color-accent);
+}
+
+.chat-container :deep(.chat-split-container.is-resizing) {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* Results container */
+.chat-container :deep(.results-container) {
+  background-color: var(--color-bg-primary);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-container :deep(.tab-content) {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-container :deep(.sql-view) {
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 60px;
+}
+
+/* Loading Spinner */
+.chat-container :deep(.loading-spinner) {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.3);
+}
+
+.chat-container :deep(.loading-indicator),
+.chat-container :deep(.loading-container) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin: 8px 20px;
+}
+
+.chat-container :deep(.loading-text),
+.chat-container :deep(.loading-message) {
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  color: var(--color-accent-bright);
+  letter-spacing: 0.02em;
+}
+
+/* Tool execution indicator */
+.chat-container :deep(.tool-indicator),
+.chat-container :deep(.active-tool) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(14, 165, 233, 0.05));
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-accent-bright);
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}

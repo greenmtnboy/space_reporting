@@ -1,0 +1,243 @@
+/* ChatView Messages Styles - Chat messages, code blocks, markdown */
+
+/* ChatGPT style chat messages */
+.chat-container :deep(.chat-messages) {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 20px 0;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.chat-container :deep(.message) {
+  padding: 20px;
+  border-radius: 0;
+  margin: 0;
+  max-width: none;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  display: flex;
+  gap: 20px;
+}
+
+.chat-container :deep(.message.user) {
+  background-color: var(--color-bg-primary);
+  flex-direction: row-reverse;
+}
+
+.chat-container :deep(.message.user .message-content) {
+  background-color: var(--color-bg-tertiary);
+  padding: 12px 18px;
+  border-radius: 18px;
+  max-width: 80%;
+  color: var(--color-text);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.chat-container :deep(.message.assistant) {
+  background-color: var(--color-bg-secondary);
+}
+
+.chat-container :deep(.message.assistant .message-content) {
+  max-width: 85%;
+  flex: 1;
+}
+
+/* Soften overall text colors */
+.chat-container :deep(.message-content) {
+  color: #d0d4dc;
+}
+
+.chat-container :deep(.message-content p) {
+  color: #d0d4dc;
+}
+
+/* Code blocks in messages */
+.chat-container :deep(.code-block),
+.chat-container :deep(pre) {
+  position: relative;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+
+.chat-container :deep(.code-block code),
+.chat-container :deep(pre code) {
+  display: block;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #c8ccd4;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Copy button styling */
+.chat-container :deep(.markdown-copy-button),
+.chat-container :deep(.copy-button) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.code-block:hover .markdown-copy-button),
+.chat-container :deep(pre:hover .markdown-copy-button),
+.chat-container :deep(.code-block:hover .copy-button),
+.chat-container :deep(pre:hover .copy-button) {
+  opacity: 1;
+}
+
+.chat-container :deep(.markdown-copy-button:hover),
+.chat-container :deep(.copy-button:hover) {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-accent-dim);
+  color: var(--color-accent-bright);
+}
+
+.chat-container :deep(.markdown-copy-button:active),
+.chat-container :deep(.copy-button:active) {
+  transform: scale(0.95);
+}
+
+.chat-container :deep(.markdown-copy-button svg),
+.chat-container :deep(.copy-button svg) {
+  width: 14px;
+  height: 14px;
+}
+
+.chat-container :deep(.markdown-copy-button .copy-icon),
+.chat-container :deep(.copy-button .copy-icon) {
+  stroke: currentColor;
+}
+
+.chat-container :deep(.markdown-copy-button .check-icon),
+.chat-container :deep(.copy-button .check-icon) {
+  stroke: var(--color-success);
+}
+
+/* Tool calls display */
+.chat-container :deep(.tool-calls) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chat-container :deep(.tool-call) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.tool-call.success) {
+  background-color: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: var(--color-text-muted);
+}
+
+.chat-container :deep(.tool-call.error) {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--color-text-muted);
+}
+
+.chat-container :deep(.tool-icon) {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.chat-container :deep(.tool-call.success .tool-icon) {
+  color: #22c55e;
+}
+
+.chat-container :deep(.tool-call.error .tool-icon) {
+  color: #ef4444;
+}
+
+.chat-container :deep(.tool-name) {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.chat-container :deep(.tool-error) {
+  color: #ef4444;
+  font-size: 0.625rem;
+  margin-left: 4px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Messages that only have tool calls (no text content) */
+.chat-container :deep(.message.assistant:has(.tool-calls):not(:has(p)):not(:has(.markdown-renderer))) {
+  background-color: transparent;
+  padding: 8px 20px;
+  border-bottom: none;
+}
+
+/* Loading indicator */
+.chat-container :deep(.loading-indicator) {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  margin: 8px 20px;
+  background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg-tertiary) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  max-width: 85%;
+}
+
+.chat-container :deep(.loading-spinner) {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.chat-container :deep(.loading-message) {
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

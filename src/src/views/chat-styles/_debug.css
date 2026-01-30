@@ -1,0 +1,58 @@
+/* ChatView Debug Styles - Debug panel and buttons */
+
+.debug-btn {
+  padding: 6px 12px;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.debug-btn:hover:not(:disabled) {
+  background-color: var(--color-bg-secondary);
+}
+
+.debug-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Debug Panel */
+.debug-panel {
+  background-color: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px 16px;
+}
+
+.debug-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.debug-result pre {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--color-text);
+}
+
+.debug-close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 1rem;
+}
+
+.debug-close:hover {
+  color: var(--color-text);
+}
