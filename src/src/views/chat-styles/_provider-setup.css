@@ -1,0 +1,113 @@
+/* ChatView Provider Setup Styles - LLM selection form */
+
+.provider-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 40px 20px;
+  background: radial-gradient(circle at center, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
+}
+
+.setup-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.setup-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.setup-header p {
+  margin: 0;
+  color: var(--color-text-muted);
+  max-width: 400px;
+}
+
+.db-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  margin-bottom: 24px;
+}
+
+.setup-form {
+  width: 100%;
+  max-width: 400px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.form-group select,
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  border-radius: 4px;
+}
+
+.loading-text {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.connect-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--color-accent);
+  color: white;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 10px;
+  border-radius: 4px;
+}
+
+.connect-btn:disabled {
+  opacity: 0.5;
+  cursor: help;
+}
+
+.input-with-cta {
+  display: flex;
+  gap: 8px;
+}
+
+.cta-btn {
+  padding: 8px 12px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.cta-btn:hover {
+  background-color: var(--color-accent);
+  color: white;
+}

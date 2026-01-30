@@ -1,0 +1,89 @@
+/* ChatView Base Styles - Layout and core structure */
+
+.chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--color-bg-primary);
+}
+
+.chat-interface {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* DB Status Indicator */
+.db-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-text-muted);
+}
+
+.db-status.loading .status-dot {
+  background-color: #f59e0b;
+  animation: pulse 1s infinite;
+}
+
+.db-status.ready .status-dot {
+  background-color: #10b981;
+}
+
+.db-status.error .status-dot {
+  background-color: #ef4444;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.db-status.mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 28px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.mini.db-status {
+  padding: 4px 10px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.status-text {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Error Message */
+.error-message {
+  margin-top: 16px;
+  padding: 10px;
+  background-color: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #f44336;
+  font-size: 0.75rem;
+  border-radius: 4px;
+}

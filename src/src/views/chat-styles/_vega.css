@@ -1,0 +1,210 @@
+/* ChatView Vega/Chart Styles - Visualization containers and Vega-Lite overrides */
+
+/* Ensure results and charts can fill space */
+.chat-container :deep(.result-window),
+.chat-container :deep(.artifacts-container) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-container :deep(.artifact-content) {
+  flex: 1;
+  overflow: auto !important;
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+}
+
+/* Explicitly target visualizer height */
+.chat-container :deep(.visualizer-content),
+.chat-container :deep(.chart-container),
+.chat-container :deep(.plotly-chart),
+.chat-container :deep(.js-plotly-plot) {
+  flex: 1 1 auto !important;
+  min-height: 450px !important;
+  height: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.chat-container :deep(.sql-view) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 24px;
+}
+
+.chat-container :deep(.vega-lite-chart) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.chat-container :deep(.chart-content-area) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-container :deep(.vega-swap-container) {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.chat-container :deep(.vega-container) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: visible;
+}
+
+.chat-container :deep(.visualization-container) {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  background-color: var(--color-bg-primary);
+  padding: 16px 16px 60px 16px !important;
+  border-radius: 4px;
+}
+
+.chat-container :deep(.vega-embed) {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.chat-container :deep(.vega-embed canvas),
+.chat-container :deep(.vega-embed svg) {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* Vega Dark Mode SVG Overrides */
+.chat-container :deep(.vega-embed svg .mark-text.role-axis-label),
+.chat-container :deep(.vega-embed svg .mark-text.role-axis-title),
+.chat-container :deep(.vega-embed svg .mark-text.role-legend-label),
+.chat-container :deep(.vega-embed svg .mark-text.role-legend-title) {
+  fill: var(--color-text-muted) !important;
+  font-family: inherit !important;
+}
+
+.chat-container :deep(.vega-embed svg .mark-rule.role-axis-grid),
+.chat-container :deep(.vega-embed svg .mark-rule.role-axis-domain),
+.chat-container :deep(.vega-embed svg .mark-rule.role-axis-tick) {
+  stroke: var(--color-border) !important;
+}
+
+.chat-container :deep(.vega-container.vega-active) {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.chat-container :deep(.vega-container.vega-transitioning) {
+  opacity: 1 !important;
+}
+
+/* Vega-Lite dark mode overrides */
+.chat-container :deep(.vega-embed) {
+  background-color: transparent !important;
+}
+
+.chat-container :deep(.vega-embed .chart-wrapper) {
+  background-color: transparent !important;
+}
+
+.chat-container :deep(.vega-embed svg) {
+  background-color: transparent !important;
+}
+
+.chat-container :deep(.vega-embed .vega-actions a) {
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}
+
+.chat-container :deep(.vega-embed .vega-actions a:hover) {
+  color: var(--color-accent-bright);
+  border-color: var(--color-accent-dim);
+}
+
+/* Inline artifact in chat messages */
+.chat-container :deep(.inline-artifact) {
+  width: 100%;
+  min-height: 400px;
+  height: 450px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--color-bg-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  margin: 12px 0;
+}
+
+/* Message layouts for artifacts */
+.chat-container :deep(.message.has-artifact) {
+  align-self: center !important;
+  max-width: 1000px !important;
+  width: 100% !important;
+  background-color: transparent !important;
+  padding: 10px 20px !important;
+}
+
+.chat-container :deep(.message.has-artifact .message-content) {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* Results/Visualize/Generated SQL tab buttons */
+.chat-container :deep(.tabs) {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.tab-button) {
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.tab-button:hover) {
+  color: var(--color-text);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.chat-container :deep(.tab-button.active) {
+  color: var(--color-accent-bright);
+  background-color: rgba(14, 165, 233, 0.1);
+  border-color: var(--color-accent-dim);
+}

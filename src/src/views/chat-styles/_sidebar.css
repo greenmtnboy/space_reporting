@@ -1,0 +1,571 @@
+/* ChatView Sidebar Styles - Sidebar panel, symbols pane, artifacts, chart config */
+
+/* Sidebar panel border/outline */
+.chat-container :deep(.sidebar-panel),
+.chat-container :deep(.symbols-pane) {
+  border-left: 1px solid var(--color-border);
+  background-color: var(--color-bg-primary);
+}
+
+.chat-container :deep(.sidebar-panel) {
+  border-left: 1px solid var(--color-border);
+}
+
+/* Symbols Pane Custom Styling */
+.chat-container :deep(.symbols-pane) {
+  background-color: var(--color-bg-primary) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+.chat-container :deep(.filter-container) {
+  background-color: var(--color-bg-primary) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  padding: 6px 8px !important;
+}
+
+/* Color-coded filter icons to match row items */
+.chat-container :deep(.filter-label) {
+  padding: 4px !important;
+  border-radius: 4px !important;
+  margin-right: 6px !important;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-container :deep(.filter-label:hover) {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Map filter icons to their type colors and backgrounds */
+.chat-container :deep(.filter-label i.mdi-key-outline) {
+  color: var(--color-accent-bright) !important;
+  background-color: rgba(14, 165, 233, 0.15);
+  padding: 4px;
+  border-radius: 3px;
+}
+
+.chat-container :deep(.filter-label i.mdi-tag-outline) {
+  color: var(--color-text-muted) !important;
+  background-color: rgba(139, 149, 165, 0.15) !important;
+  padding: 4px;
+  border-radius: 3px;
+}
+
+.chat-container :deep(.filter-label i.mdi-cube-outline) {
+  color: var(--color-success-bright) !important;
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  padding: 4px;
+  border-radius: 3px;
+}
+
+/* Active states */
+.chat-container :deep(.filter-label input:checked + i) {
+  opacity: 1 !important;
+  filter: saturate(1.2) brightness(1.2);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.05);
+}
+
+.chat-container :deep(.search-container) {
+  padding: 8px 12px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-container :deep(.symbols-search) {
+  background-color: var(--color-bg-tertiary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px !important;
+  height: 28px !important;
+  padding: 0 8px !important;
+  font-size: 0.8125rem !important;
+  color: var(--color-text) !important;
+  font-family: inherit;
+}
+
+.chat-container :deep(.symbols-search:focus) {
+  border-color: var(--color-accent) !important;
+  outline: none;
+}
+
+/* Symbol list container */
+.chat-container :deep(.symbols-list),
+.chat-container :deep(.symbol-list) {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding: 4px 0 !important;
+}
+
+/* Individual symbol items */
+.chat-container :deep(.symbol-item) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.chat-container :deep(.symbol-item:hover) {
+  background-color: var(--color-bg-tertiary);
+}
+
+.chat-container :deep(.symbol-item:last-child) {
+  border-bottom: none;
+}
+
+/* Symbol icon styling */
+.chat-container :deep(.symbol-icon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-size: 0.875rem;
+}
+
+.chat-container :deep(.symbol-icon i),
+.chat-container :deep(.symbol-icon .mdi) {
+  font-size: 1rem;
+}
+
+/* Icon type colors */
+.chat-container :deep(.symbol-icon.property) {
+  background-color: rgba(139, 149, 165, 0.15);
+  color: var(--color-text-muted);
+}
+
+.chat-container :deep(.symbol-icon.key) {
+  background-color: rgba(14, 165, 233, 0.15);
+  color: var(--color-accent-bright);
+}
+
+.chat-container :deep(.symbol-icon.metric) {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--color-success-bright);
+}
+
+/* Symbol details section */
+.chat-container :deep(.symbol-details) {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Symbol label (name) */
+.chat-container :deep(.symbol-label) {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+/* Symbol description */
+.chat-container :deep(.symbol-description) {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  word-break: break-word;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* Multiple descriptions - show as code for derivation formulas */
+.chat-container :deep(.symbol-description + .symbol-description) {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--color-accent);
+  background-color: rgba(14, 165, 233, 0.08);
+  padding: 4px 6px;
+  border-radius: 3px;
+  margin-top: 4px;
+  max-height: 80px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  -webkit-line-clamp: unset;
+}
+
+/* Filter buttons */
+.chat-container :deep(.filter-container) {
+  padding: 6px 12px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.chat-container :deep(.filter-label) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.filter-label input) {
+  display: none;
+}
+
+.chat-container :deep(.filter-label:has(input:checked)) {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-accent-dim);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Sidebar tabs */
+.chat-container :deep(.sidebar-tabs) {
+  display: flex;
+  height: 40px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 8px;
+  gap: 4px;
+}
+
+.chat-container :deep(.sidebar-tab) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 100%;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.sidebar-tab:hover) {
+  color: var(--color-text-secondary);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.chat-container :deep(.sidebar-tab.active) {
+  color: var(--color-accent-bright);
+  border-bottom-color: var(--color-accent);
+  background-color: rgba(14, 165, 233, 0.05);
+}
+
+/* Tooltip Styles */
+.chat-container :deep(.custom-tooltip) {
+  background-color: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  z-index: 1000 !important;
+  position: absolute !important;
+  padding: 2px;
+}
+
+/* Artifact count badge */
+.chat-container :deep(.artifact-count) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: linear-gradient(135deg, var(--color-accent-dim), var(--color-accent));
+  color: white;
+  border-radius: 10px;
+}
+
+/* Sidebar content area */
+.chat-container :deep(.sidebar-content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--color-bg-primary);
+  max-height: 100%;
+}
+
+.chat-container :deep(.artifacts-content) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Artifacts list */
+.chat-container :deep(.artifacts-list) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  overflow-y: auto;
+  max-height: 200px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.artifact-list-item) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.artifact-list-item:hover) {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-bright);
+}
+
+.chat-container :deep(.artifact-list-item.active) {
+  background-color: rgba(14, 165, 233, 0.1);
+  border-color: var(--color-accent-dim);
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.15);
+}
+
+.chat-container :deep(.artifact-list-item i) {
+  font-size: 1.1rem;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.chat-container :deep(.artifact-item-content) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.chat-container :deep(.artifact-label) {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-container :deep(.artifact-meta) {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Expanded artifact area */
+.chat-container :deep(.artifact-expanded) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Chat Overrides for LLM header */
+.chat-container :deep(.llm-chat-header) {
+  height: 36px;
+  padding: 0 12px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-container :deep(.llm-chat-header h2) {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+  font-family: inherit;
+}
+
+/* Chart Config Panel Styling (Scoped to Sidebar and Inline Artifacts) */
+.chat-container :deep(.sidebar-panel .inner-padding),
+.chat-container :deep(.inline-artifact .inner-padding) {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chat-container :deep(.sidebar-panel .control-section),
+.chat-container :deep(.inline-artifact .control-section) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 20px;
+}
+
+.chat-container :deep(.sidebar-panel .control-section:last-child),
+.chat-container :deep(.inline-artifact .control-section:last-child) {
+  border-bottom: none;
+}
+
+.chat-container :deep(.sidebar-panel .control-section-label),
+.chat-container :deep(.inline-artifact .control-section-label) {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.chat-container :deep(.sidebar-panel .chart-type-icons),
+.chat-container :deep(.inline-artifact .chart-type-icons) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 8px;
+}
+
+.chat-container :deep(.sidebar-panel .chart-icon),
+.chat-container :deep(.inline-artifact .chart-icon) {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.chat-container :deep(.sidebar-panel .chart-icon:hover),
+.chat-container :deep(.inline-artifact .chart-icon:hover) {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-border-bright);
+  color: var(--color-text);
+}
+
+.chat-container :deep(.sidebar-panel .chart-icon.selected),
+.chat-container :deep(.inline-artifact .chart-icon.selected) {
+  background-color: rgba(14, 165, 233, 0.1);
+  border-color: var(--color-accent);
+  color: var(--color-accent-bright);
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.2);
+}
+
+.chat-container :deep(.sidebar-panel .chart-icon i),
+.chat-container :deep(.inline-artifact .chart-icon i) {
+  font-size: 1.25rem;
+}
+
+.chat-container :deep(.sidebar-panel .control-group),
+.chat-container :deep(.inline-artifact .control-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-container :deep(.sidebar-panel .control-group:has(input[type="checkbox"])),
+.chat-container :deep(.inline-artifact .control-group:has(input[type="checkbox"])) {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-container :deep(.sidebar-panel .chart-label),
+.chat-container :deep(.inline-artifact .chart-label) {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.chat-container :deep(.sidebar-panel .form-select),
+.chat-container :deep(.inline-artifact .form-select) {
+  width: 100%;
+  padding: 6px 10px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chat-container :deep(.sidebar-panel .form-select:focus),
+.chat-container :deep(.inline-artifact .form-select:focus) {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.chat-container :deep(.sidebar-panel input[type="checkbox"]),
+.chat-container :deep(.inline-artifact input[type="checkbox"]) {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.chat-container :deep(.sidebar-panel .editor-btn),
+.chat-container :deep(.inline-artifact .editor-btn) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-container :deep(.sidebar-panel .editor-btn:hover),
+.chat-container :deep(.inline-artifact .editor-btn:hover) {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-border-bright);
+  transform: translateY(-1px);
+}
+
+.chat-container :deep(.sidebar-panel .editor-btn i),
+.chat-container :deep(.inline-artifact .editor-btn i) {
+  font-size: 1rem;
+  color: var(--color-accent);
+}

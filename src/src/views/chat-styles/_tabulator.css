@@ -1,0 +1,126 @@
+/* ChatView Tabulator Styles - Data table dark mode overrides */
+
+.chat-container :deep(.tabulator) {
+  background-color: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  overflow: hidden;
+}
+
+.chat-container :deep(.tabulator *) {
+  box-sizing: border-box;
+}
+
+.chat-container :deep(.tabulator-table) {
+  background-color: var(--color-bg-primary) !important;
+  color: var(--color-text) !important;
+  width: 100% !important;
+  padding: 0 !important;
+}
+
+.chat-container :deep(.tabulator-headers) {
+  background-color: var(--color-bg-secondary) !important;
+  position: relative !important;
+}
+
+.chat-container :deep(.tabulator-header) {
+  background-color: var(--color-bg-secondary) !important;
+  border-bottom: 2px solid var(--color-border) !important;
+  position: relative !important;
+  z-index: 1;
+}
+
+.chat-container :deep(.tabulator-header .tabulator-col) {
+  background-color: var(--color-bg-secondary) !important;
+  border-right: 1px solid var(--color-border) !important;
+  display: inline-flex !important;
+  align-items: center;
+}
+
+.chat-container :deep(.tabulator-col) {
+  background-color: var(--color-bg-secondary) !important;
+  border-right: 1px solid var(--color-border) !important;
+}
+
+.chat-container :deep(.tabulator-col-title) {
+  color: var(--color-text-muted) !important;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 12px !important;
+}
+
+/* Hide column resize handles */
+.chat-container :deep(.tabulator-header .tabulator-col-resize-handle),
+.chat-container :deep(.tabulator-col-resize-handle) {
+  display: none !important;
+}
+
+.chat-container :deep(.tabulator-col-content) {
+  color: var(--color-text) !important;
+}
+
+.chat-container :deep(.tabulator-row) {
+  display: flex !important;
+  background-color: var(--color-bg-primary) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  min-height: 32px;
+}
+
+.chat-container :deep(.tabulator-row:hover) {
+  background-color: var(--color-bg-tertiary) !important;
+}
+
+.chat-container :deep(.tabulator-row.tabulator-row-even) {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+.chat-container :deep(.tabulator-row.tabulator-row-even:hover) {
+  background-color: var(--color-bg-tertiary) !important;
+}
+
+.chat-container :deep(.tabulator-cell) {
+  display: inline-block !important;
+  color: var(--color-text) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding: 6px 12px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-container :deep(.tabulator-footer) {
+  background-color: var(--color-bg-secondary) !important;
+  border-top: 1px solid var(--color-border) !important;
+  color: var(--color-text-muted) !important;
+}
+
+.chat-container :deep(.tabulator-footer .tabulator-page) {
+  color: var(--color-text-muted) !important;
+}
+
+.chat-container :deep(.tabulator-footer .tabulator-page.active) {
+  color: var(--color-accent-bright) !important;
+}
+
+.chat-container :deep(.tabulator-tableholder) {
+  background-color: var(--color-bg-primary) !important;
+}
+
+/* Tabulator scrollbar */
+.chat-container :deep(.tabulator-tableholder::-webkit-scrollbar) {
+  width: 6px;
+  height: 6px;
+}
+
+.chat-container :deep(.tabulator-tableholder::-webkit-scrollbar-track) {
+  background: var(--color-bg-secondary);
+}
+
+.chat-container :deep(.tabulator-tableholder::-webkit-scrollbar-thumb) {
+  background: var(--color-border-bright);
+  border-radius: 3px;
+}
