@@ -1,0 +1,351 @@
+/* ChatView Sharing Styles - Share modal and shared chat view */
+
+/* Share Modal Overlay */
+.share-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.share-modal {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.share-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.share-modal-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: var(--color-text);
+  background-color: var(--color-bg-tertiary);
+}
+
+.share-modal-body {
+  padding: 20px;
+}
+
+.share-modal-body p {
+  margin: 0 0 16px 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.share-url-container {
+  display: flex;
+  gap: 8px;
+}
+
+.share-url-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background-color: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+  background-color: var(--color-accent-hover, #2563eb);
+}
+
+.copy-btn.success {
+  background-color: #10b981;
+}
+
+.share-error {
+  margin-top: 12px;
+  padding: 10px;
+  background-color: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #f44336;
+  font-size: 0.75rem;
+  border-radius: 4px;
+}
+
+.share-info {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.url-warning {
+  color: #f59e0b;
+}
+
+/* Shared Chat View (Read-only) */
+.shared-chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.shared-header {
+  padding: 24px 32px;
+  background: linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
+  border-bottom: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.shared-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background-color: var(--color-accent);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.shared-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.shared-timestamp {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.shared-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.shared-message {
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.shared-message.user {
+  background-color: var(--color-bg-secondary);
+}
+
+.shared-message.assistant {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-accent);
+  border-left-width: 3px;
+}
+
+.message-role {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.message-role i {
+  font-size: 1rem;
+}
+
+.shared-message.user .message-role {
+  color: var(--color-text);
+}
+
+.shared-message.assistant .message-role {
+  color: var(--color-accent);
+}
+
+.message-content {
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.message-content pre {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-content code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+.message-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.message-content code:not(pre code) {
+  background-color: var(--color-bg-primary);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.shared-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-bg-secondary);
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.action-btn.primary {
+  background-color: var(--color-accent);
+  color: white;
+}
+
+.action-btn.primary:hover {
+  background-color: var(--color-accent-hover, #2563eb);
+}
+
+.action-btn.secondary {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.action-btn.secondary:hover {
+  background-color: var(--color-bg-primary);
+  border-color: var(--color-text-muted);
+}
+
+.shared-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: var(--color-bg-tertiary);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .share-modal {
+    margin: 10px;
+    max-width: none;
+  }
+
+  .share-url-container {
+    flex-direction: column;
+  }
+
+  .shared-header {
+    padding: 16px;
+  }
+
+  .shared-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .shared-messages {
+    padding: 16px;
+  }
+
+  .shared-message {
+    padding: 12px;
+  }
+
+  .shared-actions {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

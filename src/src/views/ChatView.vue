@@ -6,9 +6,13 @@ import {
   LLMChatSplitView,
 } from '@trilogy-data/trilogy-studio-components'
 import ViewHeader from '../components/ViewHeader.vue'
+import { useChatSharing } from '../composables/useChatSharing'
 
 // Initialize Trilogy core (all stores/services)
 const trilogy = useTrilogyCore()
+
+// Chat sharing functionality
+const sharing = useChatSharing()
 
 // Provide stores for child components
 provide('llmConnectionStore', trilogy.llmConnectionStore)
@@ -44,20 +48,37 @@ const hasActiveLLMConnection = computed(() => {
   return llmStore.activeConnection !== ''
 })
 
+// View mode: 'setup' (need LLM), 'chat' (active chat), 'shared' (viewing shared read-only)
+const viewMode = computed(() => {
+  if (sharing.isSharedChat.value && !hasActiveLLMConnection.value) {
+    return 'shared'
+  }
+  if (hasActiveLLMConnection.value) {
+    return 'chat'
+  }
+  return 'setup'
+})
+
 // Initialize DuckDB connection on mount
 onMounted(async () => {
   try {
+    // Check for shared chat data in URL first
+    const hasSharedChat = sharing.checkForSharedChat()
+    if (hasSharedChat) {
+      console.log('Loading shared chat:', sharing.sharedChatData.value?.title)
+    }
+
     // Check if connection already exists (handles navigation/hot reload)
     if (!trilogy.connectionStore.connections[dataConnectionName]) {
       trilogy.connectionStore.newConnection(dataConnectionName, 'duckdb', {})
     }
-    
+
     // Only reset if not already connected
     const conn = trilogy.connectionStore.connections[dataConnectionName]
     if (conn && !conn.connected) {
       await trilogy.connectionStore.resetConnection(dataConnectionName)
     }
-    
+
     console.log('DuckDB connection ready')
     dbStatus.value = 'ready'
 
@@ -68,9 +89,9 @@ onMounted(async () => {
       trilogy.userSettingsStore.saveSettings()
     }
     trilogy.userSettingsStore.toggleTheme()
-    
-    // Create a chat with this data connection if none exists
-    if (!trilogy.chatStore.activeChatId) {
+
+    // Create a chat with this data connection if none exists (unless viewing shared chat)
+    if (!trilogy.chatStore.activeChatId && !hasSharedChat) {
       trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
     }
 
@@ -250,12 +271,180 @@ const connectionInfo = computed(() => {
 const activeDatasets = computed(() => {
   return chat.activeImportsForChat.value.map(imp => imp.alias || imp.name)
 })
+
+// Share current chat
+function shareChat() {
+  const messages = chat.activeChatMessages.value || []
+  const artifacts = chat.activeChatArtifacts.value || []
+  const title = chat.activeChatTitle.value || 'Space Data Chat'
+
+  // Filter to only user/assistant messages (exclude system messages)
+  const shareableMessages = messages
+    .filter((m: { role: string }) => m.role === 'user' || m.role === 'assistant')
+    .map((m: { role: string; content: string }) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content
+    }))
+
+  // Transform artifacts to shareable format
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shareableArtifacts = artifacts.map((a: any) => ({
+    type: a.type || 'unknown',
+    content: JSON.stringify(a),
+    title: a.title
+  }))
+
+  sharing.openShareModal(title, shareableMessages, shareableArtifacts)
+}
+
+// Continue a shared chat by setting up LLM connection
+function continueSharedChat() {
+  if (!sharing.sharedChatData.value) return
+
+  // Create a new chat with the shared messages
+  trilogy.chatStore.newChat(
+    sharing.sharedChatData.value.title,
+    dataConnectionName,
+    'Continued from shared chat'
+  )
+
+  // Load the shared messages into the chat
+  if (trilogy.chatStore.activeChatId) {
+    const chatId = trilogy.chatStore.activeChatId
+    const chatData = trilogy.chatStore.chats[chatId]
+    if (chatData) {
+      chatData.messages = [...sharing.sharedChatData.value.messages]
+    }
+  }
+
+  // Clear shared state - user will now set up LLM
+  sharing.clearSharedChat()
+}
+
+// Start fresh (ignore shared chat)
+function startFreshChat() {
+  sharing.clearSharedChat()
+  if (!trilogy.chatStore.activeChatId) {
+    trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
+  }
+}
+
+// Format message content for display (basic markdown-like rendering)
+function formatMessageContent(content: string): string {
+  if (!content) return ''
+
+  // Escape HTML first
+  let formatted = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  // Code blocks (```...```)
+  formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
+
+  // Inline code (`...`)
+  formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>')
+
+  // Bold (**...**)
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+
+  // Line breaks
+  formatted = formatted.replace(/\n/g, '<br>')
+
+  return formatted
+}
 </script>
 
 <template>
   <div class="chat-view">
-    <!-- Provider Selection - show when no active LLM connection -->
-    <div v-if="!hasActiveLLMConnection" class="provider-setup">
+    <!-- Share Modal -->
+    <div v-if="sharing.showShareModal.value" class="share-modal-overlay" @click.self="sharing.closeShareModal">
+      <div class="share-modal">
+        <div class="share-modal-header">
+          <h2>Share Chat</h2>
+          <button class="close-btn" @click="sharing.closeShareModal">
+            <i class="mdi mdi-close"></i>
+          </button>
+        </div>
+        <div class="share-modal-body">
+          <p>Copy this link to share your conversation. Anyone with the link can view it.</p>
+          <div class="share-url-container">
+            <input
+              type="text"
+              :value="sharing.shareUrl.value"
+              readonly
+              class="share-url-input"
+              @focus="($event.target as HTMLInputElement)?.select()"
+            />
+            <button
+              class="copy-btn"
+              @click="sharing.copyShareUrl"
+              :class="{ success: sharing.copySuccess.value }"
+            >
+              <i :class="sharing.copySuccess.value ? 'mdi mdi-check' : 'mdi mdi-content-copy'"></i>
+              {{ sharing.copySuccess.value ? 'Copied!' : 'Copy' }}
+            </button>
+          </div>
+          <div v-if="sharing.shareError.value" class="share-error">
+            {{ sharing.shareError.value }}
+          </div>
+          <div class="share-info">
+            <span class="url-length">URL length: {{ sharing.shareUrlLength.value.toLocaleString() }} characters</span>
+            <span v-if="sharing.isUrlTooLong.value" class="url-warning">
+              This URL may be too long for some browsers or services.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared Chat View - read-only mode -->
+    <div v-if="viewMode === 'shared'" class="shared-chat-view">
+      <div class="shared-header">
+        <div class="shared-badge">
+          <i class="mdi mdi-share-variant"></i>
+          Shared Chat
+        </div>
+        <h1>{{ sharing.sharedChatData.value?.title || 'Shared Conversation' }}</h1>
+        <p class="shared-timestamp" v-if="sharing.sharedChatData.value?.sharedAt">
+          Shared {{ new Date(sharing.sharedChatData.value.sharedAt).toLocaleDateString() }}
+        </p>
+      </div>
+
+      <div class="shared-messages">
+        <div
+          v-for="(message, index) in sharing.sharedChatData.value?.messages"
+          :key="index"
+          class="shared-message"
+          :class="message.role"
+        >
+          <div class="message-role">
+            <i :class="message.role === 'user' ? 'mdi mdi-account' : 'mdi mdi-robot'"></i>
+            {{ message.role === 'user' ? 'You' : 'Assistant' }}
+          </div>
+          <div class="message-content" v-html="formatMessageContent(message.content)"></div>
+        </div>
+      </div>
+
+      <div class="shared-actions">
+        <button class="action-btn secondary" @click="startFreshChat">
+          <i class="mdi mdi-plus"></i>
+          Start New Chat
+        </button>
+        <button class="action-btn primary" @click="continueSharedChat">
+          <i class="mdi mdi-message-reply"></i>
+          Continue This Conversation
+        </button>
+      </div>
+
+      <div class="shared-note">
+        <i class="mdi mdi-information-outline"></i>
+        To continue this conversation, you'll need to connect an LLM provider.
+      </div>
+    </div>
+
+    <!-- Provider Selection - show when no active LLM connection and not viewing shared -->
+    <div v-else-if="viewMode === 'setup'" class="provider-setup">
       <div class="setup-header">
         <h1>Chat with GCAT Data</h1>
         <div class="db-status-badge" :class="dbStatus">
@@ -335,8 +524,8 @@ const activeDatasets = computed(() => {
       </div>
     </div>
 
-    <!-- Chat Interface -->
-    <div v-else class="chat-interface">
+    <!-- Chat Interface - active chat with LLM -->
+    <div v-else-if="viewMode === 'chat'" class="chat-interface">
       <ViewHeader :title="chat.activeChatTitle.value">
         <div v-if="activeDatasets.length > 0" class="looking-at">
           <span class="looking-at-label">Looking at:</span>
@@ -347,6 +536,16 @@ const activeDatasets = computed(() => {
 
         <template #actions>
           <div class="header-actions">
+            <button
+              class="header-action-btn"
+              @click="shareChat"
+              title="Share Chat"
+              :disabled="!chat.activeChatMessages.value?.length"
+            >
+              <i class="mdi mdi-share-variant"></i>
+              <span class="desktop-only">Share</span>
+            </button>
+
             <button class="header-action-btn primary" @click="resetChat" title="New Chat">
               <i class="mdi mdi-refresh"></i>
               <span class="desktop-only">New Chat</span>
