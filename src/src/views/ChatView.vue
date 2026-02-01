@@ -141,9 +141,11 @@ function resetChat() {
   if (trilogy.chatStore.activeChatId) {
     // Clear existing chat data
     trilogy.chatStore.clearChatMessages(trilogy.chatStore.activeChatId)
+    chat.handleImportChange([])
   } else {
     // Create new chat if none exists
     trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat')
+    chat.handleImportChange([])
   }
 }
 
@@ -323,6 +325,8 @@ function startFreshChat() {
   if (!trilogy.chatStore.activeChatId) {
     trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
   }
+  console.log('clearing selected model')
+  selectedModel.value = ''
 }
 
 // Filter messages to only show user/assistant in read-only view (system messages preserved in data)

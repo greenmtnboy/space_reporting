@@ -126,13 +126,6 @@ export function useChatSharing() {
 
       shareUrl.value = generateShareUrl(data)
 
-      // Check URL length - browsers typically support ~2000 chars,
-      // but data URLs in hash can be longer
-      if (shareUrl.value.length > 100000) {
-        shareError.value = 'Chat is too long to share via URL. Consider sharing a shorter conversation.'
-        return false
-      }
-
       return true
     } catch (e) {
       shareError.value = e instanceof Error ? e.message : 'Failed to create share URL'
@@ -192,6 +185,9 @@ export function useChatSharing() {
   ) {
     if (createShareUrl(title, messages, artifacts)) {
       showShareModal.value = true
+    }
+    else {
+      console.log('Failed to create share URL:', shareError.value)
     }
   }
 
