@@ -325,6 +325,12 @@ function startFreshChat() {
   }
 }
 
+// Filter messages to only show user/assistant in read-only view (system messages preserved in data)
+const displayableSharedMessages = computed(() => {
+  if (!sharing.sharedChatData.value?.messages) return []
+  return sharing.sharedChatData.value.messages.filter(m => m.role !== 'system')
+})
+
 // Format message content for display (basic markdown-like rendering)
 function formatMessageContent(content: string): string {
   if (!content) return ''
@@ -412,14 +418,14 @@ function formatMessageContent(content: string): string {
 
       <div class="shared-messages">
         <div
-          v-for="(message, index) in sharing.sharedChatData.value?.messages"
+          v-for="(message, index) in displayableSharedMessages"
           :key="index"
           class="shared-message"
           :class="message.role"
         >
           <div class="message-role">
-            <i :class="message.role === 'user' ? 'mdi mdi-account' : message.role === 'system' ? 'mdi mdi-cog' : 'mdi mdi-robot'"></i>
-            {{ message.role === 'user' ? 'You' : message.role === 'system' ? 'System' : 'Assistant' }}
+            <i :class="message.role === 'user' ? 'mdi mdi-account' : 'mdi mdi-robot'"></i>
+            {{ message.role === 'user' ? 'You' : 'Assistant' }}
           </div>
           <div class="message-content" v-html="formatMessageContent(message.content)"></div>
         </div>

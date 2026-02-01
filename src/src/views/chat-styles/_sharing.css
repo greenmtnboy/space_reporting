@@ -230,17 +230,6 @@
   color: var(--color-accent);
 }
 
-.shared-message.system {
-  background-color: rgba(139, 92, 246, 0.1);
-  border-color: rgba(139, 92, 246, 0.3);
-  border-left-width: 3px;
-  font-size: 0.875rem;
-}
-
-.shared-message.system .message-role {
-  color: #8b5cf6;
-}
-
 .message-content {
   color: var(--color-text);
   font-size: 0.9375rem;
