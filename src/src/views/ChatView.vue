@@ -278,14 +278,6 @@ function shareChat() {
   const artifacts = chat.activeChatArtifacts.value || []
   const title = chat.activeChatTitle.value || 'Space Data Chat'
 
-  // Filter to only user/assistant messages (exclude system messages)
-  const shareableMessages = messages
-    .filter((m: { role: string }) => m.role === 'user' || m.role === 'assistant')
-    .map((m: { role: string; content: string }) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content
-    }))
-
   // Transform artifacts to shareable format
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shareableArtifacts = artifacts.map((a: any) => ({
@@ -294,7 +286,9 @@ function shareChat() {
     title: a.title
   }))
 
-  sharing.openShareModal(title, shareableMessages, shareableArtifacts)
+  // Pass all messages for full fidelity (including system prompts and tool calls)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sharing.openShareModal(title, messages as any, shareableArtifacts)
 }
 
 // Continue a shared chat by setting up LLM connection
@@ -313,7 +307,9 @@ function continueSharedChat() {
     const chatId = trilogy.chatStore.activeChatId
     const chatData = trilogy.chatStore.chats[chatId]
     if (chatData) {
-      chatData.messages = [...sharing.sharedChatData.value.messages]
+      // Cast to any since SharedChatMessage is more flexible than ChatMessage
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      chatData.messages = [...sharing.sharedChatData.value.messages] as any
     }
   }
 
@@ -390,8 +386,11 @@ function formatMessageContent(content: string): string {
           </div>
           <div class="share-info">
             <span class="url-length">URL length: {{ sharing.shareUrlLength.value.toLocaleString() }} characters</span>
-            <span v-if="sharing.isUrlTooLong.value" class="url-warning">
-              This URL may be too long for some browsers or services.
+            <span v-if="sharing.isUrlTooLong.value" class="url-warning url-error">
+              This URL exceeds browser limits and may not load correctly.
+            </span>
+            <span v-else-if="sharing.isSafariWarning.value" class="url-warning">
+              This URL may not work in Safari (80KB limit). Works in Chrome/Firefox.
             </span>
           </div>
         </div>
@@ -419,8 +418,8 @@ function formatMessageContent(content: string): string {
           :class="message.role"
         >
           <div class="message-role">
-            <i :class="message.role === 'user' ? 'mdi mdi-account' : 'mdi mdi-robot'"></i>
-            {{ message.role === 'user' ? 'You' : 'Assistant' }}
+            <i :class="message.role === 'user' ? 'mdi mdi-account' : message.role === 'system' ? 'mdi mdi-cog' : 'mdi mdi-robot'"></i>
+            {{ message.role === 'user' ? 'You' : message.role === 'system' ? 'System' : 'Assistant' }}
           </div>
           <div class="message-content" v-html="formatMessageContent(message.content)"></div>
         </div>

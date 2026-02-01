@@ -1,11 +1,14 @@
 import { ref, computed } from 'vue'
 
+export interface SharedChatMessage {
+  role: string
+  content: string
+  [key: string]: unknown  // Allow additional properties (tool calls, etc.)
+}
+
 export interface SharedChatData {
   title: string
-  messages: Array<{
-    role: 'user' | 'assistant'
-    content: string
-  }>
+  messages: SharedChatMessage[]
   artifacts?: Array<{
     type: string
     content: string
@@ -97,18 +100,15 @@ export function useChatSharing() {
   // Generate share URL from current chat data
   function createShareUrl(
     title: string,
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+    messages: SharedChatMessage[],
     artifacts?: Array<{ type: string; content: string; title?: string }>
   ) {
     shareError.value = ''
     copySuccess.value = false
 
     try {
-      // Filter to only essential message data
-      const cleanMessages = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }))
+      // Preserve all message data for full fidelity
+      const cleanMessages = messages.map(msg => ({ ...msg }))
 
       // Optionally include artifacts (simplified)
       const cleanArtifacts = artifacts?.map(art => ({
@@ -187,7 +187,7 @@ export function useChatSharing() {
   // Open share modal
   function openShareModal(
     title: string,
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+    messages: SharedChatMessage[],
     artifacts?: Array<{ type: string; content: string; title?: string }>
   ) {
     if (createShareUrl(title, messages, artifacts)) {
@@ -203,7 +203,8 @@ export function useChatSharing() {
   }
 
   const shareUrlLength = computed(() => shareUrl.value.length)
-  const isUrlTooLong = computed(() => shareUrl.value.length > 100000)
+  const isUrlTooLong = computed(() => shareUrl.value.length > 2000000) // 2MB - most browsers
+  const isSafariWarning = computed(() => shareUrl.value.length > 80000) // 80KB - Safari limit
 
   return {
     // State
@@ -215,6 +216,7 @@ export function useChatSharing() {
     copySuccess,
     shareUrlLength,
     isUrlTooLong,
+    isSafariWarning,
 
     // Methods
     checkForSharedChat,

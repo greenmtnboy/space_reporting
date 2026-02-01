@@ -36,12 +36,15 @@ Chat data is encoded in the URL hash fragment:
 
 **Encoded data structure**:
 ```typescript
+interface SharedChatMessage {
+  role: string  // 'user' | 'assistant' | 'system' | tool-specific roles
+  content: string
+  [key: string]: unknown  // Preserves tool calls and other properties
+}
+
 interface SharedChatData {
   title: string
-  messages: Array<{
-    role: 'user' | 'assistant'
-    content: string
-  }>
+  messages: SharedChatMessage[]  // All messages for full fidelity
   artifacts?: Array<{
     type: string
     content: string
@@ -74,10 +77,19 @@ The ChatView now supports three view modes:
 
 ### Limitations
 
-- **URL length**: Very long conversations may exceed browser URL limits (~2MB for most browsers, but some services limit to ~2KB)
+- **URL length limits by browser**:
+  - Chrome/Firefox/Edge: ~2MB (works well)
+  - Safari: ~80KB (shows warning when exceeded)
+  - Some URL shorteners/services: ~2KB-8KB
 - **No real-time updates**: Shared URL is a snapshot; changes to original chat are not reflected
 - **No authentication**: Anyone with the URL can view the chat content
 - **Artifacts simplified**: Complex artifacts may not render in read-only view
+
+### URL Length Warnings
+
+The share modal displays warnings based on URL size:
+- **Over 80KB**: Warning that Safari may not load the URL
+- **Over 2MB**: Error that most browsers won't handle this URL
 
 ### User Flow
 

@@ -131,6 +131,11 @@
   color: #f59e0b;
 }
 
+.url-warning.url-error {
+  color: #ef4444;
+  font-weight: 500;
+}
+
 /* Shared Chat View (Read-only) */
 .shared-chat-view {
   display: flex;
@@ -223,6 +228,17 @@
 
 .shared-message.assistant .message-role {
   color: var(--color-accent);
+}
+
+.shared-message.system {
+  background-color: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+  border-left-width: 3px;
+  font-size: 0.875rem;
+}
+
+.shared-message.system .message-role {
+  color: #8b5cf6;
 }
 
 .message-content {
