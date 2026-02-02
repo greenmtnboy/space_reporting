@@ -3,7 +3,7 @@ import raw.launch;
 where launch_date is not null
 select
     launch_date,
-    launch_tag,
+    id aslaunch_tag,
     case when vehicle.stage_no = 'F' THEN 4
     else   vehicle.stage_no::int
     end as vehicle.stage_number,

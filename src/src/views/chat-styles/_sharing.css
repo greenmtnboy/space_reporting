@@ -136,21 +136,7 @@
   font-weight: 500;
 }
 
-/* Shared Chat View (Read-only) */
-.shared-chat-view {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.shared-header {
-  padding: 24px 32px;
-  background: linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
-  border-bottom: 1px solid var(--color-border);
-  text-align: center;
-}
-
+/* Shared Chat Badge (in header) */
 .shared-badge {
   display: inline-flex;
   align-items: center;
@@ -163,158 +149,70 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-radius: 20px;
-  margin-bottom: 12px;
 }
 
-.shared-header h1 {
-  margin: 0 0 8px 0;
-  font-size: 1.5rem;
-  font-weight: 600;
+.shared-badge .shared-timestamp {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.9;
 }
 
-.shared-timestamp {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
+/* Shared mode - overlay the input area with connect CTA */
+.chat-interface.shared-mode .shared-container {
+  position: relative;
 }
 
-.shared-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 800px;
-  margin: 0 auto;
-  width: 100%;
+.shared-input-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to bottom, transparent 0%, var(--color-bg-primary) 30%);
+  padding: 40px 24px 24px;
+  z-index: 10;
 }
 
-.shared-message {
-  padding: 16px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-}
-
-.shared-message.user {
-  background-color: var(--color-bg-secondary);
-}
-
-.shared-message.assistant {
-  background-color: var(--color-bg-tertiary);
-  border-color: var(--color-accent);
-  border-left-width: 3px;
-}
-
-.message-role {
+.shared-input-cta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-  margin-bottom: 8px;
-}
-
-.message-role i {
-  font-size: 1rem;
-}
-
-.shared-message.user .message-role {
-  color: var(--color-text);
-}
-
-.shared-message.assistant .message-role {
-  color: var(--color-accent);
-}
-
-.message-content {
-  color: var(--color-text);
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.message-content pre {
-  background-color: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 12px;
-  overflow-x: auto;
-  margin: 8px 0;
-}
-
-.message-content code {
-  font-family: var(--font-mono);
-  font-size: 0.875em;
-}
-
-.message-content pre code {
-  background: none;
-  padding: 0;
-}
-
-.message-content code:not(pre code) {
-  background-color: var(--color-bg-primary);
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
-.shared-actions {
-  display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 16px;
   padding: 16px 24px;
-  border-top: 1px solid var(--color-border);
   background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.action-btn {
+.cta-text {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.cta-connect-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px;
+  padding: 10px 20px;
+  background-color: var(--color-accent);
+  color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.875rem;
   font-weight: 500;
-  transition: all 0.2s;
+  white-space: nowrap;
+  transition: background-color 0.2s;
 }
 
-.action-btn.primary {
-  background-color: var(--color-accent);
-  color: white;
-}
-
-.action-btn.primary:hover {
+.cta-connect-btn:hover {
   background-color: var(--color-accent-hover, #2563eb);
 }
 
-.action-btn.secondary {
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-
-.action-btn.secondary:hover {
-  background-color: var(--color-bg-primary);
-  border-color: var(--color-text-muted);
-}
-
-.shared-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  background-color: var(--color-bg-tertiary);
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
+.cta-connect-btn i {
+  font-size: 1.125rem;
 }
 
 /* Mobile responsiveness */
@@ -328,28 +226,13 @@
     flex-direction: column;
   }
 
-  .shared-header {
-    padding: 16px;
-  }
-
-  .shared-header h1 {
-    font-size: 1.25rem;
-  }
-
-  .shared-messages {
-    padding: 16px;
-  }
-
-  .shared-message {
-    padding: 12px;
-  }
-
-  .shared-actions {
+  .shared-input-cta {
     flex-direction: column;
-    padding: 16px;
+    text-align: center;
+    gap: 12px;
   }
 
-  .action-btn {
+  .cta-connect-btn {
     width: 100%;
     justify-content: center;
   }

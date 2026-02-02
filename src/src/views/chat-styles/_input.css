@@ -15,7 +15,7 @@
   width: 100% !important;
   background-color: var(--color-bg-tertiary) !important;
   border-radius: 4px !important;
-  padding: 10px !important;
+  /* Padding is set in the more general textarea rule below for consistency with animated placeholder */
   font-family: inherit !important;
   font-size: 0.875rem !important;
   min-height: 60px !important;
@@ -222,19 +222,27 @@
   position: relative;
 }
 
-/* Animated placeholder styling */
+/* Animated placeholder styling - positioned exactly where textarea cursor starts */
 .chat-container :deep(.animated-placeholder) {
   position: absolute;
+  /* Match textarea padding exactly (4px 0) so text aligns with cursor position */
   top: 4px;
   left: 0;
   color: var(--color-text-muted);
   font-size: 0.9375rem;
+  line-height: 1.5; /* Match textarea line-height */
   pointer-events: none;
   opacity: 0.7;
   transition: opacity 0.3s ease-in-out;
 }
 
 .chat-container :deep(.animated-placeholder.fade-transition) {
+  opacity: 0;
+}
+
+/* Hide placeholder when component marks it hidden (user has typed) */
+/* Note: We intentionally don't hide on focus so users see hints until they start typing */
+.chat-container :deep(.animated-placeholder.hidden) {
   opacity: 0;
 }
 

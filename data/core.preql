@@ -6,7 +6,7 @@ and site.latitude is not null and site.longitude is not null
 and success_flag is not null
 select
     flight_id,
-    launch_tag,
+    id as launch_tag,
     success_flag,
     launch_date,
     site.key,

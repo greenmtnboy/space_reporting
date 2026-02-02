@@ -6,9 +6,16 @@ export interface SharedChatMessage {
   [key: string]: unknown  // Allow additional properties (tool calls, etc.)
 }
 
+export interface SharedChatImport {
+  name: string
+  alias?: string
+  [key: string]: unknown  // Allow additional properties
+}
+
 export interface SharedChatData {
   title: string
   messages: SharedChatMessage[]
+  imports?: SharedChatImport[]
   artifacts?: Array<{
     type: string
     content: string
@@ -21,13 +28,16 @@ const SHARE_PARAM = 'share'
 
 /**
  * Compress and encode chat data for URL sharing
+ * Uses URL-safe base64 (+ -> -, / -> _, no padding =)
  */
 function encodeShareData(data: SharedChatData): string {
   try {
     const json = JSON.stringify(data)
-    // Use base64 encoding for URL safety
+    // Use base64 encoding, then make URL-safe
     const base64 = btoa(unescape(encodeURIComponent(json)))
-    return base64
+    // Convert to URL-safe base64: + -> -, / -> _, remove padding =
+    const urlSafe = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    return urlSafe
   } catch (e) {
     console.error('Failed to encode share data:', e)
     throw new Error('Failed to encode chat data')
@@ -36,10 +46,18 @@ function encodeShareData(data: SharedChatData): string {
 
 /**
  * Decode shared chat data from URL parameter
+ * Handles URL-safe base64 (- -> +, _ -> /, adds padding)
  */
 function decodeShareData(encoded: string): SharedChatData | null {
   try {
-    const json = decodeURIComponent(escape(atob(encoded)))
+    // Convert URL-safe base64 back to standard base64
+    let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/')
+    // Add padding if needed
+    const pad = base64.length % 4
+    if (pad) {
+      base64 += '='.repeat(4 - pad)
+    }
+    const json = decodeURIComponent(escape(atob(base64)))
     const data = JSON.parse(json)
 
     // Validate structure
@@ -101,6 +119,7 @@ export function useChatSharing() {
   function createShareUrl(
     title: string,
     messages: SharedChatMessage[],
+    imports?: SharedChatImport[],
     artifacts?: Array<{ type: string; content: string; title?: string }>
   ) {
     shareError.value = ''
@@ -109,6 +128,9 @@ export function useChatSharing() {
     try {
       // Preserve all message data for full fidelity
       const cleanMessages = messages.map(msg => ({ ...msg }))
+
+      // Include imports for context
+      const cleanImports = imports?.map(imp => ({ ...imp }))
 
       // Optionally include artifacts (simplified)
       const cleanArtifacts = artifacts?.map(art => ({
@@ -120,6 +142,7 @@ export function useChatSharing() {
       const data: SharedChatData = {
         title: title || 'Shared Chat',
         messages: cleanMessages,
+        imports: cleanImports,
         artifacts: cleanArtifacts,
         sharedAt: Date.now()
       }
@@ -181,9 +204,10 @@ export function useChatSharing() {
   function openShareModal(
     title: string,
     messages: SharedChatMessage[],
+    imports?: SharedChatImport[],
     artifacts?: Array<{ type: string; content: string; title?: string }>
   ) {
-    if (createShareUrl(title, messages, artifacts)) {
+    if (createShareUrl(title, messages, imports, artifacts)) {
       showShareModal.value = true
     }
     else {

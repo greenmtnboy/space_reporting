@@ -14,6 +14,17 @@ const trilogy = useTrilogyCore()
 // Chat sharing functionality
 const sharing = useChatSharing()
 
+// Ensure dark theme is set early (before render) for Vega-Lite and other components
+trilogy.userSettingsStore.loadSettings()
+if (!trilogy.userSettingsStore.settings.theme) {
+  trilogy.userSettingsStore.updateSetting('theme', 'dark')
+  trilogy.userSettingsStore.saveSettings()
+}
+trilogy.userSettingsStore.toggleTheme()
+
+// Check for shared chat immediately (before onMounted) so viewMode computes correctly
+sharing.checkForSharedChat()
+
 // Provide stores for child components
 provide('llmConnectionStore', trilogy.llmConnectionStore)
 provide('connectionStore', trilogy.connectionStore)
@@ -62,10 +73,10 @@ const viewMode = computed(() => {
 // Initialize DuckDB connection on mount
 onMounted(async () => {
   try {
-    // Check for shared chat data in URL first
-    const hasSharedChat = sharing.checkForSharedChat()
+    // Shared chat was already checked during setup, just log if present
+    const hasSharedChat = sharing.isSharedChat.value
     if (hasSharedChat) {
-      console.log('Loading shared chat:', sharing.sharedChatData.value?.title)
+      console.log('Loaded shared chat:', sharing.sharedChatData.value?.title)
     }
 
     // Check if connection already exists (handles navigation/hot reload)
@@ -82,13 +93,7 @@ onMounted(async () => {
     console.log('DuckDB connection ready')
     dbStatus.value = 'ready'
 
-    // Ensure dark theme is set for Vega-Lite and other components
-    trilogy.userSettingsStore.loadSettings()
-    if (!trilogy.userSettingsStore.settings.theme) {
-      trilogy.userSettingsStore.updateSetting('theme', 'dark')
-      trilogy.userSettingsStore.saveSettings()
-    }
-    trilogy.userSettingsStore.toggleTheme()
+    // Theme is set during setup (before render) to ensure Vega charts render with correct theme
 
     // Create a chat with this data connection if none exists (unless viewing shared chat)
     if (!trilogy.chatStore.activeChatId && !hasSharedChat) {
@@ -278,6 +283,7 @@ const activeDatasets = computed(() => {
 function shareChat() {
   const messages = chat.activeChatMessages.value || []
   const artifacts = chat.activeChatArtifacts.value || []
+  const imports = chat.activeImportsForChat.value || []
   const title = chat.activeChatTitle.value || 'Space Data Chat'
 
   // Transform artifacts to shareable format
@@ -290,7 +296,7 @@ function shareChat() {
 
   // Pass all messages for full fidelity (including system prompts and tool calls)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sharing.openShareModal(title, messages as any, shareableArtifacts)
+  sharing.openShareModal(title, messages as any, imports as any, shareableArtifacts)
 }
 
 // Continue a shared chat by setting up LLM connection
@@ -315,6 +321,12 @@ function continueSharedChat() {
     }
   }
 
+  // Restore imports from shared chat so the agent has context
+  if (sharing.sharedChatData.value.imports?.length) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    chat.handleImportChange(sharing.sharedChatData.value.imports as any)
+  }
+
   // Clear shared state - user will now set up LLM
   sharing.clearSharedChat()
 }
@@ -329,35 +341,18 @@ function startFreshChat() {
   selectedModel.value = ''
 }
 
-// Filter messages to only show user/assistant in read-only view (system messages preserved in data)
-const displayableSharedMessages = computed(() => {
+// Get shared messages for display (filter out system messages for cleaner view)
+const sharedMessagesForDisplay = computed(() => {
   if (!sharing.sharedChatData.value?.messages) return []
-  return sharing.sharedChatData.value.messages.filter(m => m.role !== 'system')
+  // Cast to any to satisfy LLMChatSplitView's stricter ChatMessage type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return sharing.sharedChatData.value.messages.filter(m => m.role !== 'system') as any
 })
 
-// Format message content for display (basic markdown-like rendering)
-function formatMessageContent(content: string): string {
-  if (!content) return ''
-
-  // Escape HTML first
-  let formatted = content
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-
-  // Code blocks (```...```)
-  formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
-
-  // Inline code (`...`)
-  formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>')
-
-  // Bold (**...**)
-  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-
-  // Line breaks
-  formatted = formatted.replace(/\n/g, '<br>')
-
-  return formatted
+// No-op send handler for shared view - prompts user to connect
+function handleSharedChatSend() {
+  // Do nothing - the input placeholder will guide the user
+  return Promise.resolve()
 }
 </script>
 
@@ -407,48 +402,45 @@ function formatMessageContent(content: string): string {
       </div>
     </div>
 
-    <!-- Shared Chat View - read-only mode -->
-    <div v-if="viewMode === 'shared'" class="shared-chat-view">
-      <div class="shared-header">
+    <!-- Shared Chat View - read-only mode using same components as active chat -->
+    <div v-if="viewMode === 'shared'" class="chat-interface shared-mode">
+      <ViewHeader :title="sharing.sharedChatData.value?.title || 'Shared Conversation'">
         <div class="shared-badge">
           <i class="mdi mdi-share-variant"></i>
           Shared Chat
+          <span v-if="sharing.sharedChatData.value?.sharedAt" class="shared-timestamp">
+            · {{ new Date(sharing.sharedChatData.value.sharedAt).toLocaleDateString() }}
+          </span>
         </div>
-        <h1>{{ sharing.sharedChatData.value?.title || 'Shared Conversation' }}</h1>
-        <p class="shared-timestamp" v-if="sharing.sharedChatData.value?.sharedAt">
-          Shared {{ new Date(sharing.sharedChatData.value.sharedAt).toLocaleDateString() }}
-        </p>
-      </div>
 
-      <div class="shared-messages">
-        <div
-          v-for="(message, index) in displayableSharedMessages"
-          :key="index"
-          class="shared-message"
-          :class="message.role"
-        >
-          <div class="message-role">
-            <i :class="message.role === 'user' ? 'mdi mdi-account' : 'mdi mdi-robot'"></i>
-            {{ message.role === 'user' ? 'You' : 'Assistant' }}
+        <template #actions>
+          <div class="header-actions">
+            <button class="header-action-btn" @click="startFreshChat" title="Start New Chat">
+              <i class="mdi mdi-plus"></i>
+              <span class="desktop-only">New Chat</span>
+            </button>
           </div>
-          <div class="message-content" v-html="formatMessageContent(message.content)"></div>
+        </template>
+      </ViewHeader>
+
+      <div class="chat-container shared-container">
+        <LLMChatSplitView
+          :editableTitle="false"
+          :showHeader="false"
+          :placeholder="['']"
+          :initialMessages="sharedMessagesForDisplay"
+          :onSendMessage="handleSharedChatSend"
+        />
+        <!-- Overlay to replace input with connect CTA -->
+        <div class="shared-input-overlay">
+          <div class="shared-input-cta">
+            <span class="cta-text">Connect an LLM provider to continue this conversation</span>
+            <button class="cta-connect-btn" @click="continueSharedChat">
+              <i class="mdi mdi-connection"></i>
+              Connect & Continue
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div class="shared-actions">
-        <button class="action-btn secondary" @click="startFreshChat">
-          <i class="mdi mdi-plus"></i>
-          Start New Chat
-        </button>
-        <button class="action-btn primary" @click="continueSharedChat">
-          <i class="mdi mdi-message-reply"></i>
-          Continue This Conversation
-        </button>
-      </div>
-
-      <div class="shared-note">
-        <i class="mdi mdi-information-outline"></i>
-        To continue this conversation, you'll need to connect an LLM provider.
       </div>
     </div>
 
