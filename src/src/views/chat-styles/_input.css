@@ -14,7 +14,6 @@
 .chat-container :deep(.input-container textarea) {
   width: 100% !important;
   background-color: var(--color-bg-tertiary) !important;
-  border: 1px solid var(--color-border) !important;
   border-radius: 4px !important;
   padding: 10px !important;
   font-family: inherit !important;

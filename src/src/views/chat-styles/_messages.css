@@ -58,11 +58,19 @@
 }
 
 /* Code blocks in messages */
-.chat-container :deep(.code-block),
-.chat-container :deep(pre) {
+.chat-container :deep(.code-block) {
   position: relative;
   background-color: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
+  border-radius: 6px;
+  margin: 12px 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.chat-container :deep(pre) {
+  position: relative;
+  background-color: var(--color-bg-tertiary);
   border-radius: 6px;
   margin: 12px 0;
   overflow: hidden;
