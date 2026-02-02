@@ -3,22 +3,25 @@ import std.net;
 import std.color;
 import etl;
 
-key code string;
-property code.u_code string;
+key code string; # unique identifier or an organization (a company, state, or other body)
+property code.u_code string; # a unified code tying together an entity that has gone through name/ownership changes. For example, the Czech republic has 3 org codes CSSR (1940-1990), CSFR (1990-1993) and CZ (1993-present), sharing the ucode CZ
 property code.state_code string; #OrgCode for organzation's host state.
-property code.type string;
+property code.type string; # 	Organization roles: a slash-separated set of types. The current database is somewhat patchy in data quality for this field, and should primary be relied on for the special values CY, IGO and AP which indicate entries with a status equivalent to a nation-state. 
 property code.class string; # Organization class: A, B, C, or D (Nonprofit, commercial, civil or defence)
-property code.t_start string;
-property code.t_stop string;
+property code._t_start string;  
+property code.t_start <-  @extract_date(_t_start); # Date the organization code began operations (approximate if needed).
+property code._t_stop string;
+property code.t_stop <- @extract_date(_t_stop); # Date the organization code ended (or was updated to new code due to state change)
 property code.short_name string;
 property code.name string;
-property code.location string; # Approximate location (e.g. city)
-property code.longitude float;
-property code.latitude float;
-property code.error float;
-property code.parent string;
-property code.short_e_name string;
-property code._e_name string; #english name
+property code.location string; # Approximate location (e.g. city).  In many cases this is given in the form UrbanArea-Suburb, e.g "Los Angeles-El Segundo"
+property code.longitude float; # HQ/geographic center longitude
+property code.latitude float; # HQ/geographic center latitude
+property code.error float; # error of lat long - not fully populated
+property code.parents string; # when nonempty, provides parent(s) of the organization of which the current entry is a subset separated by /. Thus, NASA is the parent of Goddard Space Flight Center. 
+property code.parent <- split(parents, '/')[0]; # primary parent organization
+property code._short_e_name string; 
+property code._e_name string; 
 property code.u_name string;
 property flag <- CAST(CASE WHEN state_code in ('SU', 'RU') THEN 'https://upload.wikimedia.org/wikipedia/commons/5/53/Flag_of_the_Soviet_Union_%283-2%29.svg'
 WHEN state_code = 'US' THEN 'https://upload.wikimedia.org/wikipedia/commons/5/55/Flag_of_the_United_States_%283-2_aspect_ratio%29.svg'
@@ -89,7 +92,7 @@ property code.color <-
 
 
 auto e_name <- coalesce(CASE WHEN _e_name = '-' then NULL else _e_name end, u_name); # the default English name of an "organization" - a company, state, or other body. Examples "European Space Agency", "US Air Force Space and Missile Center", "Beijing Interstellar Glory Space Tech. Co. Ltd." Best search with wildcards; abbreviations typically expanded.
-
+auto short_e_name <- coalesce(CASE WHEN _short_e_name = '-' then NULL else _short_e_name end, short_name); # the short English name of an "organization" - a company, state, or other body. Examples "ESA", "USAF SMC", "CASC". Best search with wildcards; abbreviations typically expanded.
 
 root datasource organizations_raw (
     Code: code,
@@ -105,7 +108,7 @@ root datasource organizations_raw (
     Longitude: ?longitude,
     Latitude: ?latitude,
     Error: error,
-    Parent: parent,
+    Parent: parents,
     ShortEName: short_e_name,
     EName: ?_e_name,
     UName: u_name,

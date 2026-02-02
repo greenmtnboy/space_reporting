@@ -118,7 +118,7 @@ property jcat.is_decommed <- status in ['R','D','C', 'E', 'F', 'OX'];
 root datasource satcat_raw (
     JCAT: jcat,
     Satcat: satcat,
-    Launch_Tag: launch.launch_tag,
+    Launch_Tag: launch.id,
     Piece: piece,
     Type: type,
     Name: name,
@@ -168,7 +168,7 @@ freshness by data_updated_through;
 datasource satcat (
     JCAT: jcat,
     Satcat: satcat,
-    Launch_Tag: launch.launch_tag,
+    Launch_Tag: launch.id,
     Piece: piece,
     Type: type,
     Name: name,

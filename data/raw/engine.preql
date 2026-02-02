@@ -58,7 +58,7 @@ auto group_hex_color <- CASE
         # Electric / rare / unspecified
         WHEN COALESCE(group, 'Unspecified') = 'EP'           THEN '#BDBDBD'
         ELSE '#BDBDBD'
-    END;
+    END; # themat hex color associated with engine group
 
 root datasource engines_raw (
     Name: name,

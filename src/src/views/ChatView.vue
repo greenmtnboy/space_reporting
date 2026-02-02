@@ -6,9 +6,24 @@ import {
   LLMChatSplitView,
 } from '@trilogy-data/trilogy-studio-components'
 import ViewHeader from '../components/ViewHeader.vue'
+import { useChatSharing } from '../composables/useChatSharing'
 
 // Initialize Trilogy core (all stores/services)
 const trilogy = useTrilogyCore()
+
+// Chat sharing functionality
+const sharing = useChatSharing()
+
+// Ensure dark theme is set early (before render) for Vega-Lite and other components
+trilogy.userSettingsStore.loadSettings()
+if (!trilogy.userSettingsStore.settings.theme) {
+  trilogy.userSettingsStore.updateSetting('theme', 'dark')
+  trilogy.userSettingsStore.saveSettings()
+}
+trilogy.userSettingsStore.toggleTheme()
+
+// Check for shared chat immediately (before onMounted) so viewMode computes correctly
+sharing.checkForSharedChat()
 
 // Provide stores for child components
 provide('llmConnectionStore', trilogy.llmConnectionStore)
@@ -44,33 +59,44 @@ const hasActiveLLMConnection = computed(() => {
   return llmStore.activeConnection !== ''
 })
 
+// View mode: 'setup' (need LLM), 'chat' (active chat), 'shared' (viewing shared read-only)
+const viewMode = computed(() => {
+  if (sharing.isSharedChat.value && !hasActiveLLMConnection.value) {
+    return 'shared'
+  }
+  if (hasActiveLLMConnection.value) {
+    return 'chat'
+  }
+  return 'setup'
+})
+
 // Initialize DuckDB connection on mount
 onMounted(async () => {
   try {
+    // Shared chat was already checked during setup, just log if present
+    const hasSharedChat = sharing.isSharedChat.value
+    if (hasSharedChat) {
+      console.log('Loaded shared chat:', sharing.sharedChatData.value?.title)
+    }
+
     // Check if connection already exists (handles navigation/hot reload)
     if (!trilogy.connectionStore.connections[dataConnectionName]) {
       trilogy.connectionStore.newConnection(dataConnectionName, 'duckdb', {})
     }
-    
+
     // Only reset if not already connected
     const conn = trilogy.connectionStore.connections[dataConnectionName]
     if (conn && !conn.connected) {
       await trilogy.connectionStore.resetConnection(dataConnectionName)
     }
-    
+
     console.log('DuckDB connection ready')
     dbStatus.value = 'ready'
 
-    // Ensure dark theme is set for Vega-Lite and other components
-    trilogy.userSettingsStore.loadSettings()
-    if (!trilogy.userSettingsStore.settings.theme) {
-      trilogy.userSettingsStore.updateSetting('theme', 'dark')
-      trilogy.userSettingsStore.saveSettings()
-    }
-    trilogy.userSettingsStore.toggleTheme()
-    
-    // Create a chat with this data connection if none exists
-    if (!trilogy.chatStore.activeChatId) {
+    // Theme is set during setup (before render) to ensure Vega charts render with correct theme
+
+    // Create a chat with this data connection if none exists (unless viewing shared chat)
+    if (!trilogy.chatStore.activeChatId && !hasSharedChat) {
       trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
     }
 
@@ -120,9 +146,11 @@ function resetChat() {
   if (trilogy.chatStore.activeChatId) {
     // Clear existing chat data
     trilogy.chatStore.clearChatMessages(trilogy.chatStore.activeChatId)
+    chat.handleImportChange([])
   } else {
     // Create new chat if none exists
     trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat')
+    chat.handleImportChange([])
   }
 }
 
@@ -250,12 +278,174 @@ const connectionInfo = computed(() => {
 const activeDatasets = computed(() => {
   return chat.activeImportsForChat.value.map(imp => imp.alias || imp.name)
 })
+
+// Share current chat
+function shareChat() {
+  const messages = chat.activeChatMessages.value || []
+  const artifacts = chat.activeChatArtifacts.value || []
+  const imports = chat.activeImportsForChat.value || []
+  const title = chat.activeChatTitle.value || 'Space Data Chat'
+
+  // Transform artifacts to shareable format
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shareableArtifacts = artifacts.map((a: any) => ({
+    type: a.type || 'unknown',
+    content: JSON.stringify(a),
+    title: a.title
+  }))
+
+  // Pass all messages for full fidelity (including system prompts and tool calls)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sharing.openShareModal(title, messages as any, imports as any, shareableArtifacts)
+}
+
+// Continue a shared chat by setting up LLM connection
+function continueSharedChat() {
+  if (!sharing.sharedChatData.value) return
+
+  // Create a new chat with the shared messages
+  trilogy.chatStore.newChat(
+    sharing.sharedChatData.value.title,
+    dataConnectionName,
+    'Continued from shared chat'
+  )
+
+  // Load the shared messages into the chat
+  if (trilogy.chatStore.activeChatId) {
+    const chatId = trilogy.chatStore.activeChatId
+    const chatData = trilogy.chatStore.chats[chatId]
+    if (chatData) {
+      // Cast to any since SharedChatMessage is more flexible than ChatMessage
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      chatData.messages = [...sharing.sharedChatData.value.messages] as any
+    }
+  }
+
+  // Restore imports from shared chat so the agent has context
+  if (sharing.sharedChatData.value.imports?.length) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    chat.handleImportChange(sharing.sharedChatData.value.imports as any)
+  }
+
+  // Clear shared state - user will now set up LLM
+  sharing.clearSharedChat()
+}
+
+// Start fresh (ignore shared chat)
+function startFreshChat() {
+  sharing.clearSharedChat()
+  if (!trilogy.chatStore.activeChatId) {
+    trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
+  }
+  console.log('clearing selected model')
+  selectedModel.value = ''
+}
+
+// Get shared messages for display (filter out system messages for cleaner view)
+const sharedMessagesForDisplay = computed(() => {
+  if (!sharing.sharedChatData.value?.messages) return []
+  // Cast to any to satisfy LLMChatSplitView's stricter ChatMessage type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return sharing.sharedChatData.value.messages.filter(m => m.role !== 'system') as any
+})
+
+// No-op send handler for shared view - prompts user to connect
+function handleSharedChatSend() {
+  // Do nothing - the input placeholder will guide the user
+  return Promise.resolve()
+}
 </script>
 
 <template>
   <div class="chat-view">
-    <!-- Provider Selection - show when no active LLM connection -->
-    <div v-if="!hasActiveLLMConnection" class="provider-setup">
+    <!-- Share Modal -->
+    <div v-if="sharing.showShareModal.value" class="share-modal-overlay" @click.self="sharing.closeShareModal">
+      <div class="share-modal">
+        <div class="share-modal-header">
+          <h2>Share Chat</h2>
+          <button class="close-btn" @click="sharing.closeShareModal">
+            <i class="mdi mdi-close"></i>
+          </button>
+        </div>
+        <div class="share-modal-body">
+          <p>Copy this link to share your conversation. Anyone with the link can view it.</p>
+          <div class="share-url-container">
+            <input
+              type="text"
+              :value="sharing.shareUrl.value"
+              readonly
+              class="share-url-input"
+              @focus="($event.target as HTMLInputElement)?.select()"
+            />
+            <button
+              class="copy-btn"
+              @click="sharing.copyShareUrl"
+              :class="{ success: sharing.copySuccess.value }"
+            >
+              <i :class="sharing.copySuccess.value ? 'mdi mdi-check' : 'mdi mdi-content-copy'"></i>
+              {{ sharing.copySuccess.value ? 'Copied!' : 'Copy' }}
+            </button>
+          </div>
+          <div v-if="sharing.shareError.value" class="share-error">
+            {{ sharing.shareError.value }}
+          </div>
+          <div class="share-info">
+            <span class="url-length">URL length: {{ sharing.shareUrlLength.value.toLocaleString() }} characters</span>
+            <span v-if="sharing.isUrlTooLong.value" class="url-warning url-error">
+              This URL exceeds browser limits and may not load correctly.
+            </span>
+            <span v-else-if="sharing.isSafariWarning.value" class="url-warning">
+              This URL may not work in Safari (80KB limit). Works in Chrome/Firefox.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared Chat View - read-only mode using same components as active chat -->
+    <div v-if="viewMode === 'shared'" class="chat-interface shared-mode">
+      <ViewHeader :title="sharing.sharedChatData.value?.title || 'Shared Conversation'">
+        <div class="shared-badge">
+          <i class="mdi mdi-share-variant"></i>
+          Shared Chat
+          <span v-if="sharing.sharedChatData.value?.sharedAt" class="shared-timestamp">
+            · {{ new Date(sharing.sharedChatData.value.sharedAt).toLocaleDateString() }}
+          </span>
+        </div>
+
+        <template #actions>
+          <div class="header-actions">
+            <button class="header-action-btn" @click="startFreshChat" title="Start New Chat">
+              <i class="mdi mdi-plus"></i>
+              <span class="desktop-only">New Chat</span>
+            </button>
+          </div>
+        </template>
+      </ViewHeader>
+
+      <div class="chat-container shared-container">
+        <LLMChatSplitView
+          :editableTitle="false"
+          :showHeader="false"
+          :placeholder="['']"
+          :initialMessages="sharedMessagesForDisplay"
+          :onSendMessage="handleSharedChatSend"
+        />
+        <!-- Overlay to replace input with connect CTA -->
+        <div class="shared-input-overlay">
+          <div class="shared-input-cta">
+            <span class="cta-text">Connect an LLM provider to continue this conversation</span>
+            <button class="cta-connect-btn" @click="continueSharedChat">
+              <i class="mdi mdi-connection"></i>
+              Connect & Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Provider Selection - show when no active LLM connection and not viewing shared -->
+    <div v-else-if="viewMode === 'setup'" class="provider-setup">
       <div class="setup-header">
         <h1>Chat with GCAT Data</h1>
         <div class="db-status-badge" :class="dbStatus">
@@ -335,8 +525,8 @@ const activeDatasets = computed(() => {
       </div>
     </div>
 
-    <!-- Chat Interface -->
-    <div v-else class="chat-interface">
+    <!-- Chat Interface - active chat with LLM -->
+    <div v-else-if="viewMode === 'chat'" class="chat-interface">
       <ViewHeader :title="chat.activeChatTitle.value">
         <div v-if="activeDatasets.length > 0" class="looking-at">
           <span class="looking-at-label">Looking at:</span>
@@ -347,6 +537,16 @@ const activeDatasets = computed(() => {
 
         <template #actions>
           <div class="header-actions">
+            <button
+              class="header-action-btn"
+              @click="shareChat"
+              title="Share Chat"
+              :disabled="!chat.activeChatMessages.value?.length"
+            >
+              <i class="mdi mdi-share-variant"></i>
+              <span class="desktop-only">Share</span>
+            </button>
+
             <button class="header-action-btn primary" @click="resetChat" title="New Chat">
               <i class="mdi mdi-refresh"></i>
               <span class="desktop-only">New Chat</span>

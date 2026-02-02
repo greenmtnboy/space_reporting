@@ -4,7 +4,7 @@ copy into json `gcs://trilogy_public_models/duckdb/launch_report/engines_over_ti
 where launch_date is not null
 select
     launch_date,
-    launch_tag,
+    id as launch_tag,
     case when vehicle.stage_no = 'F' THEN 4
     else   vehicle.stage_no::int
     end as vehicle.stage_number,

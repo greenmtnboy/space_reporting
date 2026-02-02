@@ -1,0 +1,239 @@
+/* ChatView Sharing Styles - Share modal and shared chat view */
+
+/* Share Modal Overlay */
+.share-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.share-modal {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.share-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.share-modal-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: var(--color-text);
+  background-color: var(--color-bg-tertiary);
+}
+
+.share-modal-body {
+  padding: 20px;
+}
+
+.share-modal-body p {
+  margin: 0 0 16px 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.share-url-container {
+  display: flex;
+  gap: 8px;
+}
+
+.share-url-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background-color: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+  background-color: var(--color-accent-hover, #2563eb);
+}
+
+.copy-btn.success {
+  background-color: #10b981;
+}
+
+.share-error {
+  margin-top: 12px;
+  padding: 10px;
+  background-color: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #f44336;
+  font-size: 0.75rem;
+  border-radius: 4px;
+}
+
+.share-info {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.url-warning {
+  color: #f59e0b;
+}
+
+.url-warning.url-error {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+/* Shared Chat Badge (in header) */
+.shared-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background-color: var(--color-accent);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 20px;
+}
+
+.shared-badge .shared-timestamp {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.9;
+}
+
+/* Shared mode - overlay the input area with connect CTA */
+.chat-interface.shared-mode .shared-container {
+  position: relative;
+}
+
+.shared-input-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to bottom, transparent 0%, var(--color-bg-primary) 30%);
+  padding: 40px 24px 24px;
+  z-index: 10;
+}
+
+.shared-input-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 24px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.cta-text {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.cta-connect-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.cta-connect-btn:hover {
+  background-color: var(--color-accent-hover, #2563eb);
+}
+
+.cta-connect-btn i {
+  font-size: 1.125rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .share-modal {
+    margin: 10px;
+    max-width: none;
+  }
+
+  .share-url-container {
+    flex-direction: column;
+  }
+
+  .shared-input-cta {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .cta-connect-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -1,8 +1,8 @@
-import raw.satellite;
+import raw.launch;
+# import raw.organization;
 
-
-where status in ['R','D','C', 'E', 'F', 'OX']
 select
-    orbit_date,
-    status_end_date
-limit 1000;
+    fail_code,
+    fail_code_name,
+    count(id) as launch_count
+limit 100;
