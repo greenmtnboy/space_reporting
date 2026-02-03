@@ -251,8 +251,7 @@ function getDefaultModels(provider: string) {
   switch (provider) {
     case 'anthropic':
       return [
-        { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
-        { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
+        { id: 'claude-opus-4-5-20251101', name: 'Claude Pous 4.5' },
       ]
     case 'openai':
       return [
