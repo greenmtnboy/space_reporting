@@ -27,35 +27,6 @@ export interface SharedChatData {
 
 const TOKEN_STORAGE_KEY = 'github-gist-token'
 
-// Legacy URL-based sharing support (for loading old shared links)
-const LEGACY_SHARE_PARAM = 'share'
-
-function decodeLegacyShareData(encoded: string): SharedChatData | null {
-  try {
-    let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/')
-    const pad = base64.length % 4
-    if (pad) {
-      base64 += '='.repeat(4 - pad)
-    }
-    const json = decodeURIComponent(escape(atob(base64)))
-    const data = JSON.parse(json)
-    if (!data.messages || !Array.isArray(data.messages)) {
-      throw new Error('Invalid chat data: missing messages')
-    }
-    return data as SharedChatData
-  } catch (e) {
-    console.error('Failed to decode legacy share data:', e)
-    return null
-  }
-}
-
-function getLegacyShareDataFromUrl(): string | null {
-  const hash = window.location.hash
-  if (!hash) return null
-  const params = new URLSearchParams(hash.slice(1))
-  return params.get(LEGACY_SHARE_PARAM)
-}
-
 export function useChatSharing() {
   // Token management
   const githubToken = ref(localStorage.getItem(TOKEN_STORAGE_KEY) || '')
@@ -86,21 +57,9 @@ export function useChatSharing() {
     const hash = window.location.hash
     if (!hash) return false
 
-    // Try new gist-based sharing first
     const gistId = backend.parseUrl(hash)
     if (gistId) {
       const data = await backend.loadShare(gistId)
-      if (data) {
-        isSharedChat.value = true
-        sharedChatData.value = data
-        return true
-      }
-    }
-
-    // Fall back to legacy URL-based sharing
-    const legacyEncoded = getLegacyShareDataFromUrl()
-    if (legacyEncoded) {
-      const data = decodeLegacyShareData(legacyEncoded)
       if (data) {
         isSharedChat.value = true
         sharedChatData.value = data
