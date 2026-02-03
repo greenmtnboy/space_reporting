@@ -109,13 +109,107 @@
 }
 
 .share-error {
-  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
   padding: 10px;
   background-color: rgba(244, 67, 54, 0.1);
   border: 1px solid rgba(244, 67, 54, 0.3);
   color: #f44336;
   font-size: 0.75rem;
   border-radius: 4px;
+}
+
+.share-error i {
+  font-size: 1rem;
+}
+
+/* Loading state */
+.share-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.share-loading i {
+  font-size: 1.5rem;
+  color: var(--color-accent);
+}
+
+/* Token setup section */
+.token-setup {
+  margin-top: 8px;
+}
+
+.token-help {
+  margin: 0 0 12px 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.token-help code {
+  padding: 2px 6px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.token-help a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.token-help a:hover {
+  text-decoration: underline;
+}
+
+.token-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.token-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  border-radius: 4px;
+}
+
+.token-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.token-save-btn {
+  padding: 10px 16px;
+  background-color: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.token-save-btn:hover:not(:disabled) {
+  background-color: var(--color-accent-hover, #2563eb);
+}
+
+.token-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .share-info {

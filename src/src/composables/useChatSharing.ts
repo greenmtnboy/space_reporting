@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { createGistBackend, type ShareBackend } from './shareBackends'
 
 export interface SharedChatMessage {
   role: string
@@ -24,115 +25,69 @@ export interface SharedChatData {
   sharedAt: number
 }
 
-const SHARE_PARAM = 'share'
-
-/**
- * Compress and encode chat data for URL sharing
- * Uses URL-safe base64 (+ -> -, / -> _, no padding =)
- */
-function encodeShareData(data: SharedChatData): string {
-  try {
-    const json = JSON.stringify(data)
-    // Use base64 encoding, then make URL-safe
-    const base64 = btoa(unescape(encodeURIComponent(json)))
-    // Convert to URL-safe base64: + -> -, / -> _, remove padding =
-    const urlSafe = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-    return urlSafe
-  } catch (e) {
-    console.error('Failed to encode share data:', e)
-    throw new Error('Failed to encode chat data')
-  }
-}
-
-/**
- * Decode shared chat data from URL parameter
- * Handles URL-safe base64 (- -> +, _ -> /, adds padding)
- */
-function decodeShareData(encoded: string): SharedChatData | null {
-  try {
-    // Convert URL-safe base64 back to standard base64
-    let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/')
-    // Add padding if needed
-    const pad = base64.length % 4
-    if (pad) {
-      base64 += '='.repeat(4 - pad)
-    }
-    const json = decodeURIComponent(escape(atob(base64)))
-    const data = JSON.parse(json)
-
-    // Validate structure
-    if (!data.messages || !Array.isArray(data.messages)) {
-      throw new Error('Invalid chat data: missing messages')
-    }
-
-    return data as SharedChatData
-  } catch (e) {
-    console.error('Failed to decode share data:', e)
-    return null
-  }
-}
-
-/**
- * Extract share data from current URL hash
- */
-function getShareDataFromUrl(): string | null {
-  const hash = window.location.hash
-  if (!hash) return null
-
-  // Parse hash as query params: #share=xxx
-  const params = new URLSearchParams(hash.slice(1))
-  return params.get(SHARE_PARAM)
-}
-
-/**
- * Generate a shareable URL with encoded chat data
- */
-function generateShareUrl(data: SharedChatData): string {
-  const encoded = encodeShareData(data)
-  const baseUrl = window.location.origin + window.location.pathname
-  return `${baseUrl}#${SHARE_PARAM}=${encoded}`
-}
+const TOKEN_STORAGE_KEY = 'github-gist-token'
 
 export function useChatSharing() {
+  // Token management
+  const githubToken = ref(localStorage.getItem(TOKEN_STORAGE_KEY) || '')
+
+  function setGitHubToken(token: string) {
+    githubToken.value = token
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token)
+    } else {
+      localStorage.removeItem(TOKEN_STORAGE_KEY)
+    }
+  }
+
+  // Create backend instance
+  const backend: ShareBackend = createGistBackend(() => githubToken.value)
+
+  // State
   const isSharedChat = ref(false)
   const sharedChatData = ref<SharedChatData | null>(null)
   const shareUrl = ref('')
   const showShareModal = ref(false)
   const shareError = ref('')
   const copySuccess = ref(false)
+  const isSharing = ref(false)
 
   // Check URL for shared data on mount
-  function checkForSharedChat() {
-    const encoded = getShareDataFromUrl()
-    if (encoded) {
-      const data = decodeShareData(encoded)
+  async function checkForSharedChat(): Promise<boolean> {
+    const hash = window.location.hash
+    if (!hash) return false
+
+    const gistId = backend.parseUrl(hash)
+    if (gistId) {
+      const data = await backend.loadShare(gistId)
       if (data) {
         isSharedChat.value = true
         sharedChatData.value = data
         return true
       }
     }
+
     return false
   }
 
   // Generate share URL from current chat data
-  function createShareUrl(
+  async function createShareUrl(
     title: string,
     messages: SharedChatMessage[],
     imports?: SharedChatImport[],
     artifacts?: Array<{ type: string; content: string; title?: string }>
-  ) {
+  ): Promise<boolean> {
     shareError.value = ''
     copySuccess.value = false
+    isSharing.value = true
 
     try {
-      // Preserve all message data for full fidelity
+      if (!backend.isAvailable()) {
+        throw new Error('GitHub token required. Please enter your token below.')
+      }
+
       const cleanMessages = messages.map(msg => ({ ...msg }))
-
-      // Include imports for context
       const cleanImports = imports?.map(imp => ({ ...imp }))
-
-      // Optionally include artifacts (simplified)
       const cleanArtifacts = artifacts?.map(art => ({
         type: art.type,
         content: art.content,
@@ -147,17 +102,21 @@ export function useChatSharing() {
         sharedAt: Date.now()
       }
 
-      shareUrl.value = generateShareUrl(data)
+      const fragment = await backend.createShare(data)
+      const baseUrl = window.location.origin + window.location.pathname
+      shareUrl.value = `${baseUrl}#${fragment}`
 
       return true
     } catch (e) {
-      shareError.value = e instanceof Error ? e.message : 'Failed to create share URL'
+      shareError.value = e instanceof Error ? e.message : 'Failed to create share'
       return false
+    } finally {
+      isSharing.value = false
     }
   }
 
   // Copy share URL to clipboard
-  async function copyShareUrl() {
+  async function copyShareUrl(): Promise<boolean> {
     if (!shareUrl.value) return false
 
     try {
@@ -167,7 +126,7 @@ export function useChatSharing() {
         copySuccess.value = false
       }, 2000)
       return true
-    } catch (e) {
+    } catch {
       // Fallback for older browsers
       const textarea = document.createElement('textarea')
       textarea.value = shareUrl.value
@@ -195,24 +154,19 @@ export function useChatSharing() {
   function clearSharedChat() {
     isSharedChat.value = false
     sharedChatData.value = null
-    // Remove hash from URL without triggering reload
     const url = window.location.origin + window.location.pathname + window.location.search
     window.history.replaceState(null, '', url)
   }
 
   // Open share modal
-  function openShareModal(
+  async function openShareModal(
     title: string,
     messages: SharedChatMessage[],
     imports?: SharedChatImport[],
     artifacts?: Array<{ type: string; content: string; title?: string }>
   ) {
-    if (createShareUrl(title, messages, imports, artifacts)) {
-      showShareModal.value = true
-    }
-    else {
-      console.log('Failed to create share URL:', shareError.value)
-    }
+    showShareModal.value = true
+    await createShareUrl(title, messages, imports, artifacts)
   }
 
   // Close share modal
@@ -220,11 +174,10 @@ export function useChatSharing() {
     showShareModal.value = false
     shareUrl.value = ''
     copySuccess.value = false
+    shareError.value = ''
   }
 
-  const shareUrlLength = computed(() => shareUrl.value.length)
-  const isUrlTooLong = computed(() => shareUrl.value.length > 2000000) // 2MB - most browsers
-  const isSafariWarning = computed(() => shareUrl.value.length > 80000) // 80KB - Safari limit
+  const hasGitHubToken = computed(() => !!githubToken.value)
 
   return {
     // State
@@ -234,9 +187,9 @@ export function useChatSharing() {
     showShareModal,
     shareError,
     copySuccess,
-    shareUrlLength,
-    isUrlTooLong,
-    isSafariWarning,
+    isSharing,
+    hasGitHubToken,
+    githubToken,
 
     // Methods
     checkForSharedChat,
@@ -244,6 +197,7 @@ export function useChatSharing() {
     copyShareUrl,
     clearSharedChat,
     openShareModal,
-    closeShareModal
+    closeShareModal,
+    setGitHubToken
   }
 }
