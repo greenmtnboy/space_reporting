@@ -13,6 +13,15 @@ const trilogy = useTrilogyCore()
 
 // Chat sharing functionality
 const sharing = useChatSharing()
+const tokenInput = ref('')
+
+async function saveTokenAndRetry() {
+  if (!tokenInput.value) return
+  sharing.setGitHubToken(tokenInput.value.trim())
+  tokenInput.value = ''
+  // Retry sharing with the new token
+  shareChat()
+}
 
 // Ensure dark theme is set early (before render) for Vega-Lite and other components
 trilogy.userSettingsStore.loadSettings()
@@ -368,36 +377,63 @@ function handleSharedChatSend() {
           </button>
         </div>
         <div class="share-modal-body">
-          <p>Copy this link to share your conversation. Anyone with the link can view it.</p>
-          <div class="share-url-container">
-            <input
-              type="text"
-              :value="sharing.shareUrl.value"
-              readonly
-              class="share-url-input"
-              @focus="($event.target as HTMLInputElement)?.select()"
-            />
-            <button
-              class="copy-btn"
-              @click="sharing.copyShareUrl"
-              :class="{ success: sharing.copySuccess.value }"
-            >
-              <i :class="sharing.copySuccess.value ? 'mdi mdi-check' : 'mdi mdi-content-copy'"></i>
-              {{ sharing.copySuccess.value ? 'Copied!' : 'Copy' }}
-            </button>
+          <!-- Loading state -->
+          <div v-if="sharing.isSharing.value" class="share-loading">
+            <i class="mdi mdi-loading mdi-spin"></i>
+            <span>Creating share link...</span>
           </div>
-          <div v-if="sharing.shareError.value" class="share-error">
-            {{ sharing.shareError.value }}
-          </div>
-          <div class="share-info">
-            <span class="url-length">URL length: {{ sharing.shareUrlLength.value.toLocaleString() }} characters</span>
-            <span v-if="sharing.isUrlTooLong.value" class="url-warning url-error">
-              This URL exceeds browser limits and may not load correctly.
-            </span>
-            <span v-else-if="sharing.isSafariWarning.value" class="url-warning">
-              This URL may not work in Safari (80KB limit). Works in Chrome/Firefox.
-            </span>
-          </div>
+
+          <!-- Success state -->
+          <template v-else-if="sharing.shareUrl.value">
+            <p>Copy this link to share your conversation. Anyone with the link can view it.</p>
+            <div class="share-url-container">
+              <input
+                type="text"
+                :value="sharing.shareUrl.value"
+                readonly
+                class="share-url-input"
+                @focus="($event.target as HTMLInputElement)?.select()"
+              />
+              <button
+                class="copy-btn"
+                @click="sharing.copyShareUrl"
+                :class="{ success: sharing.copySuccess.value }"
+              >
+                <i :class="sharing.copySuccess.value ? 'mdi mdi-check' : 'mdi mdi-content-copy'"></i>
+                {{ sharing.copySuccess.value ? 'Copied!' : 'Copy' }}
+              </button>
+            </div>
+          </template>
+
+          <!-- Error / Token required state -->
+          <template v-else-if="sharing.shareError.value">
+            <div class="share-error">
+              <i class="mdi mdi-alert-circle"></i>
+              {{ sharing.shareError.value }}
+            </div>
+
+            <!-- Token input if not configured -->
+            <div v-if="!sharing.hasGitHubToken.value" class="token-setup">
+              <p class="token-help">
+                Create a token with <code>gist</code> scope at
+                <a href="https://github.com/settings/tokens/new?scopes=gist&description=Space%20Chat%20Sharing" target="_blank" rel="noopener">
+                  github.com/settings/tokens
+                </a>
+              </p>
+              <div class="token-input-row">
+                <input
+                  type="password"
+                  v-model="tokenInput"
+                  placeholder="ghp_xxxxxxxxxxxx"
+                  class="token-input"
+                  @keyup.enter="saveTokenAndRetry"
+                />
+                <button class="token-save-btn" @click="saveTokenAndRetry" :disabled="!tokenInput">
+                  Save & Retry
+                </button>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
