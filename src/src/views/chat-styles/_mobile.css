@@ -115,27 +115,40 @@
     display: none !important;
   }
 
-  /* Sidebar: collapsed by default, placed above chat */
-  .chat-container :deep(.sidebar-panel),
-  .chat-container :deep(.symbols-pane) {
+  /* Sidebar: collapsed by default, placed above chat.
+     The library sets inline style="width: Npx" and scoped height:100%,
+     so we must override with height/flex/width, not just max-height. */
+  .chat-container :deep(.sidebar-panel) {
     order: -1 !important;
+    width: 100% !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    min-height: 0 !important;
+    flex: 0 0 0px !important;
+    overflow: hidden !important;
     border-left: none !important;
     border-bottom: 1px solid var(--color-border) !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-    transition: max-height 0.3s ease;
+    transition: height 0.3s ease, max-height 0.3s ease, flex 0.3s ease;
   }
 
-  .chat-container.mobile-sidebar-open :deep(.sidebar-panel),
-  .chat-container.mobile-sidebar-open :deep(.symbols-pane) {
+  .chat-container :deep(.symbols-pane) {
+    width: 100% !important;
+    min-height: 0 !important;
+  }
+
+  /* When sidebar is open on mobile */
+  .chat-container.mobile-sidebar-open :deep(.sidebar-panel) {
+    height: 40vh !important;
     max-height: 40vh !important;
+    flex: 0 0 40vh !important;
     overflow-y: auto !important;
   }
 
   .chat-container :deep(.chat-panel) {
     width: 100% !important;
+    height: auto !important;
     min-width: 0 !important;
-    flex: 1 !important;
+    flex: 1 1 0% !important;
   }
 
   /* ── Messages ── */
