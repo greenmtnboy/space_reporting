@@ -1,0 +1,114 @@
+/* ChatView Mobile Styles - Responsive layout for small screens */
+
+/* Mobile sidebar toggle button */
+.mobile-sidebar-toggle {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  /* Show the toggle button on mobile */
+  .mobile-sidebar-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 16px;
+    background-color: var(--color-bg-secondary);
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  .mobile-sidebar-toggle:hover {
+    background-color: var(--color-bg-tertiary);
+    color: var(--color-text);
+  }
+
+  .mobile-sidebar-toggle i {
+    font-size: 1rem;
+    color: var(--color-accent);
+  }
+
+  /* Stack split container vertically on mobile */
+  .chat-container :deep(.chat-split-container) {
+    flex-direction: column !important;
+  }
+
+  /* Hide the resizer on mobile */
+  .chat-container :deep(.panel-resizer) {
+    display: none !important;
+  }
+
+  /* Sidebar: collapsed by default on mobile, placed above chat via order */
+  .chat-container :deep(.sidebar-panel),
+  .chat-container :deep(.symbols-pane) {
+    order: -1 !important;
+    border-left: none !important;
+    border-bottom: 1px solid var(--color-border) !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    transition: max-height 0.3s ease;
+  }
+
+  /* When sidebar is open on mobile */
+  .chat-container.mobile-sidebar-open :deep(.sidebar-panel),
+  .chat-container.mobile-sidebar-open :deep(.symbols-pane) {
+    max-height: 40vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Chat panel takes full width */
+  .chat-container :deep(.chat-panel) {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  /* Fix input container width on mobile */
+  .chat-container :deep(.input-container) {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 8px 12px 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Input wrapper fills available width */
+  .chat-container :deep(.input-wrapper),
+  .chat-container :deep(.chat-input-wrapper) {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Textarea needs to respect container bounds */
+  .chat-container :deep(textarea) {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Messages area should not exceed viewport width */
+  .chat-container :deep(.messages-container),
+  .chat-container :deep(.chat-messages) {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Header actions wrap on mobile */
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .connection-badge {
+    font-size: 0.625rem;
+    padding: 0 6px;
+    height: 24px;
+  }
+}

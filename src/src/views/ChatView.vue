@@ -42,6 +42,9 @@ provide('chatStore', trilogy.chatStore)
 provide('userSettingsStore', trilogy.userSettingsStore)
 provide('queryExecutionService', trilogy.queryExecutionService)
 
+// Mobile sidebar toggle
+const mobileSidebarOpen = ref(false)
+
 // Track DuckDB connection status
 const dataConnectionName = 'space-duckdb'
 const dbStatus = ref<'loading' | 'ready' | 'error'>('loading')
@@ -251,11 +254,13 @@ function getDefaultModels(provider: string) {
   switch (provider) {
     case 'anthropic':
       return [
-        { id: 'claude-opus-4-5-20251101', name: 'Claude Pous 4.5' },
+        { id: 'claude-opus-4-6-20260201', name: 'Claude Opus 4.6' },
+        { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5' },
       ]
     case 'openai':
       return [
-        { id: 'gpt-5.2', name: 'GPT-5.2' }, 
+        { id: 'gpt-5.3', name: 'GPT-5.3' },
+        { id: 'gpt-5.2', name: 'GPT-5.2' },
       ]
     case 'google':
       return [{ id: 'models/gemini-2.5-flash', name: 'models/gemini-2.5-flash' }]
@@ -603,7 +608,15 @@ function handleSharedChatSend() {
         </template>
       </ViewHeader>
 
-      <div class="chat-container">
+      <button
+        class="mobile-sidebar-toggle mobile-only"
+        @click="mobileSidebarOpen = !mobileSidebarOpen"
+      >
+        <i class="mdi" :class="mobileSidebarOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'"></i>
+        {{ mobileSidebarOpen ? 'Hide' : 'Show' }} Symbols &amp; Artifacts
+      </button>
+
+      <div class="chat-container" :class="{ 'mobile-sidebar-open': mobileSidebarOpen }">
         <LLMChatSplitView
           :editableTitle="true"
           :showHeader="false"
