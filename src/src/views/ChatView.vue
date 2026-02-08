@@ -259,7 +259,6 @@ function getDefaultModels(provider: string) {
       ]
     case 'openai':
       return [
-        { id: 'gpt-5.3', name: 'GPT-5.3' },
         { id: 'gpt-5.2', name: 'GPT-5.2' },
       ]
     case 'google':

@@ -6,19 +6,19 @@
 }
 
 @media (max-width: 600px) {
-  /* Show the toggle button on mobile */
+  /* ── Toggle Button ── */
   .mobile-sidebar-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     width: 100%;
-    padding: 8px 16px;
+    padding: 5px 12px;
     background-color: var(--color-bg-secondary);
     border: none;
     border-bottom: 1px solid var(--color-border);
     color: var(--color-text-muted);
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: 0.5625rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -32,21 +32,90 @@
   }
 
   .mobile-sidebar-toggle i {
-    font-size: 1rem;
+    font-size: 0.875rem;
     color: var(--color-accent);
   }
 
-  /* Stack split container vertically on mobile */
+  /* ── Header ── */
+  .view-header {
+    padding: 0.5rem 0.75rem !important;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .view-header h1 {
+    font-size: 1rem !important;
+  }
+
+  .header-left {
+    gap: 0.25rem !important;
+  }
+
+  .header-right {
+    gap: 0.4rem !important;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .header-action-btn {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.5rem;
+    gap: 4px;
+  }
+
+  .header-action-btn i {
+    font-size: 0.875rem;
+  }
+
+  .connection-badge {
+    font-size: 0.5rem;
+    padding: 0 5px;
+    height: 20px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .looking-at {
+    margin-right: 0;
+    padding-right: 0;
+    border-right: none;
+    max-width: none;
+    gap: 4px;
+  }
+
+  .looking-at-label {
+    font-size: 0.5625rem;
+  }
+
+  .dataset-tag {
+    font-size: 0.5rem;
+    padding: 1px 4px;
+  }
+
+  .db-status.mini {
+    padding: 2px 6px;
+    height: 20px;
+  }
+
+  .db-status .status-text {
+    font-size: 0.5625rem;
+  }
+
+  /* ── Split Layout ── */
   .chat-container :deep(.chat-split-container) {
     flex-direction: column !important;
   }
 
-  /* Hide the resizer on mobile */
   .chat-container :deep(.panel-resizer) {
     display: none !important;
   }
 
-  /* Sidebar: collapsed by default on mobile, placed above chat via order */
+  /* Sidebar: collapsed by default, placed above chat */
   .chat-container :deep(.sidebar-panel),
   .chat-container :deep(.symbols-pane) {
     order: -1 !important;
@@ -57,58 +126,145 @@
     transition: max-height 0.3s ease;
   }
 
-  /* When sidebar is open on mobile */
   .chat-container.mobile-sidebar-open :deep(.sidebar-panel),
   .chat-container.mobile-sidebar-open :deep(.symbols-pane) {
     max-height: 40vh !important;
     overflow-y: auto !important;
   }
 
-  /* Chat panel takes full width */
   .chat-container :deep(.chat-panel) {
     width: 100% !important;
     min-width: 0 !important;
     flex: 1 !important;
   }
 
-  /* Fix input container width on mobile */
-  .chat-container :deep(.input-container) {
-    max-width: 100% !important;
-    width: 100% !important;
-    padding: 8px 12px 12px !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Input wrapper fills available width */
-  .chat-container :deep(.input-wrapper),
-  .chat-container :deep(.chat-input-wrapper) {
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Textarea needs to respect container bounds */
-  .chat-container :deep(textarea) {
-    width: 100% !important;
-    min-width: 0 !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Messages area should not exceed viewport width */
-  .chat-container :deep(.messages-container),
+  /* ── Messages ── */
   .chat-container :deep(.chat-messages) {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    padding: 10px 0 !important;
+  }
+
+  .chat-container :deep(.messages-container) {
     max-width: 100% !important;
     overflow-x: hidden !important;
   }
 
-  /* Header actions wrap on mobile */
-  .header-actions {
-    flex-wrap: wrap;
-    gap: 6px;
+  .chat-container :deep(.message) {
+    padding: 10px 12px !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.5 !important;
+    gap: 10px !important;
   }
 
-  .connection-badge {
-    font-size: 0.625rem;
-    padding: 0 6px;
-    height: 24px;
+  .chat-container :deep(.message.user .message-content) {
+    padding: 8px 12px !important;
+    max-width: 90% !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .chat-container :deep(.message.assistant .message-content) {
+    max-width: 100% !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .chat-container :deep(.message-content) {
+    font-size: 0.8125rem !important;
+  }
+
+  .chat-container :deep(.message-content p) {
+    font-size: 0.8125rem !important;
+  }
+
+  /* Code blocks */
+  .chat-container :deep(.code-block code),
+  .chat-container :deep(pre code) {
+    font-size: 0.6875rem !important;
+    padding: 8px 10px !important;
+  }
+
+  /* Tool calls */
+  .chat-container :deep(.tool-call) {
+    font-size: 0.5625rem !important;
+    padding: 3px 6px !important;
+  }
+
+  .chat-container :deep(.loading-indicator) {
+    padding: 8px 12px !important;
+    margin: 4px 12px !important;
+    font-size: 0.6875rem !important;
+  }
+
+  /* ── Input Area ── */
+  .chat-container :deep(.input-container) {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 6px 8px 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  .chat-container :deep(.input-wrapper),
+  .chat-container :deep(.chat-input-wrapper) {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 6px 8px !important;
+    border-radius: 8px !important;
+  }
+
+  .chat-container :deep(textarea) {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    font-size: 0.8125rem !important;
+    min-height: 20px !important;
+  }
+
+  .chat-container :deep(.animated-placeholder) {
+    font-size: 0.8125rem !important;
+  }
+
+  .chat-container :deep(.send-button) {
+    height: 28px !important;
+    min-width: 28px !important;
+    padding: 0 8px !important;
+    font-size: 0.625rem !important;
+    border-radius: 6px !important;
+  }
+
+  /* ── Sidebar content (when expanded) ── */
+  .chat-container :deep(.sidebar-tabs) {
+    height: 32px !important;
+    padding: 0 6px !important;
+  }
+
+  .chat-container :deep(.sidebar-tab) {
+    font-size: 0.5625rem !important;
+    padding: 0 8px !important;
+  }
+
+  .chat-container :deep(.symbol-item) {
+    padding: 6px 8px !important;
+    gap: 6px !important;
+  }
+
+  .chat-container :deep(.symbol-label) {
+    font-size: 0.6875rem !important;
+  }
+
+  .chat-container :deep(.symbol-description) {
+    font-size: 0.5625rem !important;
+  }
+
+  .chat-container :deep(.artifact-list-item) {
+    padding: 6px 8px !important;
+    gap: 6px !important;
+  }
+
+  .chat-container :deep(.artifact-label) {
+    font-size: 0.6875rem !important;
+  }
+
+  .chat-container :deep(.artifact-meta) {
+    font-size: 0.5625rem !important;
   }
 }
