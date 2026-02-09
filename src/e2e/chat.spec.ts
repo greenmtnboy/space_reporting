@@ -1,9 +1,21 @@
 import { test, expect } from '@playwright/test'
 
+// Capture page errors and console errors for debugging CI failures
+function attachErrorListeners(page: import('@playwright/test').Page) {
+    const errors: string[] = []
+    page.on('pageerror', (err) => errors.push(`PAGE_ERROR: ${err.message}`))
+    page.on('console', (msg) => {
+        if (msg.type() === 'error') errors.push(`CONSOLE_ERROR: ${msg.text()}`)
+    })
+    return errors
+}
+
 test.describe('Chat page - setup view', () => {
     test('loads chat view and shows provider setup', async ({ page }) => {
+        const errors = attachErrorListeners(page)
         await page.goto('/chat')
-        await expect(page.getByTestId('chat-view')).toBeVisible()
+        await expect(page.getByTestId('chat-view')).toBeVisible({ timeout: 15000 })
+            .catch(() => { throw new Error(`chat-view not visible. Errors:\n${errors.join('\n')}`) })
         await expect(page.getByTestId('provider-setup')).toBeVisible()
     })
 
