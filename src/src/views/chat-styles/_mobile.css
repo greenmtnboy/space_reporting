@@ -36,11 +36,43 @@
     color: var(--color-accent);
   }
 
+  /* ── Global width constraints ── */
+  .chat-view {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .chat-interface {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .chat-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .chat-container :deep(.chat-split-container) {
+    max-width: 100% !important;
+  }
+
+  .chat-container :deep(.llm-chat-container) {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
   /* ── Header ── */
   .view-header {
     padding: 0.5rem 0.75rem !important;
     flex-wrap: wrap;
     gap: 0.35rem;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
   .view-header h1 {
