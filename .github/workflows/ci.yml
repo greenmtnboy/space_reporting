@@ -51,6 +51,10 @@ jobs:
       if: steps.playwright-cache.outputs.cache-hit == 'true'
       run: pnpm exec playwright install-deps ${{ matrix.browser }}
 
+    - name: Build app
+      working-directory: ./src
+      run: pnpm build
+
     - name: Run Playwright tests
       working-directory: ./src
       run: pnpm exec playwright test --project=${{ matrix.browser }}

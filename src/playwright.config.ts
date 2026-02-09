@@ -41,7 +41,7 @@ export default defineConfig({
         inDocker || inProd
             ? undefined
             : {
-                command: 'pnpm dev',
+                command: process.env.CI ? 'pnpm preview --port 5174' : 'pnpm dev',
                 port: 5174,
                 reuseExistingServer: !process.env.CI,
             },
