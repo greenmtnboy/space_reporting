@@ -36,6 +36,13 @@
     color: var(--color-accent);
   }
 
+  /* ── Prevent iOS auto-zoom on input focus (requires >= 16px) ── */
+  .chat-view input,
+  .chat-view select,
+  .chat-view textarea {
+    font-size: 16px !important;
+  }
+
   /* ── Global width & height constraints ── */
   .chat-view {
     height: 100% !important;
@@ -262,12 +269,12 @@
     width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
-    font-size: 0.8125rem !important;
+    font-size: 16px !important;
     min-height: 20px !important;
   }
 
   .chat-container :deep(.animated-placeholder) {
-    font-size: 0.8125rem !important;
+    font-size: 16px !important;
   }
 
   .chat-container :deep(.send-button) {
