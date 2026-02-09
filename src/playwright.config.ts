@@ -3,16 +3,40 @@ import { defineConfig, devices } from '@playwright/test'
 const inDocker = process.env.TEST_ENV === 'docker'
 const inProd = process.env.TEST_ENV === 'prod'
 
+// In CI, only run Chromium to avoid 3x browser overhead.
+// Locally, run all browsers for thorough pre-push validation.
+const defaultProjects = [
+    {
+        name: 'chromium',
+        use: { ...devices['Desktop Chrome'] },
+    },
+    {
+        name: 'firefox',
+        use: { ...devices['Desktop Firefox'] },
+    },
+    {
+        name: 'webkit',
+        use: { ...devices['Desktop Safari'] },
+    },
+]
+
+const ciProjects = [
+    {
+        name: 'chromium',
+        use: { ...devices['Desktop Chrome'] },
+    },
+]
+
 export default defineConfig({
     testDir: './e2e',
-    timeout: 120000,
+    timeout: 30000,
     expect: {
-        timeout: 30000,
+        timeout: 10000,
     },
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
-    retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    retries: process.env.CI ? 1 : 0,
+    workers: process.env.CI ? 2 : undefined,
     reporter: 'html',
     use: {
         baseURL: inProd
@@ -23,20 +47,7 @@ export default defineConfig({
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
     },
-    projects: [
-        {
-            name: 'chromium',
-            use: { ...devices['Desktop Chrome'] },
-        },
-        {
-            name: 'firefox',
-            use: { ...devices['Desktop Firefox'] },
-        },
-        {
-            name: 'webkit',
-            use: { ...devices['Desktop Safari'] },
-        },
-    ],
+    projects: process.env.CI ? ciProjects : defaultProjects,
     webServer:
         inDocker || inProd
             ? undefined
