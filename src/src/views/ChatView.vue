@@ -369,7 +369,7 @@ function handleSharedChatSend() {
 </script>
 
 <template>
-  <div class="chat-view">
+  <div class="chat-view" data-testid="chat-view">
     <!-- Share Modal -->
     <div v-if="sharing.showShareModal.value" class="share-modal-overlay" @click.self="sharing.closeShareModal">
       <div class="share-modal">
@@ -484,7 +484,7 @@ function handleSharedChatSend() {
     </div>
 
     <!-- Provider Selection - show when no active LLM connection and not viewing shared -->
-    <div v-else-if="viewMode === 'setup'" class="provider-setup">
+    <div v-else-if="viewMode === 'setup'" class="provider-setup" data-testid="provider-setup">
       <div class="setup-header">
         <h1>Chat with GCAT Data</h1>
         <div class="db-status-badge" :class="dbStatus">
@@ -499,7 +499,7 @@ function handleSharedChatSend() {
       <div class="setup-form">
         <div class="form-group">
           <label for="provider-select">Provider</label>
-          <select id="provider-select" v-model="selectedProvider" @change="loadModels">
+          <select id="provider-select" v-model="selectedProvider" @change="loadModels" data-testid="provider-select">
             <option value="">Select a provider...</option>
             <option v-for="provider in availableProviders" :key="provider.id" :value="provider.id">
               {{ provider.name }}
@@ -531,10 +531,11 @@ function handleSharedChatSend() {
 
         <div class="form-group" v-if="selectedProvider">
           <label for="model-select">Model</label>
-          <select 
-            id="model-select" 
-            v-model="selectedModel" 
+          <select
+            id="model-select"
+            v-model="selectedModel"
             :disabled="!apiKeyInput || loadingModels"
+            data-testid="model-select"
           >
             <option v-if="availableModels.length === 0" value="">
               {{ apiKeyInput ? 'Loading models...' : 'Enter API key to see models' }}
@@ -609,13 +610,14 @@ function handleSharedChatSend() {
 
       <button
         class="mobile-sidebar-toggle mobile-only"
+        data-testid="mobile-sidebar-toggle"
         @click="mobileSidebarOpen = !mobileSidebarOpen"
       >
         <i class="mdi" :class="mobileSidebarOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'"></i>
         {{ mobileSidebarOpen ? 'Hide' : 'Show' }} Symbols &amp; Artifacts
       </button>
 
-      <div class="chat-container" :class="{ 'mobile-sidebar-open': mobileSidebarOpen }">
+      <div class="chat-container" :class="{ 'mobile-sidebar-open': mobileSidebarOpen }" data-testid="chat-container">
         <LLMChatSplitView
           :editableTitle="true"
           :showHeader="false"
