@@ -72,8 +72,24 @@ test.describe('Chat page - mobile layout', () => {
     })
 
     test('flex/overflow chain enables scrollable chat without losing input', async ({ page }) => {
-        await page.goto('./chat')
-        await expect(page.getByTestId('chat-view')).toBeVisible()
+        const mockData = mockSharedChat(10)
+        const mockGistId = 'test-mock-gist-overflow'
+
+        await page.route(`**/api.github.com/gists/${mockGistId}`, route => {
+            route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    id: mockGistId,
+                    files: {
+                        'chat.json': { content: JSON.stringify(mockData) },
+                    },
+                }),
+            })
+        })
+
+        await page.goto(`./chat#gist=${mockGistId}`)
+        await expect(page.locator('.shared-mode')).toBeVisible({ timeout: 10000 })
 
         const chain = await page.evaluate(() => {
             const check = (selector: string) => {
@@ -90,7 +106,6 @@ test.describe('Chat page - mobile layout', () => {
             return {
                 chatView: check('.chat-view'),
                 chatInterface: check('.chat-interface'),
-                providerSetup: check('.provider-setup'),
             }
         })
 
@@ -98,13 +113,12 @@ test.describe('Chat page - mobile layout', () => {
         expect(chain.chatView).not.toBeNull()
         expect(chain.chatView!.overflow).toBe('hidden')
 
-        // In setup mode (no LLM connected), .chat-interface doesn't exist.
-        // When present (active chat), it should flex-grow and clip overflow.
-        if (chain.chatInterface) {
-            expect(chain.chatInterface.flexGrow).toBe('1')
-            expect(chain.chatInterface.overflow).toBe('hidden')
-            expect(chain.chatInterface.minHeight).toBe('0px')
-        }
+        // chat-interface: flex-grows to fill, clips overflow, min-height:0
+        // allows shrinking below content size
+        expect(chain.chatInterface).not.toBeNull()
+        expect(chain.chatInterface!.flexGrow).toBe('1')
+        expect(chain.chatInterface!.overflow).toBe('hidden')
+        expect(chain.chatInterface!.minHeight).toBe('0px')
     })
 })
 
