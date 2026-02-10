@@ -2,13 +2,13 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Chat page - setup view', () => {
     test('loads chat view and shows provider setup', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         await expect(page.getByTestId('chat-view')).toBeVisible()
         await expect(page.getByTestId('provider-setup')).toBeVisible()
     })
 
     test('provider select has expected options', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         const select = page.getByTestId('provider-select')
         await expect(select).toBeVisible()
 
@@ -21,7 +21,7 @@ test.describe('Chat page - setup view', () => {
     })
 
     test('selecting Anthropic shows correct default models without typos', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         const providerSelect = page.getByTestId('provider-select')
         await providerSelect.selectOption('anthropic')
 
@@ -42,7 +42,7 @@ test.describe('Chat page - setup view', () => {
     })
 
     test('selecting OpenAI shows GPT-5.2 model', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         await page.getByTestId('provider-select').selectOption('openai')
 
         const modelSelect = page.getByTestId('model-select')

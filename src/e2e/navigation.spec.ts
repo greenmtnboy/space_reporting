@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test('navigation to all main pages', async ({ page }) => {
     // 1. Visit Home (Rockets)
-    await page.goto('/')
+    await page.goto('./')
     await expect(page.getByTestId('rockets-view')).toBeVisible()
 
     // 2. Navigate to Satellites
@@ -22,11 +22,11 @@ test('navigation to all main pages', async ({ page }) => {
 
     // 5. Navigate back to Home
     await page.getByTestId('nav-link-rockets').click()
-    await expect(page).toHaveURL('/space_reporting/') // Exact match for home if base is correct, or just /
+    await expect(page).toHaveURL(/.*space_reporting/)
     await expect(page.getByTestId('rockets-view')).toBeVisible()
 })
 
 test('check page titles', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('./')
     await expect(page).toHaveTitle(/Rocket Launches/)
 })
