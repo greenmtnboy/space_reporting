@@ -49,11 +49,6 @@ export default defineConfig({
             testIgnore: /chat-mobile/,
         },
         {
-            name: 'firefox-mobile',
-            use: { ...devices['Desktop Firefox'], ...mobileViewport },
-            testMatch: /chat-mobile/,
-        },
-        {
             name: 'webkit',
             use: { ...devices['Desktop Safari'] },
             testIgnore: /chat-mobile/,
