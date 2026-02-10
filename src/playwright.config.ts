@@ -30,13 +30,29 @@ export default defineConfig({
             testIgnore: /chat-mobile/,
         },
         {
+            name: 'chromium-mobile',
+            use: { ...devices['Pixel 7'] },
+            testMatch: /chat-mobile/,
+        },
+        {
             name: 'firefox',
             use: { ...devices['Desktop Firefox'] },
             testIgnore: /chat-mobile/,
         },
         {
+            name: 'firefox-mobile',
+            use: { ...devices['Galaxy S5'] },
+            testMatch: /chat-mobile/,
+        },
+        {
             name: 'webkit',
             use: { ...devices['Desktop Safari'] },
+            testIgnore: /chat-mobile/,
+        },
+        {
+            name: 'webkit-mobile',
+            use: { ...devices['iPhone 13'] },
+            testMatch: /chat-mobile/,
         },
     ],
     webServer:

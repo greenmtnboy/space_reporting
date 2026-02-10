@@ -1,4 +1,4 @@
-import { test, expect, devices } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
 // Generate a mock shared chat with enough messages to overflow the viewport
 function mockSharedChat(messageCount: number) {
@@ -15,8 +15,6 @@ function mockSharedChat(messageCount: number) {
         sharedAt: Date.now(),
     }
 }
-
-test.use({ ...devices['iPhone 13'] })
 
 test.describe('Chat page - mobile layout', () => {
     test('chat view fits within viewport width', async ({ page }) => {
