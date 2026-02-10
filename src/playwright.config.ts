@@ -19,7 +19,7 @@ export default defineConfig({
             ? 'https://rocket-launches-2025.web.app' // Placeholder, update if known
             : inDocker
                 ? 'http://localhost:8080'
-                : 'http://localhost:5174/space_reporting',
+                : 'http://localhost:5174/space_reporting/',
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
     },

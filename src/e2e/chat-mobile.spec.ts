@@ -20,7 +20,7 @@ test.use({ ...devices['iPhone 13'] })
 
 test.describe('Chat page - mobile layout', () => {
     test('chat view fits within viewport width', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         await expect(page.getByTestId('chat-view')).toBeVisible()
 
         const chatView = page.getByTestId('chat-view')
@@ -31,7 +31,7 @@ test.describe('Chat page - mobile layout', () => {
     })
 
     test('provider setup form fits within viewport', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
 
         const setup = page.getByTestId('provider-setup')
         await expect(setup).toBeVisible()
@@ -46,7 +46,7 @@ test.describe('Chat page - mobile layout', () => {
     })
 
     test('no horizontal scrollbar on chat page', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         await expect(page.getByTestId('chat-view')).toBeVisible()
 
         const hasHorizontalScroll = await page.evaluate(() => {
@@ -56,7 +56,7 @@ test.describe('Chat page - mobile layout', () => {
     })
 
     test('chat-view height is bounded by parent, not viewport', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         await expect(page.getByTestId('chat-view')).toBeVisible()
 
         const heights = await page.evaluate(() => {
@@ -74,7 +74,7 @@ test.describe('Chat page - mobile layout', () => {
     })
 
     test('flex/overflow chain enables scrollable chat without losing input', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         await expect(page.getByTestId('chat-view')).toBeVisible()
 
         const chain = await page.evaluate(() => {
@@ -131,7 +131,7 @@ test.describe('Chat page - mobile scroll with shared chat', () => {
         })
 
         // Navigate to chat with the shared gist hash
-        await page.goto(`/chat#gist=${mockGistId}`)
+        await page.goto(`./chat#gist=${mockGistId}`)
 
         // Wait for the shared chat to render with messages
         await expect(page.locator('.shared-mode')).toBeVisible({ timeout: 10000 })
@@ -193,7 +193,7 @@ test.describe('Chat page - mobile scroll with shared chat', () => {
             })
         })
 
-        await page.goto(`/chat#gist=${mockGistId}`)
+        await page.goto(`./chat#gist=${mockGistId}`)
         await expect(page.locator('.shared-mode')).toBeVisible({ timeout: 10000 })
 
         const hasHorizontalScroll = await page.evaluate(() => {

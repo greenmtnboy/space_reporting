@@ -1,26 +1,14 @@
 import { test, expect } from '@playwright/test'
 
-// Capture page errors and console errors for debugging CI failures
-function attachErrorListeners(page: import('@playwright/test').Page) {
-    const errors: string[] = []
-    page.on('pageerror', (err) => errors.push(`PAGE_ERROR: ${err.message}`))
-    page.on('console', (msg) => {
-        if (msg.type() === 'error') errors.push(`CONSOLE_ERROR: ${msg.text()}`)
-    })
-    return errors
-}
-
 test.describe('Chat page - setup view', () => {
     test('loads chat view and shows provider setup', async ({ page }) => {
-        const errors = attachErrorListeners(page)
-        await page.goto('/chat')
-        await expect(page.getByTestId('chat-view')).toBeVisible({ timeout: 15000 })
-            .catch(() => { throw new Error(`chat-view not visible. Errors:\n${errors.join('\n')}`) })
+        await page.goto('./chat')
+        await expect(page.getByTestId('chat-view')).toBeVisible()
         await expect(page.getByTestId('provider-setup')).toBeVisible()
     })
 
     test('provider select has expected options', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         const select = page.getByTestId('provider-select')
         await expect(select).toBeVisible()
 
@@ -33,7 +21,7 @@ test.describe('Chat page - setup view', () => {
     })
 
     test('selecting Anthropic shows correct default models without typos', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         const providerSelect = page.getByTestId('provider-select')
         await providerSelect.selectOption('anthropic')
 
@@ -54,7 +42,7 @@ test.describe('Chat page - setup view', () => {
     })
 
     test('selecting OpenAI shows GPT-5.2 model', async ({ page }) => {
-        await page.goto('/chat')
+        await page.goto('./chat')
         await page.getByTestId('provider-select').selectOption('openai')
 
         const modelSelect = page.getByTestId('model-select')
