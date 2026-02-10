@@ -3,6 +3,15 @@ import { defineConfig, devices } from '@playwright/test'
 const inDocker = process.env.TEST_ENV === 'docker'
 const inProd = process.env.TEST_ENV === 'prod'
 
+// Mobile viewport shared across all mobile projects.
+// We intentionally omit defaultBrowserType so each project uses its own engine.
+const mobileViewport = {
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+}
+
 export default defineConfig({
     testDir: './e2e',
     timeout: 30000,
@@ -31,7 +40,7 @@ export default defineConfig({
         },
         {
             name: 'chromium-mobile',
-            use: { ...devices['Pixel 7'] },
+            use: { ...devices['Desktop Chrome'], ...mobileViewport },
             testMatch: /chat-mobile/,
         },
         {
@@ -41,7 +50,7 @@ export default defineConfig({
         },
         {
             name: 'firefox-mobile',
-            use: { ...devices['Galaxy S5'] },
+            use: { ...devices['Desktop Firefox'], ...mobileViewport },
             testMatch: /chat-mobile/,
         },
         {
@@ -51,7 +60,7 @@ export default defineConfig({
         },
         {
             name: 'webkit-mobile',
-            use: { ...devices['iPhone 13'] },
+            use: { ...devices['Desktop Safari'], ...mobileViewport },
             testMatch: /chat-mobile/,
         },
     ],
