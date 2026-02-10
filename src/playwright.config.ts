@@ -27,10 +27,12 @@ export default defineConfig({
         {
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
+            testIgnore: /chat-mobile/,
         },
         {
             name: 'firefox',
             use: { ...devices['Desktop Firefox'] },
+            testIgnore: /chat-mobile/,
         },
         {
             name: 'webkit',
