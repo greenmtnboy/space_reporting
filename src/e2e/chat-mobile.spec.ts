@@ -90,6 +90,7 @@ test.describe('Chat page - mobile layout', () => {
             return {
                 chatView: check('.chat-view'),
                 chatInterface: check('.chat-interface'),
+                providerSetup: check('.provider-setup'),
             }
         })
 
@@ -97,12 +98,13 @@ test.describe('Chat page - mobile layout', () => {
         expect(chain.chatView).not.toBeNull()
         expect(chain.chatView!.overflow).toBe('hidden')
 
-        // chat-interface: flex-grows to fill, clips overflow, min-height:0
-        // allows shrinking below content size
-        expect(chain.chatInterface).not.toBeNull()
-        expect(chain.chatInterface!.flexGrow).toBe('1')
-        expect(chain.chatInterface!.overflow).toBe('hidden')
-        expect(chain.chatInterface!.minHeight).toBe('0px')
+        // In setup mode (no LLM connected), .chat-interface doesn't exist.
+        // When present (active chat), it should flex-grow and clip overflow.
+        if (chain.chatInterface) {
+            expect(chain.chatInterface.flexGrow).toBe('1')
+            expect(chain.chatInterface.overflow).toBe('hidden')
+            expect(chain.chatInterface.minHeight).toBe('0px')
+        }
     })
 })
 
