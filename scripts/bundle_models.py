@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 
 def bundle_models(raw_dir, output_file):
     models = []
@@ -22,7 +23,9 @@ def bundle_models(raw_dir, output_file):
     print(f"Bundled {len(models)} models into {output_file}")
 
 if __name__ == "__main__":
+    script_dir = Path(__file__).resolve().parent
+    project_root = script_dir.parent
     bundle_models(
-        raw_dir=r'C:\Users\ethan\coding_projects\space_reporting\data\raw',
-        output_file=r'C:\Users\ethan\coding_projects\space_reporting\src\public\models.json'
+        raw_dir=project_root / 'data' / 'raw',
+        output_file=project_root / 'src' / 'public' / 'models.json'
     )
