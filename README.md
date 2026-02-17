@@ -1,16 +1,16 @@
-# Space Dashboards
+# Rocket and Satellite Dashboards
 
-Because space - rockets and satellites - are fun and have interesting data.
+Because space exploration is fascinating, and we have rich data.
 
-Contains:
-- Launch View
-- Satellite View
-- Engine View
-- Chat w/ data view
+This repo generates a static website containing:
+- Global Launch View
+- Satellite Orbit View
+- Engine Exploration View
+- Chat w/ Raw Data Page
 
 Hosted on Github pages.
 
-[View Here](https://greenmtnboy.github.io/space_reporting/)
+[View It here](https://greenmtnboy.github.io/space_reporting/)
 
 ## Data
 
@@ -55,3 +55,7 @@ Example for launch data:
 ```bash
 trilogy run C:\Users\ethan\coding_projects\space_reporting\data\core.preql
 ```
+
+### Updating Semantic Model
+
+Rerun scripts/bundle_models.py after updating the files to update the bundled semantic models used by the chat experience.
