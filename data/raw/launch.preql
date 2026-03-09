@@ -25,7 +25,6 @@ property id.ascent_pad string;
 property id.apogee int; # the highest altitude actually reached, in km. This field may be omitted for orbital launches. In many cases for non-orbital launches the value is a guess based on known capabilities of the launch vehicle, so only values with no appended question-mark should be taken as accurate.
 property id.apo_flag string;
 property id.range string; # the range in km measured along the curved surface of the Earth between launch site and impact site, for a suborbital launch. I have only recently added this field and very few entries are filled in.
-property id.range_flag string;
 property id.dest string;
 property id.orb_pay float; # payload in tonnes delivered to orbit
 key _launch_code string;
@@ -233,7 +232,6 @@ root datasource raw_launch_info (
     Apogee: apogee,
     Apoflag: ?apo_flag,
     Range: ?range,
-    RangeFlag: ?range_flag,
     Dest: dest,
     OrbPay: orb_pay,
     Agency: orgs,
@@ -266,7 +264,6 @@ datasource launch_info (
     apogee,
     ?apo_flag,
     ?range,
-    ?range_flag,
     dest,
     orb_pay,
     orgs,

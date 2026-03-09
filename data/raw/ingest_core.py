@@ -59,12 +59,15 @@ def download_tsv(file_path: str) -> io.BytesIO:
     return buf
 
 
-def clean_tsv_content(raw_bytes: io.BytesIO) -> io.BytesIO:
+def clean_tsv_content(raw_bytes: io.BytesIO, fallback_headers: List[str] | None = None) -> io.BytesIO:
     """
     Clean TSV content by:
     1. Removing comment lines (lines starting with #) except the first line
     2. Stripping trailing/leading spaces from all fields
     3. Converting '-' to empty string in numeric columns
+
+    If fallback_headers is provided, it is used as the header row and all
+    non-comment lines (including the first) are treated as data rows.
     """
     raw_bytes.seek(0)
     lines = raw_bytes.read().decode(ENCODING, errors="replace").splitlines()
@@ -72,21 +75,30 @@ def clean_tsv_content(raw_bytes: io.BytesIO) -> io.BytesIO:
     if not lines:
         return io.BytesIO()
 
-    # Process header - always use first line, strip # if present
-    header_line = lines[0].lstrip("#").strip()
+    if fallback_headers is not None:
+        # Use provided headers; treat all non-comment lines as data
+        headers = fallback_headers
+        data_lines = []
+        for line in lines:
+            if not line.strip().startswith("#"):
+                data_lines.append(line.strip())
+    else:
+        # Process header - always use first line, strip # if present
+        header_line = lines[0].lstrip("#").strip()
 
-    # Collect non-comment data lines
-    data_lines = []
-    for line in lines[1:]:
-        if not line.strip().startswith("#"):
-            data_lines.append(line.strip())
+        # Collect non-comment data lines
+        data_lines = []
+        for line in lines[1:]:
+            if not line.strip().startswith("#"):
+                data_lines.append(line.strip())
 
     # Parse with CSV reader to handle fields properly
     all_rows: List[List[str]] = []
 
-    # Parse header
-    header_reader = csv.reader(io.StringIO(header_line), delimiter="\t")
-    headers = [col.strip() for col in next(header_reader)]
+    # Parse header (from file if not using fallback)
+    if fallback_headers is None:
+        header_reader = csv.reader(io.StringIO(header_line), delimiter="\t")
+        headers = [col.strip() for col in next(header_reader)]
     all_rows.append(headers)
 
     # Parse data rows and strip whitespace
@@ -95,6 +107,17 @@ def clean_tsv_content(raw_bytes: io.BytesIO) -> io.BytesIO:
             row_reader = csv.reader(io.StringIO(line), delimiter="\t")
             row = [field.strip() for field in next(row_reader)]
             all_rows.append(row)
+
+    # Verify column count of first data row matches headers
+    if len(all_rows) > 1:
+        first_data_row = all_rows[1]
+        if len(first_data_row) != len(headers):
+            raise ValueError(
+                f"Column count mismatch: headers has {len(headers)} columns "
+                f"but first data row has {len(first_data_row)} columns.\n"
+                f"Headers: {headers}\n"
+                f"First row: {first_data_row}"
+            )
 
     if len(all_rows) <= 1:  # Only header, no data
         out = io.StringIO()
@@ -159,19 +182,21 @@ def emit(table: pa.Table) -> None:
         writer.write_table(table)
 
 
-def ingest_gcat_file(file_path: str) -> pa.Table:
+def ingest_gcat_file(file_path: str, fallback_headers: List[str] | None = None) -> pa.Table:
     """
     Download a single file from GCAT and return it as an Arrow table.
 
     Args:
         file_path: Relative path to the file, e.g. 'tsv/cat/lcat.tsv'
+        fallback_headers: If the TSV has no header row, provide column names here.
+            All non-comment lines will be treated as data rows.
 
     Returns:
         PyArrow Table with the data and a 'data_update_date' column
     """
     data_update_date = fetch_data_update_date()
     raw_bytes = download_tsv(file_path)
-    cleaned_bytes = clean_tsv_content(raw_bytes)
+    cleaned_bytes = clean_tsv_content(raw_bytes, fallback_headers=fallback_headers)
     table = load_arrow_table(cleaned_bytes)
     table = add_data_update_column(table, data_update_date)
     return table
