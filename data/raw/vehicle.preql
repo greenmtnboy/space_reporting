@@ -11,11 +11,8 @@ property <name,variant>.alias string; # An entry in this field indicates that th
 property <name,variant>.min_stage int; # the lowest stage number on the rocket; typically 1, but can be 0 or -1 for strapons.
 property <name,variant>.max_stage int; # the highest stage number on the rocket; typically >=1.
 property <name,variant>.length float::m; # Approximate; will vary with fairings and other configuration.
-property <name,variant>.lflag string;
 property <name,variant>.diameter float::m;
-property <name,variant>.dflag string;
 property <name,variant>.launch_mass float::tonne;
-property <name,variant>.mflag string;
 property <name,variant>.leo_capacity float::kg; # in kg, approximate; only provided for some of the orbital vehicles. Values in these fields are especially tentative. 
 property <name,variant>.gto_capacity float::kg; # in kg, approximate; only provided for some of the orbital vehicles. Values in these fields are especially tentative. 
 property <name,variant>.to_thrust int;
@@ -53,11 +50,8 @@ root datasource lv_info_raw (
     LV_Min_Stage: min_stage,
     LV_Max_Stage: max_stage,
     Length: ?length,
-    LFlag: ?lflag,
     Diameter: diameter,
-    DFlag: ?dflag,
     Launch_Mass: ?launch_mass,
-    MFlag: ?mflag,
     LEO_Capacity: ?leo_capacity,
     GTO_Capacity: ?gto_capacity,
     TO_Thrust: ?to_thrust,
@@ -80,11 +74,8 @@ datasource lv_info (
     min_stage,
     max_stage,
     ?length,
-    ?lflag,
     diameter,
-    ?dflag,
     ?launch_mass,
-    ?mflag,
     ?leo_capacity,
     ?gto_capacity,
     ?to_thrust,
