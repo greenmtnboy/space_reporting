@@ -50,31 +50,33 @@ function getTypeColorClass(type: FilterType): string {
 </script>
 
 <template>
-  <div v-if="filters.length > 0" class="filter-chips">
-    <span class="filter-label">Filters:</span>
-    <div class="chips-container">
-      <div
-        v-for="filter in filters"
-        :key="`${filter.type}-${filter.value}`"
-        class="chip"
-        :class="getTypeColorClass(filter.type)"
-      >
-        <span class="chip-type">{{ getTypeLabel(filter.type) }}:</span>
-        <span class="chip-value">{{ filter.label }}</span>
-        <button
-          class="chip-remove"
-          @click="emit('remove', filter.type, filter.value)"
-          :aria-label="`Remove ${filter.label} filter`"
+  <div class="filter-chips">
+    <template v-if="filters.length > 0">
+      <span class="filter-label">Filters:</span>
+      <div class="chips-container">
+        <div
+          v-for="filter in filters"
+          :key="`${filter.type}-${filter.value}`"
+          class="chip"
+          :class="getTypeColorClass(filter.type)"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </button>
+          <span class="chip-type">{{ getTypeLabel(filter.type) }}:</span>
+          <span class="chip-value">{{ filter.label }}</span>
+          <button
+            class="chip-remove"
+            @click="emit('remove', filter.type, filter.value)"
+            :aria-label="`Remove ${filter.label} filter`"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
-    </div>
-    <button class="clear-all-btn" @click="emit('clearAll')">
-      Clear all
-    </button>
+      <button class="clear-all-btn" @click="emit('clearAll')">
+        Clear all
+      </button>
+    </template>
   </div>
 </template>
 
@@ -83,7 +85,8 @@ function getTypeColorClass(type: FilterType): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 4px 12px;
+  min-height: 1.75rem;
   background-color: var(--color-bg-tertiary);
   border-bottom: 1px solid var(--color-border);
   flex-wrap: wrap;
@@ -191,7 +194,8 @@ function getTypeColorClass(type: FilterType): string {
 
 @media (max-width: 600px) {
   .filter-chips {
-    padding: 6px 10px;
+    padding: 3px 10px;
+    min-height: 1.5rem;
     gap: 6px;
   }
 

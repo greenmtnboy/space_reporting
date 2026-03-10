@@ -30,8 +30,9 @@ const orbitGroupRef = ref<THREE.Group | null>(null)
 
 // Initialize year range first (other composables depend on it)
 const {
-  selectedRangeId,
-  selectedRange,
+  startDate,
+  endDate,
+  activePresetId,
   rangeStart,
   rangeEnd,
   rangeDuration,
@@ -39,8 +40,7 @@ const {
   title: yearTitle,
   progressStartLabel,
   progressEndLabel,
-  selectRange,
-  options: yearRangeOptions
+  setRange,
 } = useYearRange()
 
 // Slow down satellite animation by 2x compared to rockets
@@ -181,9 +181,9 @@ function handleCloseModal() {
   showCompletionModal.value = false
 }
 
-function handleYearRangeSelect(rangeId: string) {
+function handleRangeChange({ start, end, presetId }: { start: Date; end: Date; presetId: string | null }) {
   showCompletionModal.value = false
-  selectRange(rangeId)
+  setRange(start, end, presetId)
 }
 
 // Cross-filter handlers
@@ -228,29 +228,13 @@ onUnmounted(() => {
 
 <template>
   <div class="satellites-view" data-testid="satellites-view">
-    <!-- Loading State -->
-    <div v-if="isDataLoading" class="loading-overlay">
-      <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <p>Loading satellite data...</p>
-      </div>
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="loadError" class="loading-overlay error">
-      <div class="loading-content">
-        <p>Failed to load satellite data</p>
-        <p class="error-detail">{{ loadError }}</p>
-        <button @click="() => loadSatelliteData()">Retry</button>
-      </div>
-    </div>
-
     <ViewHeader
       :title="title"
       :current-date-display="currentDateDisplay"
-      :year-range-options="yearRangeOptions"
-      :selected-range-id="selectedRangeId"
-      @select-range="handleYearRangeSelect"
+      :start-date="startDate"
+      :end-date="endDate"
+      :active-preset-id="activePresetId"
+      @range-change="handleRangeChange"
     />
 
     <!-- Filter Chips -->
@@ -261,17 +245,36 @@ onUnmounted(() => {
     />
 
     <main class="main-content">
-      <div class="globe-section">
-        <div
-          ref="globeContainer"
-          class="globe-container"
-        >
-          <!-- Three.js canvas will be inserted here -->
+      <!-- Loading State -->
+      <div v-if="isDataLoading" class="loading-overlay">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <p>Loading satellite data...</p>
         </div>
+      </div>
 
-        <div class="satellite-counter">
-          <span class="counter-value">{{ activeSatellites.length }}</span>
-          <span class="counter-label">active satellites</span>
+      <!-- Error State -->
+      <div v-else-if="loadError" class="loading-overlay error">
+        <div class="loading-content">
+          <p>Failed to load satellite data</p>
+          <p class="error-detail">{{ loadError }}</p>
+          <button @click="() => loadSatelliteData()">Retry</button>
+        </div>
+      </div>
+
+      <div class="globe-section">
+        <div class="globe-area">
+          <div
+            ref="globeContainer"
+            class="globe-container"
+          >
+            <!-- Three.js canvas will be inserted here -->
+          </div>
+
+          <div class="satellite-counter">
+            <span class="counter-value">{{ activeSatellites.length }}</span>
+            <span class="counter-label">active satellites</span>
+          </div>
         </div>
 
         <ControlPanel
@@ -294,7 +297,7 @@ onUnmounted(() => {
         <CompletionModal
           v-if="showCompletionModal"
           :launch-count="accumulatedSatellites.length"
-          :year-range-label="selectedRange.label"
+          :year-range-label="yearTitle"
           :item-label="'satellites launched'"
           @play-again="handlePlayAgain"
           @close="handleCloseModal"
@@ -370,22 +373,34 @@ onUnmounted(() => {
 }
 
 .globe-section {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   padding: 0.5rem;
   position: relative;
   gap: 0.5rem;
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
+}
+
+/* Absorbs all spare vertical space; globe shrinks when space is tight */
+.globe-area {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .globe-container {
-  flex: 0 1 auto;
   width: 100%;
-  max-height: calc(100vh - 200px);
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: 1;
   position: relative;
   border: 1px solid var(--color-border);
@@ -394,18 +409,11 @@ onUnmounted(() => {
 
 @media (max-width: 900px) {
   .globe-section {
-    flex: 1 1 auto;
     min-height: 200px;
-    overflow: visible;
   }
 
   .globe-container {
-    max-width: 100%;
-    flex: 0 1 auto;
-    width: 100%;
-    height: auto;
     max-height: calc(50vh - 80px);
-    aspect-ratio: 1;
   }
 }
 
