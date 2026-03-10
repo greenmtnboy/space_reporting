@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import YearRangeButtons from './YearRangeButtons.vue'
-import type { YearRangeOption } from '../composables/useYearRange'
+import DateRangeSelector from './DateRangeSelector.vue'
 
 defineProps<{
   title: string
   currentDateDisplay?: string
-  yearRangeOptions?: YearRangeOption[]
-  selectedRangeId?: string
+  startDate?: Date
+  endDate?: Date
+  activePresetId?: string | null
 }>()
 
 const emit = defineEmits<{
-  'select-range': [rangeId: string]
+  'range-change': [{ start: Date; end: Date; presetId: string | null }]
 }>()
 </script>
 
@@ -22,11 +22,12 @@ const emit = defineEmits<{
         <div v-if="currentDateDisplay" class="date-display mobile-only">{{ currentDateDisplay }}</div>
       </div>
       <div class="header-details">
-        <YearRangeButtons
-          v-if="yearRangeOptions && selectedRangeId"
-          :options="yearRangeOptions"
-          :selected-id="selectedRangeId"
-          @select="(id) => emit('select-range', id)"
+        <DateRangeSelector
+          v-if="startDate && endDate"
+          :start-date="startDate"
+          :end-date="endDate"
+          :active-preset-id="activePresetId ?? null"
+          @change="(v) => emit('range-change', v)"
         />
         <slot></slot>
       </div>
@@ -97,25 +98,25 @@ const emit = defineEmits<{
   .view-header {
     padding: 0.75rem 1rem;
   }
-  
+
   .view-header h1 {
     font-size: 1.25rem;
   }
-  
+
   .header-top-row {
     justify-content: space-between;
     width: 100%;
   }
-  
+
   .header-left {
     width: 100%;
   }
-  
+
   .date-display.mobile-only {
     display: block;
     font-size: 1rem;
   }
-  
+
   .date-display.desktop-only {
     display: none;
   }

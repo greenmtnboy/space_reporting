@@ -13,8 +13,9 @@ import { useCrossFilter } from '../composables/useCrossFilter'
 import type { EngineFilters } from '../composables/useEngines'
 
 const {
-  selectedRangeId,
-  selectedRange,
+  startDate,
+  endDate,
+  activePresetId,
   rangeStart,
   rangeEnd,
   rangeDuration,
@@ -22,8 +23,7 @@ const {
   title,
   progressStartLabel,
   progressEndLabel,
-  selectRange,
-  options: yearRangeOptions
+  setRange,
 } = useYearRange(120000)
 
 const {
@@ -183,9 +183,9 @@ function handleCloseModal() {
   showCompletionModal.value = false
 }
 
-function handleSelectRange(rangeId: string) {
+function handleRangeChange({ start, end, presetId }: { start: Date; end: Date; presetId: string | null }) {
   showCompletionModal.value = false
-  selectRange(rangeId)
+  setRange(start, end, presetId)
 }
 
 // Cross-filter handlers
@@ -643,29 +643,13 @@ function updateTooltipPosition(event: MouseEvent) {
 
 <template>
   <div class="engines-view" data-testid="engines-view">
-    <!-- Loading State -->
-    <div v-if="isLoading" class="loading-overlay">
-      <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <p>Loading engine data...</p>
-      </div>
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="loadError" class="loading-overlay error">
-      <div class="loading-content">
-        <p>Failed to load engine data</p>
-        <p class="error-detail">{{ loadError }}</p>
-        <button @click="() => loadEngineData()">Retry</button>
-      </div>
-    </div>
-
     <ViewHeader
       :title="`${title} Engine Firings`"
       :current-date-display="currentDateDisplay"
-      :year-range-options="yearRangeOptions"
-      :selected-range-id="selectedRangeId"
-      @select-range="handleSelectRange"
+      :start-date="startDate"
+      :end-date="endDate"
+      :active-preset-id="activePresetId"
+      @range-change="handleRangeChange"
     />
 
     <!-- Filter Chips -->
@@ -676,6 +660,23 @@ function updateTooltipPosition(event: MouseEvent) {
     />
 
     <main class="main-content">
+      <!-- Loading State -->
+      <div v-if="isLoading" class="loading-overlay">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <p>Loading engine data...</p>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="loadError" class="loading-overlay error">
+        <div class="loading-content">
+          <p>Failed to load engine data</p>
+          <p class="error-detail">{{ loadError }}</p>
+          <button @click="() => loadEngineData()">Retry</button>
+        </div>
+      </div>
+
       <div class="display-section">
         <!-- Stage Sections with Flare + Kill Markers -->
         <div class="stages-container">
@@ -881,7 +882,7 @@ function updateTooltipPosition(event: MouseEvent) {
         <CompletionModal
           v-if="showCompletionModal"
           :launch-count="totalEngineFireings"
-          :year-range-label="selectedRange.label"
+          :year-range-label="title"
           item-label="engine firings"
           @play-again="handlePlayAgain"
           @close="handleCloseModal"

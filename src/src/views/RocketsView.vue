@@ -29,8 +29,9 @@ const mapHeight = ref(1024)
 
 // Initialize year range first (other composables depend on it)
 const {
-  selectedRangeId,
-  selectedRange,
+  startDate,
+  endDate,
+  activePresetId,
   rangeStart,
   rangeEnd,
   rangeDuration,
@@ -38,8 +39,7 @@ const {
   title,
   progressStartLabel,
   progressEndLabel,
-  selectRange,
-  options: yearRangeOptions
+  setRange,
 } = useYearRange()
 
 // Initialize composables
@@ -149,9 +149,9 @@ function handleCloseModal() {
   showCompletionModal.value = false
 }
 
-function handleYearRangeSelect(rangeId: string) {
+function handleRangeChange({ start, end, presetId }: { start: Date; end: Date; presetId: string | null }) {
   showCompletionModal.value = false
-  selectRange(rangeId)
+  setRange(start, end, presetId)
   // Animation reset is handled by watch in useAnimation
   resetSeenLaunches()
 }
@@ -210,29 +210,13 @@ onUnmounted(() => {
 
 <template>
   <div class="rockets-view" data-testid="rockets-view">
-    <!-- Loading State -->
-    <div v-if="isDataLoading" class="loading-overlay">
-      <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <p>Loading launch data...</p>
-      </div>
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="loadError" class="loading-overlay error">
-      <div class="loading-content">
-        <p>Failed to load launch data</p>
-        <p class="error-detail">{{ loadError }}</p>
-        <button @click="() => loadLaunchData()">Retry</button>
-      </div>
-    </div>
-
     <ViewHeader
       :title="`${title} Rocket Launches`"
       :current-date-display="currentDateDisplay"
-      :year-range-options="yearRangeOptions"
-      :selected-range-id="selectedRangeId"
-      @select-range="handleYearRangeSelect"
+      :start-date="startDate"
+      :end-date="endDate"
+      :active-preset-id="activePresetId"
+      @range-change="handleRangeChange"
     />
 
     <!-- Filter Chips -->
@@ -243,6 +227,23 @@ onUnmounted(() => {
     />
 
     <main class="main-content">
+      <!-- Loading State -->
+      <div v-if="isDataLoading" class="loading-overlay">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <p>Loading launch data...</p>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="loadError" class="loading-overlay error">
+        <div class="loading-content">
+          <p>Failed to load launch data</p>
+          <p class="error-detail">{{ loadError }}</p>
+          <button @click="() => loadLaunchData()">Retry</button>
+        </div>
+      </div>
+
       <div class="map-section">
         <div
           ref="mapContainer"
@@ -296,7 +297,7 @@ onUnmounted(() => {
         <CompletionModal
           v-if="showCompletionModal"
           :launch-count="accumulatedLaunches.length"
-          :year-range-label="selectedRange.label"
+          :year-range-label="title"
           @play-again="handlePlayAgain"
           @close="handleCloseModal"
         />
