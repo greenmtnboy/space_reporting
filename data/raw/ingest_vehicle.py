@@ -11,8 +11,9 @@ from ingest_core import emit, ingest_gcat_file
 
 LV_HEADERS = [
     "LV_Name", "LV_Family", "LV_Manufacturer", "LV_Variant", "LV_Alias",
-    "LV_Min_Stage", "LV_Max_Stage", "Length", "Diameter", "Launch_Mass",
-    "LEO_Capacity", "GTO_Capacity", "TO_Thrust", "Class", "Apogee", "Range",
+    "LV_Min_Stage", "LV_Max_Stage", "Length", "LFlag", "Diameter", "DFlag",
+    "Launch_Mass", "MFlag", "LEO_Capacity", "GTO_Capacity", "TO_Thrust",
+    "Class", "Apogee", "Range",
 ]
 
 if __name__ == "__main__":

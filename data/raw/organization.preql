@@ -116,7 +116,7 @@ root datasource organizations_raw (
     )
 grain (code)
 file `ingest_orgs.py`
-freshness by data_updated_through;
+;
 
 
 datasource organizations (

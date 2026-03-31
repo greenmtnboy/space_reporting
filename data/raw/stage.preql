@@ -33,7 +33,7 @@ root datasource stages_raw (
     )
 grain (name)
 file `ingest_stages.py`
-freshness by data_updated_through;
+;
 
 
 datasource stages (

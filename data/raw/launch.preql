@@ -245,7 +245,7 @@ root datasource raw_launch_info (
     )
 grain (id)
 file `ingest_launch.py`
-freshness by data_updated_through;
+;
 
 datasource launch_info (
     id,

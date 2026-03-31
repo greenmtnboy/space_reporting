@@ -62,7 +62,7 @@ root datasource lv_info_raw (
     )
 grain (name,variant)
 file `ingest_vehicle.py`
-freshness by data_updated_through;
+;
 
 
 datasource lv_info (
@@ -115,7 +115,7 @@ root datasource lvs_info_raw (
     )
 grain (name,stage_no,variant)
 file `ingest_vehicle_stages.py`
-freshness by data_updated_through;
+;
 
 
 datasource lvs_info (
