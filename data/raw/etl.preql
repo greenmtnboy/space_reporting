@@ -10,5 +10,3 @@ def extract_date(col)-> CASE
         )
         ELSE NULL
     END::date;
-
-    #4A6CFF
