@@ -240,8 +240,7 @@ root datasource raw_launch_info (
     Category: category,
     LTCite: lt_cite,
     Cite: cite,
-    Notes: notes,
-    data_update_date: data_updated_through
+    Notes: notes
     )
 grain (id)
 file `ingest_launch.py`

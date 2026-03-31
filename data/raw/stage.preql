@@ -28,8 +28,7 @@ root datasource stages_raw (
     Thrust: ?thrust,
     Duration: ?duration,
     Engine: ~engine.name,
-    NEng: ?engine_count,
-    data_update_date: data_updated_through
+    NEng: ?engine_count
     )
 grain (name)
 file `ingest_stages.py`

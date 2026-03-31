@@ -70,8 +70,7 @@ root datasource engines_raw (
     Chambers: ?chambers,
     Date: date,
     Usage: usage,
-    Group: group,
-    data_update_date: data_updated_through
+    Group: group
     )
 grain (name)
 file `ingest_engine.py`
