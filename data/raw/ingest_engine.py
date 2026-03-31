@@ -10,7 +10,8 @@ from ingest_core import emit, ingest_gcat_file
 
 ENGINES_HEADERS = [
     "Name", "Manufacturer", "Family", "Alt_Name", "Oxidizer", "Fuel",
-    "Mass", "Impulse", "Thrust", "Isp", "Duration", "Chambers",
+    "Mass", "MFlag", "Impulse", "ImpFlag", "Thrust", "TFlag",
+    "Isp", "IspFlag", "Duration", "DurFlag", "Chambers",
     "Date", "Usage", "Group",
 ]
 

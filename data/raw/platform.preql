@@ -50,7 +50,7 @@ root datasource platform_info_raw (
     )
 grain (code)
 file `ingest_platform.py`
-freshness by data_updated_through;
+;
 
 
 datasource platform_info (

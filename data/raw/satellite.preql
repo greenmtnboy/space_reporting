@@ -144,8 +144,7 @@ root datasource satcat_raw (
     )
 grain (jcat)
 file `ingest_satcat.py`
-freshness by data_updated_through;
-
+;
 
 datasource satcat (
     JCAT: jcat,

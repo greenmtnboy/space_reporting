@@ -5,17 +5,17 @@
 # ///
 
 # Column reference: https://planet4589.org/space/gcat/data/cat/satcat.html
-# Note: All flag columns (MassFlag, DryFlag, TotFlag, LFlag, DFlag, SpanFlag, PF, AF, IF)
-# were removed in upstream format change.
 
 from ingest_core import emit, ingest_gcat_file
 
 SATCAT_HEADERS = [
     "JCAT", "Satcat", "Launch_Tag", "Piece", "Type", "Name", "PLName",
     "LDate", "Parent", "SDate", "Primary", "DDate", "Status", "Dest",
-    "Owner", "State", "Manufacturer", "Bus", "Motor", "Mass",
-    "DryMass", "TotMass", "Length", "Diameter", "Span", "Shape",
-    "ODate", "Perigee", "Apogee", "Inc", "OpOrbit", "OQUAL", "AltNames",
+    "Owner", "State", "Manufacturer", "Bus", "Motor", "Mass", "MassFlag",
+    "DryMass", "DryFlag", "TotMass", "TotFlag", "Length", "LFlag",
+    "Diameter", "DFlag", "Span", "SpanFlag", "Shape",
+    "ODate", "Perigee", "PF", "Apogee", "AF", "Inc", "IF",
+    "OpOrbit", "OQUAL", "AltNames",
 ]
 
 if __name__ == "__main__":
