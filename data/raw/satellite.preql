@@ -139,8 +139,7 @@ root datasource satcat_raw (
     Inc: inc,
     OpOrbit: op_orbit,
     OQUAL: oqual,
-    AltNames: alt_names,
-    data_update_date: data_updated_through
+    AltNames: alt_names
     )
 grain (jcat)
 file `ingest_satcat.py`

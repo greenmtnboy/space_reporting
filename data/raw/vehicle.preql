@@ -57,8 +57,7 @@ root datasource lv_info_raw (
     TO_Thrust: ?to_thrust,
     Class: class,
     Apogee: ?apogee,
-    Range: ?range,
-    data_update_date: data_updated_through
+    Range: ?range
     )
 grain (name,variant)
 file `ingest_vehicle.py`
@@ -110,8 +109,7 @@ root datasource lvs_info_raw (
     Stage_Impulse: ?stage_impulse,
     Stage_Apogee: stage_apogee,
     Stage_Perigee: stage_perigee,
-    Perigee_Qual: perigee_qual,
-    data_update_date: data_updated_through
+    Perigee_Qual: perigee_qual
     )
 grain (name,stage_no,variant)
 file `ingest_vehicle_stages.py`

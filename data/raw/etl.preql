@@ -1,5 +1,11 @@
 # shared concepts
-key data_updated_through datetime; # date when the data was last updated
+property <*>.data_updated_through datetime; # date when the data was last updated
+
+datasource data_update_info (
+    data_update_date: data_updated_through
+    )
+file `ingest_update_date.py`
+;
 
 def extract_date(col)-> CASE 
         WHEN TRIM(REGEXP_EXTRACT(REPLACE(col, '?', ''), '(\d{4}\s+[A-Za-z]{3}\s+\d{1,2})', 1)) IS NOT NULL 
@@ -10,5 +16,3 @@ def extract_date(col)-> CASE
         )
         ELSE NULL
     END::date;
-
-    #4A6CFF

@@ -3,10 +3,10 @@
 Because space exploration is fascinating, and we have rich data.
 
 This repo generates a static website containing:
-- Global Launch View
-- Satellite Orbit View
-- Engine Exploration View
-- Chat w/ Raw Data Page
+- [Global Launch View](https://greenmtnboy.github.io/space_reporting/)
+- [Satellite Orbit View](https://greenmtnboy.github.io/space_reporting/satellites)
+- [Engine Exploration View](https://greenmtnboy.github.io/space_reporting/engines)
+- [Chat w/ Raw Data Page](https://greenmtnboy.github.io/space_reporting/chat)
 
 Hosted on Github pages.
 

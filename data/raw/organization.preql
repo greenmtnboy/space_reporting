@@ -111,8 +111,7 @@ root datasource organizations_raw (
     Parent: parents,
     ShortEName: short_e_name,
     EName: ?_e_name,
-    UName: u_name,
-    data_update_date: data_updated_through
+    UName: u_name
     )
 grain (code)
 file `ingest_orgs.py`

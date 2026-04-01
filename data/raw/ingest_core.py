@@ -194,11 +194,8 @@ def ingest_gcat_file(file_path: str, fallback_headers: List[str] | None = None) 
     Returns:
         PyArrow Table with the data and a 'data_update_date' column
     """
-    data_update_date = fetch_data_update_date()
     raw_bytes = download_tsv(file_path)
     cleaned_bytes = clean_tsv_content(raw_bytes, fallback_headers=fallback_headers)
-    table = load_arrow_table(cleaned_bytes)
-    table = add_data_update_column(table, data_update_date)
-    return table
+    return load_arrow_table(cleaned_bytes)
 
 
