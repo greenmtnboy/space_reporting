@@ -13,11 +13,12 @@ test.describe('Chat page - setup view', () => {
         await expect(select).toBeVisible()
 
         const options = select.locator('option')
-        // placeholder + 3 providers
-        await expect(options).toHaveCount(4)
-        await expect(options.nth(1)).toHaveText('Anthropic (Claude)')
-        await expect(options.nth(2)).toHaveText('OpenAI')
-        await expect(options.nth(3)).toHaveText('Google (Gemini)')
+        // placeholder + 4 providers (demo, anthropic, openai, google)
+        await expect(options).toHaveCount(5)
+        await expect(options.nth(1)).toHaveText('Demo (limited messages)')
+        await expect(options.nth(2)).toHaveText('Anthropic (Claude)')
+        await expect(options.nth(3)).toHaveText('OpenAI')
+        await expect(options.nth(4)).toHaveText('Google (Gemini)')
     })
 
     test('selecting Anthropic shows correct default models without typos', async ({ page }) => {
@@ -32,13 +33,9 @@ test.describe('Chat page - setup view', () => {
         const optionTexts = await options.allTextContents()
         const trimmed = optionTexts.map(t => t.trim())
 
-        // Should contain properly spelled 'Opus', not 'Pous'
-        expect(trimmed.some(t => t.includes('Opus'))).toBe(true)
-        expect(trimmed.some(t => t.includes('Pous'))).toBe(false)
-
-        // Should have Claude Opus 4.6 as first real option
+        // Should contain Claude Sonnet and Opus models
+        expect(trimmed).toContain('Claude Sonnet 4.6')
         expect(trimmed).toContain('Claude Opus 4.6')
-        expect(trimmed).toContain('Claude Opus 4.5')
     })
 
     test('selecting OpenAI shows GPT-5.2 model', async ({ page }) => {

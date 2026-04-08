@@ -1,7 +1,7 @@
 # shared concepts
 property <*>.data_updated_through datetime; # date when the data was last updated
 
-datasource data_update_info (
+root datasource data_update_info (
     data_update_date: data_updated_through
     )
 file `ingest_update_date.py`

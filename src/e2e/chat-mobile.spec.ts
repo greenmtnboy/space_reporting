@@ -151,9 +151,9 @@ test.describe('Chat page - mobile scroll with shared chat', () => {
         await expect(page.locator('.shared-mode')).toBeVisible({ timeout: 10000 })
 
         // Wait for messages to render
-        await expect(page.locator('.message').first()).toBeVisible({ timeout: 10000 })
+        await expect(page.locator('.chat-msg').first()).toBeVisible({ timeout: 10000 })
 
-        const messageCount = await page.locator('.message').count()
+        const messageCount = await page.locator('.chat-msg').count()
         expect(messageCount).toBeGreaterThan(0)
 
         const viewport = page.viewportSize()!

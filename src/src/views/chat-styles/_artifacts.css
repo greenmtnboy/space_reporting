@@ -1,0 +1,188 @@
+/* ChatView Artifact Styles - Split pane layout */
+
+.chat-split-pane {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.chat-split-pane > .chat-container {
+  flex: 1;
+  min-width: 320px;
+  transition: flex 0.2s ease;
+}
+
+.chat-split-pane > .chat-container.has-artifacts {
+  flex: 0 0 40%;
+  max-width: 480px;
+}
+
+/* ── Artifact Panel ── */
+.artifact-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+}
+
+.artifact-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.artifact-tabs::-webkit-scrollbar {
+  height: 2px;
+}
+
+.artifact-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.artifact-tab i {
+  font-family: 'Material Design Icons';
+  font-size: 0.85rem;
+}
+
+.artifact-tab:hover {
+  color: var(--color-text);
+  background: var(--color-bg-secondary);
+}
+
+.artifact-tab.active {
+  color: var(--color-accent-bright);
+  background: var(--color-bg-secondary);
+  border-color: var(--color-accent-dim);
+}
+
+/* ── View Toggle (chart/table) ── */
+.artifact-view-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggle-btn i {
+  font-family: 'Material Design Icons';
+  font-size: 0.8rem;
+}
+
+.toggle-btn:hover {
+  color: var(--color-text);
+}
+
+.toggle-btn.active {
+  color: var(--color-accent-bright);
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.2);
+}
+
+/* ── Artifact Content ── */
+.artifact-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.artifact-render-area {
+  flex: 1;
+  min-height: 300px;
+  overflow: auto;
+  padding: 4px;
+  position: relative;
+}
+
+.artifact-markdown {
+  padding: 16px;
+}
+
+.artifact-code {
+  padding: 12px;
+}
+
+.artifact-code pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text);
+}
+
+.artifact-fallback {
+  padding: 12px;
+}
+
+.artifact-fallback pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text-muted);
+}
+
+/* ── Mobile: stack vertically ── */
+@media (max-width: 768px) {
+  .chat-split-pane {
+    flex-direction: column;
+  }
+
+  .chat-split-pane > .chat-container.has-artifacts {
+    flex: 0 0 50%;
+    max-width: 100%;
+  }
+
+  .artifact-panel {
+    border-left: none;
+    border-top: 1px solid var(--color-border);
+    max-height: 50%;
+  }
+}

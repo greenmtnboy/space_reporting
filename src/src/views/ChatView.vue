@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, provide, computed } from 'vue'
+import { ref, onMounted, provide, computed, nextTick, watch } from 'vue'
 import {
   useTrilogyChat,
   useTrilogyCore,
-  LLMChatSplitView,
-} from '@trilogy-data/trilogy-studio-components'
+  MarkdownRenderer,
+  DataTable,
+  VegaLiteChart,
+} from '@trilogy-data/trilogy-studio-components/dashboard'
+import type { ChatArtifact } from '@trilogy-data/trilogy-studio-components/llm'
 import ViewHeader from '../components/ViewHeader.vue'
 import { useChatSharing } from '../composables/useChatSharing'
+import { PREQL_MODELS } from '../models'
 
 // Initialize Trilogy core (all stores/services)
 const trilogy = useTrilogyCore()
@@ -19,16 +23,16 @@ async function saveTokenAndRetry() {
   if (!tokenInput.value) return
   sharing.setGitHubToken(tokenInput.value.trim())
   tokenInput.value = ''
-  // Retry sharing with the new token
   shareChat()
 }
 
-// Ensure dark theme is set early (before render) for Vega-Lite and other components
+// Ensure dark theme and production resolver are set early (before composables read settings)
 trilogy.userSettingsStore.loadSettings()
 if (!trilogy.userSettingsStore.settings.theme) {
   trilogy.userSettingsStore.updateSetting('theme', 'dark')
-  trilogy.userSettingsStore.saveSettings()
 }
+trilogy.userSettingsStore.updateSetting('trilogyResolver', 'https://trilogy-service.fly.dev')
+trilogy.userSettingsStore.saveSettings()
 trilogy.userSettingsStore.toggleTheme()
 
 // Check for shared chat immediately (before onMounted) so viewMode computes correctly
@@ -41,9 +45,6 @@ provide('editorStore', trilogy.editorStore)
 provide('chatStore', trilogy.chatStore)
 provide('userSettingsStore', trilogy.userSettingsStore)
 provide('queryExecutionService', trilogy.queryExecutionService)
-
-// Mobile sidebar toggle
-const mobileSidebarOpen = ref(false)
 
 // Track DuckDB connection status
 const dataConnectionName = 'space-duckdb'
@@ -61,10 +62,10 @@ const availableModels = ref<{ id: string; name: string }[]>([])
 const connectionError = ref('')
 
 const availableProviders = [
+  { id: 'demo', name: 'Demo (limited messages)' },
   { id: 'anthropic', name: 'Anthropic (Claude)' },
   { id: 'openai', name: 'OpenAI' },
   { id: 'google', name: 'Google (Gemini)' },
-  // { id: 'mistral', name: 'Mistral' },
 ]
 
 const hasActiveLLMConnection = computed(() => {
@@ -82,21 +83,97 @@ const viewMode = computed(() => {
   return 'setup'
 })
 
+// Use the chat composable with tools — handles tool loop internally
+const chat = useTrilogyChat({
+  dataConnectionName,
+  initialTitle: 'Space Data Chat',
+  persistChat: true,
+})
+
+// ── Chat UI state ──
+const userInput = ref('')
+const messagesContainer = ref<HTMLDivElement>()
+
+const SUGGESTIONS = [
+  'What rockets have the most engines?',
+  'Plot the top launch sites in Asia.',
+  'What\'s the biggest GEO satellite cluster?',
+]
+
+// Send message using useTrilogyChat's built-in tool loop
+async function handleSend() {
+  const text = userInput.value.trim()
+  if (!text || chat.isChatLoading.value) return
+  userInput.value = ''
+  await chat.handleChatMessageWithTools(text, chat.activeChatMessages.value)
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    handleSend()
+  }
+}
+
+async function injectSuggestion(text: string) {
+  if (chat.isChatLoading.value) return
+  await chat.handleChatMessageWithTools(text, chat.activeChatMessages.value)
+}
+
+// Visible messages — filter out hidden/system messages
+const visibleMessages = computed(() =>
+  (chat.activeChatMessages.value || []).filter(
+    (m: any) => m.role !== 'system' && !m.hidden && (m.content || m.executedToolCalls?.length),
+  ),
+)
+
+// Artifact panel state
+const visibleArtifacts = computed(() =>
+  (chat.activeChatArtifacts.value || []).filter((a: ChatArtifact) => !a.hidden),
+)
+const hasArtifacts = computed(() => visibleArtifacts.value.length > 0)
+const activeArtifactIndex = computed({
+  get: () => chat.activeChatArtifactIndex.value,
+  set: (v: number) => chat.handleActiveArtifactUpdate(v),
+})
+const activeArtifact = computed(() => visibleArtifacts.value[activeArtifactIndex.value] || null)
+// Tab state per artifact: 'chart' or 'table'
+const artifactTab = ref<'chart' | 'table'>('chart')
+
+// Auto-select latest artifact when new ones arrive
+watch(() => visibleArtifacts.value.length, (newLen) => {
+  if (newLen > 0) {
+    activeArtifactIndex.value = newLen - 1
+    const latest = visibleArtifacts.value[newLen - 1]
+    artifactTab.value = latest.type === 'results' ? 'table' : 'chart'
+  }
+})
+
+// Auto-scroll to bottom on new messages
+async function scrollToBottom() {
+  await nextTick()
+  if (messagesContainer.value) {
+    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  }
+}
+watch(() => visibleMessages.value.length, scrollToBottom)
+watch(
+  () => visibleMessages.value[visibleMessages.value.length - 1]?.content,
+  scrollToBottom,
+)
+
 // Initialize DuckDB connection on mount
 onMounted(async () => {
   try {
-    // Shared chat was already checked during setup, just log if present
     const hasSharedChat = sharing.isSharedChat.value
     if (hasSharedChat) {
       console.log('Loaded shared chat:', sharing.sharedChatData.value?.title)
     }
 
-    // Check if connection already exists (handles navigation/hot reload)
     if (!trilogy.connectionStore.connections[dataConnectionName]) {
       trilogy.connectionStore.newConnection(dataConnectionName, 'duckdb', {})
     }
 
-    // Only reset if not already connected
     const conn = trilogy.connectionStore.connections[dataConnectionName]
     if (conn && !conn.connected) {
       await trilogy.connectionStore.resetConnection(dataConnectionName)
@@ -105,43 +182,22 @@ onMounted(async () => {
     console.log('DuckDB connection ready')
     dbStatus.value = 'ready'
 
-    // Theme is set during setup (before render) to ensure Vega charts render with correct theme
-
-    // Create a chat with this data connection if none exists (unless viewing shared chat)
     if (!trilogy.chatStore.activeChatId && !hasSharedChat) {
       trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
     }
 
-    // Ensure production resolver is used
+    // Always force production resolver
     trilogy.resolver.settingStore.loadSettings()
-    const currentResolver = trilogy.resolver.settingStore.settings.trilogyResolver
-    if (!currentResolver || currentResolver.includes('localhost')) {
-      trilogy.resolver.settingStore.updateSetting('trilogyResolver', 'https://trilogy-service.fly.dev')
-      trilogy.resolver.settingStore.saveSettings()
-    }
+    trilogy.resolver.settingStore.updateSetting('trilogyResolver', 'https://trilogy-service.fly.dev')
+    trilogy.resolver.settingStore.saveSettings()
 
-    // Load bundled models
-    try {
-      const modelsUrl = `${import.meta.env.BASE_URL}models.json`
-      console.log(`Fetching models from ${modelsUrl}...`)
-      const response = await fetch(modelsUrl)
-      if (response.ok) {
-        const models = await response.json()
-        console.log(`Loaded ${models.length} models from bundle`)
-        
-        models.forEach((model: any) => {
-          // Check if editor already exists (using base name like 'etl')
-          if (!trilogy.editorStore.editors[model.name]) {
-            console.log(`Creating editor for model: ${model.name} on connection: ${dataConnectionName}`)
-            trilogy.editorStore.newEditor(model.name, 'preql', dataConnectionName, model.contents)
-          } else {
-            console.log(`Editor for model ${model.name} already exists.`)
-          }
-        })
+    // Load preql models (imported at build time from data/raw/*.preql)
+    for (const model of PREQL_MODELS) {
+      if (!trilogy.editorStore.editors[model.name]) {
+        trilogy.editorStore.newEditor(model.name, 'preql', dataConnectionName, model.contents)
       }
-    } catch (modelError) {
-      console.error('Failed to load bundled models:', modelError)
     }
+    console.log(`Loaded ${PREQL_MODELS.length} preql models`)
   } catch (error) {
     console.error('Failed to initialize DuckDB:', error)
     dbStatus.value = 'error'
@@ -156,40 +212,37 @@ const handlePaste = () => {
 // Reset chat - clear messages and start fresh
 function resetChat() {
   if (trilogy.chatStore.activeChatId) {
-    // Clear existing chat data
     trilogy.chatStore.clearChatMessages(trilogy.chatStore.activeChatId)
     chat.handleImportChange([])
   } else {
-    // Create new chat if none exists
     trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat')
     chat.handleImportChange([])
   }
 }
 
-// Use the chat composable with tools
-const chat = useTrilogyChat({
-  dataConnectionName,
-  initialTitle: 'Space Data Chat',
-  persistChat: true,
-})
-
 // Connect LLM provider
 const connectProvider = async () => {
   connectionError.value = ''
   try {
-    const model = selectedModel.value || availableModels.value[0]?.id
     const connName = `${selectedProvider.value}-${Date.now()}`
-    
-    llmStore.newConnection(connName, selectedProvider.value, {
-      apiKey: apiKeyInput.value,
-      model: model,
-      saveCredential: false,
-    })
-    
+
+    if (isDemo.value) {
+      await llmStore.newConnection(connName, 'demo', {
+        model: 'google/gemini-3-flash-preview',
+        saveCredential: false,
+      })
+    } else {
+      const model = selectedModel.value || availableModels.value[0]?.id
+      await llmStore.newConnection(connName, selectedProvider.value, {
+        apiKey: apiKeyInput.value,
+        model: model,
+        saveCredential: false,
+      })
+    }
+
     llmStore.activeConnection = connName
     showProviderSelector.value = false
-    
-    // Update the chat's LLM connection
+
     if (trilogy.chatStore.activeChatId) {
       trilogy.chatStore.chats[trilogy.chatStore.activeChatId].llmConnectionName = connName
     }
@@ -204,8 +257,7 @@ const loadModels = async () => {
     availableModels.value = []
     return
   }
-  
-  // If no API key, just show default models but don't try to fetch
+
   if (!apiKeyInput.value) {
     availableModels.value = getDefaultModels(selectedProvider.value)
     if (availableModels.value.length > 0 && !selectedModel.value) {
@@ -213,14 +265,13 @@ const loadModels = async () => {
     }
     return
   }
-  
+
   loadingModels.value = true
   connectionError.value = ''
-  
+
   try {
     const modelIds = await llmStore.fetchModelsForProvider(selectedProvider.value, apiKeyInput.value)
-    
-    // Filter to chat models
+
     const chatModels = modelIds.filter((id: string) => {
       const lower = id.toLowerCase()
       if (selectedProvider.value === 'openai') {
@@ -231,16 +282,15 @@ const loadModels = async () => {
       }
       return true
     })
-    
+
     availableModels.value = chatModels.map((id: string) => ({ id, name: id }))
-    
+
     if (availableModels.value.length > 0 && !selectedModel.value) {
       selectedModel.value = availableModels.value[0].id
     }
   } catch (error) {
     console.error('Failed to fetch models:', error)
     connectionError.value = error instanceof Error ? error.message : 'Failed to fetch models'
-    // Fallback models
     availableModels.value = getDefaultModels(selectedProvider.value)
     if (availableModels.value.length > 0) {
       selectedModel.value = availableModels.value[0].id
@@ -254,30 +304,34 @@ function getDefaultModels(provider: string) {
   switch (provider) {
     case 'anthropic':
       return [
+        { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
         { id: 'claude-opus-4-6-20260201', name: 'Claude Opus 4.6' },
-        { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5' },
       ]
     case 'openai':
-      return [
-        { id: 'gpt-5.2', name: 'GPT-5.2' },
-      ]
+      return [{ id: 'gpt-5.2', name: 'GPT-5.2' }]
     case 'google':
       return [{ id: 'models/gemini-2.5-flash', name: 'models/gemini-2.5-flash' }]
-    // case 'mistral':
-    //   return [{ id: 'mistral-large-latest', name: 'Mistral Large' }]
+    case 'demo':
+      return []
     default:
       return []
   }
 }
 
-const canConnect = computed(() => selectedProvider.value && apiKeyInput.value && selectedModel.value)
+const isDemo = computed(() => selectedProvider.value === 'demo')
+
+const canConnect = computed(() => {
+  if (!selectedProvider.value) return false
+  if (isDemo.value) return true
+  return apiKeyInput.value && selectedModel.value
+})
 
 const connectTooltip = computed(() => {
   if (canConnect.value) return 'Connect to LLM'
-  const missing = []
+  const missing: string[] = []
   if (!selectedProvider.value) missing.push('provider')
-  if (!apiKeyInput.value) missing.push('API key')
-  if (!selectedModel.value) missing.push('model')
+  if (!isDemo.value && !apiKeyInput.value) missing.push('API key')
+  if (!isDemo.value && !selectedModel.value) missing.push('model')
   return `Missing: ${missing.join(', ')}`
 })
 
@@ -288,7 +342,7 @@ const connectionInfo = computed(() => {
 })
 
 const activeDatasets = computed(() => {
-  return chat.activeImportsForChat.value.map(imp => imp.alias || imp.name)
+  return chat.activeImportsForChat.value.map((imp: any) => imp.alias || imp.name)
 })
 
 // Share current chat
@@ -298,16 +352,12 @@ function shareChat() {
   const imports = chat.activeImportsForChat.value || []
   const title = chat.activeChatTitle.value || 'Space Data Chat'
 
-  // Transform artifacts to shareable format
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shareableArtifacts = artifacts.map((a: any) => ({
     type: a.type || 'unknown',
     content: JSON.stringify(a),
-    title: a.title
+    title: a.title,
   }))
 
-  // Pass all messages for full fidelity (including system prompts and tool calls)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sharing.openShareModal(title, messages as any, imports as any, shareableArtifacts)
 }
 
@@ -315,31 +365,24 @@ function shareChat() {
 function continueSharedChat() {
   if (!sharing.sharedChatData.value) return
 
-  // Create a new chat with the shared messages
   trilogy.chatStore.newChat(
     sharing.sharedChatData.value.title,
     dataConnectionName,
-    'Continued from shared chat'
+    'Continued from shared chat',
   )
 
-  // Load the shared messages into the chat
   if (trilogy.chatStore.activeChatId) {
     const chatId = trilogy.chatStore.activeChatId
     const chatData = trilogy.chatStore.chats[chatId]
     if (chatData) {
-      // Cast to any since SharedChatMessage is more flexible than ChatMessage
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       chatData.messages = [...sharing.sharedChatData.value.messages] as any
     }
   }
 
-  // Restore imports from shared chat so the agent has context
   if (sharing.sharedChatData.value.imports?.length) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     chat.handleImportChange(sharing.sharedChatData.value.imports as any)
   }
 
-  // Clear shared state - user will now set up LLM
   sharing.clearSharedChat()
 }
 
@@ -349,22 +392,46 @@ function startFreshChat() {
   if (!trilogy.chatStore.activeChatId) {
     trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
   }
-  console.log('clearing selected model')
   selectedModel.value = ''
 }
 
-// Get shared messages for display (filter out system messages for cleaner view)
+// Get shared messages for display
 const sharedMessagesForDisplay = computed(() => {
   if (!sharing.sharedChatData.value?.messages) return []
-  // Cast to any to satisfy LLMChatSplitView's stricter ChatMessage type
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return sharing.sharedChatData.value.messages.filter(m => m.role !== 'system') as any
+  return sharing.sharedChatData.value.messages.filter(m => m.role !== 'system')
 })
 
-// No-op send handler for shared view - prompts user to connect
-function handleSharedChatSend() {
-  // Do nothing - the input placeholder will guide the user
-  return Promise.resolve()
+// Helper: get tool display text from a message
+function getToolSummary(msg: any): string {
+  const tools = msg.executedToolCalls || msg.toolCalls || []
+  if (!tools.length) return ''
+  return tools.map((tc: any) => tc.name).join(', ')
+}
+
+function artifactIcon(type: string): string {
+  switch (type) {
+    case 'chart': return 'mdi mdi-chart-bar'
+    case 'results': return 'mdi mdi-table'
+    case 'markdown': return 'mdi mdi-language-markdown'
+    case 'code': return 'mdi mdi-code-braces'
+    default: return 'mdi mdi-file-document-outline'
+  }
+}
+
+// For chart/results artifacts, data is a Results instance directly.
+// For markdown artifacts, data is { markdown: string, queryResults: Results }.
+function getArtifactResults(artifact: ChatArtifact): any {
+  if (artifact.type === 'chart' || artifact.type === 'results') return artifact.data
+  if (artifact.type === 'markdown') return artifact.data?.queryResults ?? null
+  return null
+}
+
+// Helper: extract markdown text from artifact data
+function getArtifactMarkdown(artifact: ChatArtifact): string {
+  if (!artifact.data) return ''
+  if (typeof artifact.data === 'string') return artifact.data
+  if (artifact.data.markdown) return artifact.data.markdown
+  return JSON.stringify(artifact.data, null, 2)
 }
 </script>
 
@@ -380,13 +447,11 @@ function handleSharedChatSend() {
           </button>
         </div>
         <div class="share-modal-body">
-          <!-- Loading state -->
           <div v-if="sharing.isSharing.value" class="share-loading">
             <i class="mdi mdi-loading mdi-spin"></i>
             <span>Creating share link...</span>
           </div>
 
-          <!-- Success state -->
           <template v-else-if="sharing.shareUrl.value">
             <p>Copy this link to share your conversation. Anyone with the link can view it.</p>
             <div class="share-url-container">
@@ -408,14 +473,12 @@ function handleSharedChatSend() {
             </div>
           </template>
 
-          <!-- Error / Token required state -->
           <template v-else-if="sharing.shareError.value">
             <div class="share-error">
               <i class="mdi mdi-alert-circle"></i>
               {{ sharing.shareError.value }}
             </div>
 
-            <!-- Token input if not configured -->
             <div v-if="!sharing.hasGitHubToken.value" class="token-setup">
               <p class="token-help">
                 Create a token with <code>gist</code> scope at
@@ -441,7 +504,7 @@ function handleSharedChatSend() {
       </div>
     </div>
 
-    <!-- Shared Chat View - read-only mode using same components as active chat -->
+    <!-- Shared Chat View - read-only mode -->
     <div v-if="viewMode === 'shared'" class="chat-interface shared-mode">
       <ViewHeader :title="sharing.sharedChatData.value?.title || 'Shared Conversation'">
         <div class="shared-badge">
@@ -463,14 +526,17 @@ function handleSharedChatSend() {
       </ViewHeader>
 
       <div class="chat-container shared-container">
-        <LLMChatSplitView
-          :editableTitle="false"
-          :showHeader="false"
-          :placeholder="['']"
-          :initialMessages="sharedMessagesForDisplay"
-          :onSendMessage="handleSharedChatSend"
-        />
-        <!-- Overlay to replace input with connect CTA -->
+        <div class="chat-messages">
+          <div
+            v-for="(msg, i) in sharedMessagesForDisplay"
+            :key="i"
+            :class="['chat-msg', `chat-msg--${msg.role}`]"
+          >
+            <div class="chat-msg-content">
+              <MarkdownRenderer v-if="msg.content" :markdown="msg.content" />
+            </div>
+          </div>
+        </div>
         <div class="shared-input-overlay">
           <div class="shared-input-cta">
             <span class="cta-text">Connect an LLM provider to continue this conversation</span>
@@ -483,7 +549,7 @@ function handleSharedChatSend() {
       </div>
     </div>
 
-    <!-- Provider Selection - show when no active LLM connection and not viewing shared -->
+    <!-- Provider Selection -->
     <div v-else-if="viewMode === 'setup'" class="provider-setup" data-testid="provider-setup">
       <div class="setup-header">
         <h1>Chat with GCAT Data</h1>
@@ -507,52 +573,58 @@ function handleSharedChatSend() {
           </select>
         </div>
 
-        <div class="form-group" v-if="selectedProvider">
-          <label for="api-key">API Key</label>
-          <div class="input-with-cta">
-            <input 
-              id="api-key" 
-              type="password" 
-              v-model="apiKeyInput" 
-              placeholder="Enter your API key"
-              @blur="loadModels"
-              @paste="handlePaste"
-            />
-            <button 
-              v-if="apiKeyInput && availableModels.length === 0" 
-              class="cta-btn" 
-              @click="loadModels"
-              title="Fetch models for this API key"
-            >
-              Fetch Models
-            </button>
+        <template v-if="selectedProvider && !isDemo">
+          <div class="form-group">
+            <label for="api-key">API Key</label>
+            <div class="input-with-cta">
+              <input
+                id="api-key"
+                type="password"
+                v-model="apiKeyInput"
+                placeholder="Enter your API key"
+                @blur="loadModels"
+                @paste="handlePaste"
+              />
+              <button
+                v-if="apiKeyInput && availableModels.length === 0"
+                class="cta-btn"
+                @click="loadModels"
+                title="Fetch models for this API key"
+              >
+                Fetch Models
+              </button>
+            </div>
           </div>
+
+          <div class="form-group">
+            <label for="model-select">Model</label>
+            <select
+              id="model-select"
+              v-model="selectedModel"
+              :disabled="!apiKeyInput || loadingModels"
+              data-testid="model-select"
+            >
+              <option v-if="availableModels.length === 0" value="">
+                {{ apiKeyInput ? 'Loading models...' : 'Enter API key to see models' }}
+              </option>
+              <option v-for="model in availableModels" :key="model.id" :value="model.id">
+                {{ model.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group" v-if="loadingModels">
+            <p class="loading-text">Loading models...</p>
+          </div>
+        </template>
+
+        <div v-else-if="isDemo" class="form-group">
+          <p class="demo-note">Try without an API key. Limited to a small number of messages per IP.</p>
         </div>
 
-        <div class="form-group" v-if="selectedProvider">
-          <label for="model-select">Model</label>
-          <select
-            id="model-select"
-            v-model="selectedModel"
-            :disabled="!apiKeyInput || loadingModels"
-            data-testid="model-select"
-          >
-            <option v-if="availableModels.length === 0" value="">
-              {{ apiKeyInput ? 'Loading models...' : 'Enter API key to see models' }}
-            </option>
-            <option v-for="model in availableModels" :key="model.id" :value="model.id">
-              {{ model.name }}
-            </option>
-          </select>
-        </div>
-
-        <div class="form-group" v-if="loadingModels">
-          <p class="loading-text">Loading models...</p>
-        </div>
-
-        <button 
-          class="connect-btn" 
-          @click="connectProvider" 
+        <button
+          class="connect-btn"
+          @click="connectProvider"
           :disabled="!canConnect"
           :title="connectTooltip"
         >
@@ -591,16 +663,16 @@ function handleSharedChatSend() {
               <i class="mdi mdi-refresh"></i>
               <span class="desktop-only">New Chat</span>
             </button>
-            
+
             <div class="db-status mini" :class="dbStatus" :title="dbError || dbStatus">
               <span class="status-dot"></span>
               <span class="status-text desktop-only">DuckDB</span>
             </div>
-            
+
             <span v-if="connectionInfo" class="connection-badge">
               {{ connectionInfo }}
             </span>
-            
+
             <button class="header-action-btn" @click="showProviderSelector = true; llmStore.activeConnection = ''" title="Change LLM">
               <i class="mdi mdi-cog-outline"></i>
             </button>
@@ -608,34 +680,174 @@ function handleSharedChatSend() {
         </template>
       </ViewHeader>
 
-      <button
-        class="mobile-sidebar-toggle mobile-only"
-        data-testid="mobile-sidebar-toggle"
-        @click="mobileSidebarOpen = !mobileSidebarOpen"
-      >
-        <i class="mdi" :class="mobileSidebarOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'"></i>
-        {{ mobileSidebarOpen ? 'Hide' : 'Show' }} Symbols &amp; Artifacts
-      </button>
+      <div class="chat-split-pane" data-testid="chat-container">
+        <!-- Left: messages + input -->
+        <div class="chat-container" :class="{ 'has-artifacts': hasArtifacts }">
+          <div class="chat-messages" ref="messagesContainer">
+            <div v-if="visibleMessages.length === 0 && !chat.isChatLoading.value" class="chat-empty">
+              Ask me about space launch data. Try:
+              <div class="chat-suggestions">
+                <button
+                  v-for="suggestion in SUGGESTIONS"
+                  :key="suggestion"
+                  class="chat-suggestion"
+                  :disabled="chat.isChatLoading.value"
+                  @click="injectSuggestion(suggestion)"
+                >{{ suggestion }}</button>
+              </div>
+            </div>
 
-      <div class="chat-container" :class="{ 'mobile-sidebar-open': mobileSidebarOpen }" data-testid="chat-container">
-        <LLMChatSplitView
-          :editableTitle="true"
-          :showHeader="false"
-          :placeholder="['What rockets have the most engines?', 'Plot the top launch sites in Asia.', 'What\'s the biggest GEO satellite cluster?']"
-          :systemPrompt="chat.chatSystemPrompt.value"
-          :connectionInfo="connectionInfo"
-          :symbols="chat.chatSymbols.value"
-          :initialMessages="chat.activeChatMessages.value"
-          :initialArtifacts="chat.activeChatArtifacts.value"
-          :initialActiveArtifactIndex="chat.activeChatArtifactIndex.value"
-          :externalLoading="chat.isChatLoading.value"
-          :activeToolName="chat.activeToolName.value"
-          :onSendMessage="chat.handleChatMessageWithTools"
-          @update:messages="chat.handleMessagesUpdate"
-          @update:artifacts="chat.handleArtifactsUpdate"
-          @update:activeArtifactIndex="chat.handleActiveArtifactUpdate"
-          @title-update="chat.handleTitleUpdate"
-        />
+            <div
+              v-for="(msg, i) in visibleMessages"
+              :key="i"
+              :class="['chat-msg', `chat-msg--${msg.role}`]"
+            >
+              <div class="chat-msg-content">
+                <MarkdownRenderer v-if="msg.content" :markdown="msg.content" />
+                <div v-if="getToolSummary(msg)" class="chat-tool-pills">
+                  <span
+                    v-for="tc in (msg.executedToolCalls || msg.toolCalls || [])"
+                    :key="tc.id"
+                    class="chat-tool-pill"
+                  >{{ tc.name }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div v-if="chat.isChatLoading.value" class="chat-msg chat-msg--assistant">
+              <div class="chat-loading">
+                <span class="chat-loading-spinner"></span>
+                {{ chat.activeToolName.value ? `Running ${chat.activeToolName.value}...` : 'Thinking...' }}
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-area">
+            <textarea
+              v-model="userInput"
+              :placeholder="chat.isChatLoading.value ? 'Waiting for response...' : 'Ask about space launch data...'"
+              :disabled="chat.isChatLoading.value"
+              @keydown="handleKeyDown"
+              rows="1"
+            ></textarea>
+            <button @click="handleSend" :disabled="chat.isChatLoading.value || !userInput.trim()">Send</button>
+          </div>
+        </div>
+
+        <!-- Right: artifact panel -->
+        <div v-if="hasArtifacts" class="artifact-panel">
+          <!-- Artifact tab bar -->
+          <div class="artifact-tabs">
+            <button
+              v-for="(art, idx) in visibleArtifacts"
+              :key="art.id"
+              :class="['artifact-tab', { active: idx === activeArtifactIndex }]"
+              @click="activeArtifactIndex = idx; artifactTab = art.type === 'results' ? 'table' : 'chart'"
+              :title="art.id"
+            >
+              <i :class="artifactIcon(art.type)"></i>
+              <span class="artifact-tab-label">{{ art.type }}</span>
+            </button>
+          </div>
+
+          <!-- Active artifact content -->
+          <div v-if="activeArtifact" class="artifact-content">
+            <!-- Chart artifact: chart/table toggle -->
+            <template v-if="activeArtifact.type === 'chart' && getArtifactResults(activeArtifact)">
+              <div class="artifact-view-toggle">
+                <button
+                  :class="['toggle-btn', { active: artifactTab === 'chart' }]"
+                  @click="artifactTab = 'chart'"
+                >
+                  <i class="mdi mdi-chart-bar"></i> Chart
+                </button>
+                <button
+                  :class="['toggle-btn', { active: artifactTab === 'table' }]"
+                  @click="artifactTab = 'table'"
+                >
+                  <i class="mdi mdi-table"></i> Table
+                </button>
+              </div>
+
+              <div class="artifact-render-area">
+                <VegaLiteChart
+                  v-if="artifactTab === 'chart'"
+                  :data="getArtifactResults(activeArtifact)!.data"
+                  :columns="getArtifactResults(activeArtifact)!.headers"
+                  :initial-config="activeArtifact.config?.chartConfig || undefined"
+                  :show-controls="false"
+                />
+                <DataTable
+                  v-else
+                  :headers="getArtifactResults(activeArtifact)!.headers"
+                  :results="getArtifactResults(activeArtifact)!.data"
+                  :flush-chrome="true"
+                  :fit-parent="true"
+                />
+              </div>
+            </template>
+
+            <!-- Results artifact: table only -->
+            <template v-else-if="activeArtifact.type === 'results' && getArtifactResults(activeArtifact)">
+              <div class="artifact-render-area">
+                <DataTable
+                  :headers="getArtifactResults(activeArtifact)!.headers"
+                  :results="getArtifactResults(activeArtifact)!.data"
+                  :flush-chrome="true"
+                  :fit-parent="true"
+                />
+              </div>
+            </template>
+
+            <!-- Markdown artifact (may also have queryResults for table view) -->
+            <template v-else-if="activeArtifact.type === 'markdown'">
+              <div v-if="getArtifactResults(activeArtifact)" class="artifact-view-toggle">
+                <button
+                  :class="['toggle-btn', { active: artifactTab === 'chart' }]"
+                  @click="artifactTab = 'chart'"
+                >
+                  <i class="mdi mdi-language-markdown"></i> Report
+                </button>
+                <button
+                  :class="['toggle-btn', { active: artifactTab === 'table' }]"
+                  @click="artifactTab = 'table'"
+                >
+                  <i class="mdi mdi-table"></i> Table
+                </button>
+              </div>
+
+              <div v-if="artifactTab === 'table' && getArtifactResults(activeArtifact)" class="artifact-render-area">
+                <DataTable
+                  :headers="getArtifactResults(activeArtifact)!.headers"
+                  :results="getArtifactResults(activeArtifact)!.data"
+                  :flush-chrome="true"
+                  :fit-parent="true"
+                />
+              </div>
+              <div v-else class="artifact-render-area artifact-markdown">
+                <MarkdownRenderer
+                  :markdown="getArtifactMarkdown(activeArtifact)"
+                  :results="getArtifactResults(activeArtifact)"
+                />
+              </div>
+            </template>
+
+            <!-- Code artifact -->
+            <template v-else-if="activeArtifact.type === 'code'">
+              <div class="artifact-render-area artifact-code">
+                <pre><code>{{ typeof activeArtifact.data === 'string' ? activeArtifact.data : JSON.stringify(activeArtifact.data, null, 2) }}</code></pre>
+              </div>
+            </template>
+
+            <!-- Fallback -->
+            <template v-else>
+              <div class="artifact-render-area artifact-fallback">
+                <pre>{{ JSON.stringify(activeArtifact.data, null, 2) }}</pre>
+              </div>
+            </template>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -645,4 +857,3 @@ function handleSharedChatSend() {
 <style scoped>
 @import './chat-styles/index.css';
 </style>
-

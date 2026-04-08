@@ -1,5 +1,30 @@
 # Chat View Spec
 
+## Library Upgrade & Demo Login (2026-04-07)
+
+### Overview
+
+Upgraded `@trilogy-data/trilogy-studio-components` from 0.1.7 to 0.1.22. Replaced the removed `LLMChatSplitView` component with a custom chat UI using `MarkdownRenderer` from `@trilogy-data/trilogy-studio-components/dashboard`. Added demo provider login support.
+
+### Key Changes
+
+| Change | Details |
+|--------|---------|
+| **Import paths** | Switched from bare `@trilogy-data/trilogy-studio-components` (removed) to subpath exports: `./dashboard` for `useTrilogyCore`, `useTrilogyChat`, `MarkdownRenderer`; `./llm` for types |
+| **Demo provider** | Added "Demo (limited messages)" option using library's `DemoProvider` — no API key needed, auto-minted OpenRouter token |
+| **Custom chat UI** | Built message list + input directly in template instead of relying on removed `LLMChatSplitView` |
+| **Tool loop** | Uses `useTrilogyChat`'s `handleChatMessageWithTools` which internally runs the library's `runToolLoop` with `RETURN_TO_USER_TOOL` for proper loop termination |
+| **CSS rewrite** | Replaced `:deep()` selectors targeting old component internals with direct class selectors for the new markup |
+
+### Provider Options
+
+| Provider | API Key Required | Default Model |
+|----------|-----------------|---------------|
+| Demo | No | Auto-selected by DemoProvider |
+| Anthropic | Yes | claude-sonnet-4-6 |
+| OpenAI | Yes | gpt-5.2 |
+| Google | Yes | models/gemini-2.5-flash |
+
 ## Chat Sharing via Data URLs (2026-01-31)
 
 ### Overview

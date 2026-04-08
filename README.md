@@ -58,4 +58,4 @@ trilogy run C:\Users\ethan\coding_projects\space_reporting\data\core.preql
 
 ### Updating Semantic Model
 
-Rerun scripts/bundle_models.py after updating the files to update the bundled semantic models used by the chat experience.
+The `.preql` files under `data/raw/` are automatically loaded at build time via Vite's `import.meta.glob` (see `src/src/models.ts`). No manual bundling step is needed.
