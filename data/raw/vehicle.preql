@@ -115,9 +115,7 @@ root datasource lvs_info_raw (
     Stage_Perigee: stage_perigee,
     Perigee_Qual: perigee_qual
     )
-# stage.name is part of the grain: a vehicle can carry two objects at the same
-# stage position (e.g. Chang Zheng 2F stage F holds both Fairing and LES)
-grain (name,stage_no,variant,stage.name)
+grain (name,stage_no,variant)
 file `ingest_vehicle_stages.py`
 ;
 
@@ -138,8 +136,6 @@ datasource lvs_info (
     # probe, not from a sibling parquet file
     ~data_updated_through
     )
-# stage.name is part of the grain: a vehicle can carry two objects at the same
-# stage position (e.g. Chang Zheng 2F stage F holds both Fairing and LES)
-grain (name,stage_no,variant,stage.name)
+grain (name,stage_no,variant)
 file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/lvs_info.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/lvs_info.parquet`
 freshness by data_updated_through;
