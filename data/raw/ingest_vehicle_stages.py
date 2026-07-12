@@ -6,6 +6,8 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/lvs.html
 
+import pyarrow as pa
+
 from ingest_core import emit, ingest_gcat_file
 
 LVS_HEADERS = [
@@ -14,6 +16,25 @@ LVS_HEADERS = [
     "Perigee_Qual",
 ]
 
+
+def dedupe_stage_positions(table: pa.Table) -> pa.Table:
+    """Keep one row per (LV_Name, LV_Variant, Stage_No).
+
+    GCAT can list two objects at the same stage position (e.g. Chang Zheng 2F
+    stage F carries both the Fairing and the LES). The model treats stage
+    position as the grain, so keep the first row listed for each position.
+    """
+    names = table.column("LV_Name").to_pylist()
+    variants = table.column("LV_Variant").to_pylist()
+    stage_nos = table.column("Stage_No").to_pylist()
+    seen: set[tuple] = set()
+    keep = []
+    for key in zip(names, variants, stage_nos):
+        keep.append(key not in seen)
+        seen.add(key)
+    return table.filter(pa.array(keep))
+
+
 if __name__ == "__main__":
     table = ingest_gcat_file("tsv/tables/lvs.tsv", fallback_headers=LVS_HEADERS)
-    emit(table)
+    emit(dedupe_stage_positions(table))

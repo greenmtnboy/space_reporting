@@ -81,7 +81,9 @@ datasource lv_info (
     class,
     ?apogee,
     ?range,
-    data_updated_through
+    # partial so refresh sources the update date from the data_update_info
+    # probe, not from a sibling parquet file
+    ~data_updated_through
     )
 grain (name,variant)
 file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/lv_info.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/lv_info.parquet`
@@ -102,7 +104,9 @@ root datasource lvs_info_raw (
     LV_Name: name,
     LV_Variant: variant,
     Stage_No: stage_no,
-    Stage_Name: ~stage.name,
+    # not marked partial: refresh must take stage names verbatim from this root
+    # rather than driving a join from the stages table (which drops/nulls rows)
+    Stage_Name: stage.name,
     Qualifier: qualifier,
     Dummy: dummy,
     Multiplicity: multiplicity,
@@ -128,7 +132,9 @@ datasource lvs_info (
     stage_apogee,
     stage_perigee,
     perigee_qual,
-    data_updated_through
+    # partial so refresh sources the update date from the data_update_info
+    # probe, not from a sibling parquet file
+    ~data_updated_through
     )
 grain (name,stage_no,variant)
 file `https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/lvs_info.parquet`:`gcs://trilogy_public_models/duckdb/launch_report/lvs_info.parquet`
