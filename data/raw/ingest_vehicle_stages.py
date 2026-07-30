@@ -8,13 +8,20 @@
 
 import pyarrow as pa
 
-from ingest_core import emit, ingest_gcat_file
+from ingest_core import documented, emit, ingest_gcat_file
 
 LVS_HEADERS = [
     "LV_Name", "LV_Variant", "Stage_No", "Stage_Name", "Qualifier",
     "Dummy", "Multiplicity", "Stage_Impulse", "Stage_Apogee", "Stage_Perigee",
     "Perigee_Qual",
 ]
+
+# Stage_No is deliberately absent: GCAT uses letters for non-numbered positions
+# such as 'F' for a fairing.
+LVS_LAYOUT = documented(
+    LVS_HEADERS,
+    numeric_columns=["Multiplicity", "Stage_Impulse", "Stage_Apogee", "Stage_Perigee"],
+)
 
 
 def dedupe_stage_positions(table: pa.Table) -> pa.Table:
@@ -36,5 +43,4 @@ def dedupe_stage_positions(table: pa.Table) -> pa.Table:
 
 
 if __name__ == "__main__":
-    table = ingest_gcat_file("tsv/tables/lvs.tsv", fallback_headers=LVS_HEADERS)
-    emit(dedupe_stage_positions(table))
+    emit(dedupe_stage_positions(ingest_gcat_file("tsv/tables/lvs.tsv", LVS_LAYOUT)))

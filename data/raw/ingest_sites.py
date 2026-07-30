@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/sites.html
 
-from ingest_core import emit, ingest_gcat_file
+from ingest_core import documented, emit, ingest_gcat_file
 
 SITES_HEADERS = [
     "Site", "Code", "UCode", "Type", "StateCode", "TStart", "TStop",
@@ -14,6 +14,9 @@ SITES_HEADERS = [
     "Parent", "ShortEName", "EName", "Group", "UName",
 ]
 
+SITES_LAYOUT = documented(
+    SITES_HEADERS, numeric_columns=["Longitude", "Latitude", "Error"]
+)
+
 if __name__ == "__main__":
-    table = ingest_gcat_file("tsv/tables/sites.tsv", fallback_headers=SITES_HEADERS)
-    emit(table)
+    emit(ingest_gcat_file("tsv/tables/sites.tsv", SITES_LAYOUT))

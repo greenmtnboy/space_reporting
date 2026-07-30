@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/cat/satcat.html
 
-from ingest_core import emit, ingest_gcat_file
+from ingest_core import documented, emit, ingest_gcat_file
 
 SATCAT_HEADERS = [
     "JCAT", "Satcat", "Launch_Tag", "Piece", "Type", "Name", "PLName",
@@ -18,6 +18,13 @@ SATCAT_HEADERS = [
     "OpOrbit", "OQUAL", "AltNames",
 ]
 
+SATCAT_LAYOUT = documented(
+    SATCAT_HEADERS,
+    numeric_columns=[
+        "Mass", "DryMass", "TotMass", "Length", "Diameter", "Span",
+        "Perigee", "Apogee", "Inc",
+    ],
+)
+
 if __name__ == "__main__":
-    table = ingest_gcat_file("tsv/cat/satcat.tsv", fallback_headers=SATCAT_HEADERS)
-    emit(table)
+    emit(ingest_gcat_file("tsv/cat/satcat.tsv", SATCAT_LAYOUT))

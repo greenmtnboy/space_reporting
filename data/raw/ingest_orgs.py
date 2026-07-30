@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/orgs.html
 
-from ingest_core import emit, ingest_gcat_file
+from ingest_core import documented, emit, ingest_gcat_file
 
 ORGS_HEADERS = [
     "Code", "UCode", "StateCode", "Type", "Class", "TStart", "TStop",
@@ -14,6 +14,9 @@ ORGS_HEADERS = [
     "Parent", "ShortEName", "EName", "UName",
 ]
 
+ORGS_LAYOUT = documented(
+    ORGS_HEADERS, numeric_columns=["Longitude", "Latitude", "Error"]
+)
+
 if __name__ == "__main__":
-    table = ingest_gcat_file("tsv/tables/orgs.tsv", fallback_headers=ORGS_HEADERS)
-    emit(table)
+    emit(ingest_gcat_file("tsv/tables/orgs.tsv", ORGS_LAYOUT))
