@@ -10,7 +10,7 @@ import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, List, Mapping, Sequence
+from typing import List, Sequence
 
 import pyarrow as pa
 import pyarrow.csv as pv
@@ -78,35 +78,31 @@ def is_numeric(value: str) -> bool:
 @dataclass(frozen=True)
 class Layout:
     """
-    One shape a GCAT file is known to take on disk.
+    The shape we expect a GCAT file to have on disk.
 
-    GCAT files carry no usable header (we always supply our own names positionally),
-    so a field appearing or disappearing upstream silently slides every later column
-    sideways without changing the row width. Describing each known shape, together
-    with constraints that only hold when the columns line up, lets ingest work out
-    which one it actually received.
+    GCAT files carry no usable header, so we name columns positionally. That makes
+    an upstream field being added or dropped dangerous: it slides every later
+    column sideways, and where the row width is padded back out nothing about the
+    row shape gives it away. The columns still parse, so corrupt-but-plausible
+    strings land in the model.
 
-    numeric_columns are columns we model as numbers; they must parse as numbers.
-    blank_columns must be entirely empty - use them to pin filler fields that GCAT
-    pads rows out with, since "this field is always empty" is often the only thing
-    that distinguishes one candidate shape from another.
+    numeric_columns are the columns we model as numbers. Checking their values is
+    what catches a slide, since a shifted file puts text where numbers belong.
     """
 
-    name: str
     headers: List[str]
     numeric_columns: Sequence[str] = ()
-    blank_columns: Sequence[str] = ()
 
     def __post_init__(self) -> None:
-        for name in (*self.numeric_columns, *self.blank_columns):
+        for name in self.numeric_columns:
             if name not in self.headers:
                 raise ValueError(
-                    f"Layout '{self.name}' constrains column '{name}', "
-                    f"which is not one of its headers: {self.headers}"
+                    f"Layout constrains column '{name}', which is not one of its "
+                    f"headers: {self.headers}"
                 )
 
     def misfits(self, rows: Rows) -> List[str]:
-        """Reasons this layout does not describe rows. Empty means it fits."""
+        """Reasons the data does not match this layout. Empty means it fits."""
         width = len(self.headers)
         wrong_width = [idx for idx, row in enumerate(rows) if len(row) != width]
         if wrong_width:
@@ -125,63 +121,10 @@ class Layout:
                     f"'{name}' (index {idx}) should be numeric but {len(bad)} of "
                     f"{len(rows)} rows hold e.g. {bad[:3]}"
                 )
-        for name in self.blank_columns:
-            idx = self.headers.index(name)
-            filled = [r[idx] for r in rows if not is_blank(r[idx])]
-            if filled:
-                problems.append(
-                    f"'{name}' (index {idx}) should be empty filler but {len(filled)} "
-                    f"of {len(rows)} rows hold e.g. {filled[:3]}"
-                )
         return problems
 
 
-def documented(
-    headers: List[str],
-    numeric_columns: Sequence[str] = (),
-    blank_columns: Sequence[str] = (),
-) -> Layout:
-    """The shape GCAT's column documentation describes - always the preferred layout."""
-    return Layout("documented", headers, numeric_columns, blank_columns)
-
-
-def select_layout(layouts: Sequence[Layout], rows: Rows) -> Layout:
-    """
-    Pick the first layout the data actually fits.
-
-    Layouts are ordered by preference, so the documented shape wins whenever it
-    fits and a variant only applies when it does not. GCAT introduces and reverts
-    these shifts intermittently, so every shape we have seen has to keep working
-    without a code change in either direction.
-    """
-    layouts = [layouts] if isinstance(layouts, Layout) else list(layouts)
-    if not layouts:
-        raise ValueError("At least one layout is required")
-
-    reasons: Dict[str, List[str]] = {}
-    for layout in layouts:
-        problems = layout.misfits(rows)
-        if not problems:
-            if layout is not layouts[0]:
-                print(
-                    f"NOTE: GCAT data matches the '{layout.name}' layout rather than "
-                    f"'{layouts[0].name}'. Reasons '{layouts[0].name}' was rejected: "
-                    f"{reasons[layouts[0].name]}",
-                    file=sys.stderr,
-                )
-            return layout
-        reasons[layout.name] = problems
-
-    detail = "\n".join(f"  {name}: {why}" for name, why in reasons.items())
-    raise ValueError(
-        "No known layout describes this GCAT file; it changed shape in a way "
-        f"ingest does not recognise. Add a Layout for the new shape.\n{detail}"
-    )
-
-
-def clean_tsv_content(
-    raw_bytes: io.BytesIO, layouts: Layout | Sequence[Layout]
-) -> io.BytesIO:
+def clean_tsv_content(raw_bytes: io.BytesIO, layout: Layout) -> io.BytesIO:
     """
     Clean TSV content by:
     1. Removing comment lines (lines starting with #)
@@ -189,7 +132,8 @@ def clean_tsv_content(
     3. Converting '-' to empty string in numeric columns
 
     GCAT's own header line is ignored - it has proven unreliable, and column names
-    come from the matching Layout instead.
+    come from the layout instead. Data that does not match the layout raises rather
+    than being published with its columns out of alignment.
     """
     raw_bytes.seek(0)
     lines = raw_bytes.read().decode(ENCODING, errors="replace").splitlines()
@@ -206,7 +150,15 @@ def clean_tsv_content(
         row_reader = csv.reader(io.StringIO(line), delimiter="\t")
         data_rows.append([field.strip() for field in next(row_reader)])
 
-    layout = select_layout(layouts, data_rows)
+    problems = layout.misfits(data_rows)
+    if problems:
+        detail = "\n".join(f"  - {why}" for why in problems)
+        raise ValueError(
+            "GCAT data does not match the expected layout, so its columns can no "
+            "longer be trusted to line up. Refusing to publish it; update the "
+            f"Layout to match the new upstream shape.\n{detail}"
+        )
+
     headers = layout.headers
 
     # Start from the layout's declared numeric columns, then add any column whose
@@ -215,9 +167,7 @@ def clean_tsv_content(
     dash_to_empty = {headers.index(name) for name in layout.numeric_columns}
     for col_idx, _ in enumerate(headers):
         non_dash_values = [
-            row[col_idx]
-            for row in data_rows
-            if col_idx < len(row) and row[col_idx] not in ("-", "")
+            row[col_idx] for row in data_rows if row[col_idx] not in ("-", "")
         ]
         if non_dash_values and all(is_numeric(val) for val in non_dash_values):
             dash_to_empty.add(col_idx)
@@ -225,8 +175,7 @@ def clean_tsv_content(
     # Replace '-' with empty string in numeric columns
     for row in data_rows:
         for col_idx in dash_to_empty:
-            if col_idx < len(row) and row[col_idx] == "-":
-                row[col_idx] = ""
+            row[col_idx] = "" if row[col_idx] == "-" else row[col_idx]
 
     # Write cleaned TSV to buffer
     out = io.StringIO()
@@ -244,32 +193,6 @@ def load_arrow_table(tsv_bytes: io.BytesIO) -> pa.Table:
         parse_options=pv.ParseOptions(delimiter="\t"),
         convert_options=pv.ConvertOptions(strings_can_be_null=True),
     )
-
-
-def conform(
-    table: pa.Table,
-    columns: Sequence[str],
-    types: Mapping[str, pa.DataType] = {},
-) -> pa.Table:
-    """
-    Project table onto columns, filling absent ones with nulls and casting types.
-
-    Whichever layout we parsed, downstream gets the same column names in the same
-    order with the same types, so the published parquet schema does not flip about
-    as GCAT breaks and repairs its files. Declare a type for any column that a
-    known layout can omit; an all-null column has no type to infer.
-    """
-    arrays = []
-    for name in columns:
-        target = types.get(name)
-        if name in table.column_names:
-            column = table.column(name)
-        else:
-            column = pa.nulls(table.num_rows, type=target or pa.string())
-        if target is not None and column.type != target:
-            column = column.cast(target)
-        arrays.append(column)
-    return pa.table(arrays, names=list(columns))
 
 
 def add_data_update_column(table: pa.Table, updated_at: datetime) -> pa.Table:
@@ -290,21 +213,21 @@ def emit(table: pa.Table) -> None:
         writer.write_table(table)
 
 
-def ingest_gcat_file(file_path: str, layouts: Layout | Sequence[Layout]) -> pa.Table:
+def ingest_gcat_file(file_path: str, layout: Layout) -> pa.Table:
     """
     Download a single file from GCAT and return it as an Arrow table.
 
     Args:
         file_path: Relative path to the file, e.g. 'tsv/cat/lcat.tsv'
-        layouts: Known shapes for the file, most preferred first, or a single
-            Layout where only one shape has ever been seen. The first one the
-            data fits is used; if none fit, ingest fails rather than publishing
-            columns that have slid out of alignment.
+        layout: The expected shape. Data that does not match it fails the ingest
+            rather than being published with misaligned columns.
 
     Returns:
-        PyArrow Table named by the matching layout. Pass it through conform() if
-        more than one layout is possible, so the output schema stays fixed.
+        PyArrow Table with the layout's column names.
     """
     raw_bytes = download_tsv(file_path)
-    cleaned_bytes = clean_tsv_content(raw_bytes, layouts)
+    try:
+        cleaned_bytes = clean_tsv_content(raw_bytes, layout)
+    except ValueError as exc:
+        raise ValueError(f"{BASE_URL}{file_path}: {exc}") from exc
     return load_arrow_table(cleaned_bytes)

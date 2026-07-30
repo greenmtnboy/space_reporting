@@ -7,7 +7,7 @@
 # Column reference: https://planet4589.org/space/gcat/data/tables/lv.html
 # Note: LV_Min_Stage and LV_Max_Stage appear as single "LV_L" column in HTML display.
 
-from ingest_core import documented, emit, ingest_gcat_file
+from ingest_core import Layout, emit, ingest_gcat_file
 
 LV_HEADERS = [
     "LV_Name", "LV_Family", "LV_Manufacturer", "LV_Variant", "LV_Alias",
@@ -16,7 +16,7 @@ LV_HEADERS = [
     "Class", "Apogee", "Range",
 ]
 
-LV_LAYOUT = documented(
+LV_LAYOUT = Layout(
     LV_HEADERS,
     numeric_columns=[
         "LV_Min_Stage", "LV_Max_Stage", "Length", "Diameter", "Launch_Mass",

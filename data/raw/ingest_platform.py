@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/platforms.html
 
-from ingest_core import documented, emit, ingest_gcat_file
+from ingest_core import Layout, emit, ingest_gcat_file
 
 PLATFORMS_HEADERS = [
     "Code", "UCode", "StateCode", "Type", "Class", "TStart", "TStop",
@@ -16,7 +16,7 @@ PLATFORMS_HEADERS = [
 
 # Longitude and Latitude are currently unpopulated upstream, so they constrain
 # nothing; they are declared so they still parse as numbers if GCAT fills them in.
-PLATFORMS_LAYOUT = documented(
+PLATFORMS_LAYOUT = Layout(
     PLATFORMS_HEADERS, numeric_columns=["Longitude", "Latitude", "Error"]
 )
 

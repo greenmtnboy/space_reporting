@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/stages.html
 
-from ingest_core import documented, emit, ingest_gcat_file
+from ingest_core import Layout, emit, ingest_gcat_file
 
 STAGES_HEADERS = [
     "Stage_Name", "Stage_Family", "Stage_Manufacturer", "Stage_Alt_Name",
@@ -14,7 +14,7 @@ STAGES_HEADERS = [
     "Engine", "NEng",
 ]
 
-STAGES_LAYOUT = documented(
+STAGES_LAYOUT = Layout(
     STAGES_HEADERS,
     numeric_columns=[
         "Length", "Diameter", "Launch_Mass", "Dry_Mass", "Thrust", "Duration", "NEng",

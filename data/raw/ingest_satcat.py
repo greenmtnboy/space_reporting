@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/cat/satcat.html
 
-from ingest_core import documented, emit, ingest_gcat_file
+from ingest_core import Layout, emit, ingest_gcat_file
 
 SATCAT_HEADERS = [
     "JCAT", "Satcat", "Launch_Tag", "Piece", "Type", "Name", "PLName",
@@ -18,7 +18,7 @@ SATCAT_HEADERS = [
     "OpOrbit", "OQUAL", "AltNames",
 ]
 
-SATCAT_LAYOUT = documented(
+SATCAT_LAYOUT = Layout(
     SATCAT_HEADERS,
     numeric_columns=[
         "Mass", "DryMass", "TotMass", "Length", "Diameter", "Span",
