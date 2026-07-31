@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/sites.html
 
-from ingest_core import documented, emit, ingest_gcat_file
+from ingest_core import Layout, emit, ingest_gcat_file
 
 SITES_HEADERS = [
     "Site", "Code", "UCode", "Type", "StateCode", "TStart", "TStop",
@@ -14,7 +14,7 @@ SITES_HEADERS = [
     "Parent", "ShortEName", "EName", "Group", "UName",
 ]
 
-SITES_LAYOUT = documented(
+SITES_LAYOUT = Layout(
     SITES_HEADERS, numeric_columns=["Longitude", "Latitude", "Error"]
 )
 

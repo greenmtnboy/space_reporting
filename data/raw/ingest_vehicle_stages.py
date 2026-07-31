@@ -8,7 +8,7 @@
 
 import pyarrow as pa
 
-from ingest_core import documented, emit, ingest_gcat_file
+from ingest_core import Layout, emit, ingest_gcat_file
 
 LVS_HEADERS = [
     "LV_Name", "LV_Variant", "Stage_No", "Stage_Name", "Qualifier",
@@ -18,7 +18,7 @@ LVS_HEADERS = [
 
 # Stage_No is deliberately absent: GCAT uses letters for non-numbered positions
 # such as 'F' for a fairing.
-LVS_LAYOUT = documented(
+LVS_LAYOUT = Layout(
     LVS_HEADERS,
     numeric_columns=["Multiplicity", "Stage_Impulse", "Stage_Apogee", "Stage_Perigee"],
 )

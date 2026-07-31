@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/orgs.html
 
-from ingest_core import documented, emit, ingest_gcat_file
+from ingest_core import Layout, emit, ingest_gcat_file
 
 ORGS_HEADERS = [
     "Code", "UCode", "StateCode", "Type", "Class", "TStart", "TStop",
@@ -14,7 +14,7 @@ ORGS_HEADERS = [
     "Parent", "ShortEName", "EName", "UName",
 ]
 
-ORGS_LAYOUT = documented(
+ORGS_LAYOUT = Layout(
     ORGS_HEADERS, numeric_columns=["Longitude", "Latitude", "Error"]
 )
 

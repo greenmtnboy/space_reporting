@@ -6,7 +6,7 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/engines.html
 
-from ingest_core import documented, emit, ingest_gcat_file
+from ingest_core import Layout, emit, ingest_gcat_file
 
 ENGINES_HEADERS = [
     "Name", "Manufacturer", "Family", "Alt_Name", "Oxidizer", "Fuel",
@@ -15,7 +15,7 @@ ENGINES_HEADERS = [
     "Date", "Usage", "Group",
 ]
 
-ENGINES_LAYOUT = documented(
+ENGINES_LAYOUT = Layout(
     ENGINES_HEADERS,
     numeric_columns=["Mass", "Impulse", "Thrust", "Isp", "Duration", "Chambers"],
 )
