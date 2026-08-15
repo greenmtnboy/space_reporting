@@ -1,0 +1,83 @@
+# Deploy the space data pipeline to trilogy-cloud.
+#
+# The refresh no longer runs in GitHub Actions. `data/trilogy.toml` declares a
+# `[cloud]` block with four `[[cloud.job]]` entries (refresh + the three JSON
+# publishes) and `trilogy cloud sync` upserts them as a shared-workspace job
+# group on trilogy-cloud, which runs the daily pipeline on its own workers
+# using the org's GOOGLE_HMAC_* secrets. All four share one schedule row; the
+# platform orders the tick so publishes wait for the refresh.
+#
+# Only main syncs, into production. There is no per-branch dev deploy flow
+# yet — PR changes to data/ take effect when they merge.
+
+name: Cloud Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/**'
+      - '.github/workflows/cloud-sync.yml'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report what would change without writing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One sync at a time. Two pushes in quick succession would otherwise race on
+# the same jobs, and the loser's content would win.
+concurrency:
+  group: cloud-sync
+  cancel-in-progress: false
+
+env:
+  SYNC_ROOT: data
+  # data/trilogy.toml's [cloud] block names the org (trilogy-data, the prod
+  # org); TRILOGY_CLOUD_API defaults to production. The token lives in the
+  # prod environment (see the job's `environment:` binding), not in repo
+  # secrets.
+  TRILOGY_CLOUD_TOKEN: ${{ secrets.TRILOGY_CLOUD_TOKEN }}
+  # First release carrying [[cloud.job]] workspaces. Pinned to a floor rather
+  # than an exact version so a CLI fix does not need a commit here, and never
+  # to a git ref — CI installing from a branch means the deployment depends
+  # on whatever that branch happens to say today.
+  TRILOGY_CLI: 'pytrilogy>=0.3.328'
+  # pytrilogy publishes real platform wheels only for cp311-cp313; pin an
+  # interpreter that has wheels so uv never falls back to a source build.
+  TRILOGY_CLI_PYTHON: '3.13'
+
+jobs:
+  sync:
+    name: Sync pipeline jobs
+    runs-on: ubuntu-24.04
+    # The prod environment's deployment branch policy allows only main, so a
+    # workflow_dispatch from any other branch cannot reach
+    # TRILOGY_CLOUD_TOKEN (the run fails at job start).
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # `sync` reads the branch and remote out of .git to derive the
+          # environment, so it needs a real checkout — not a detached tarball.
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Install trilogy CLI
+        run: uv tool install --python "$TRILOGY_CLI_PYTHON" "$TRILOGY_CLI"
+
+      - name: Show what would change
+        run: trilogy cloud sync "$SYNC_ROOT" --dry-run
+
+      - name: Sync
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        # --prune deletes jobs whose directory is gone, which is what makes a
+        # deleted model directory actually leave the cloud.
+        run: trilogy cloud sync "$SYNC_ROOT" --prune

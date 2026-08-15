@@ -1,0 +1,5 @@
+# Entrypoint for the space-refresh cloud job (see [cloud] in trilogy.toml).
+# raw.satellite imports raw.launch, which pulls in vehicle -> stage -> engine
+# plus platform, sites, organization and etl — the entire raw tree — so a
+# refresh from this one script probes every GCAT datasource.
+import raw.satellite;
