@@ -8,3 +8,56 @@ env_file="../.env"
 enable_gcs = true
 enable_python_datasources = true
 
+# How these jobs deploy to trilogy-cloud (`trilogy cloud sync`, see
+# .github/workflows/cloud-sync.yml). One [[cloud.job]] entry per job; the
+# entries share this directory as a single workspace, so no files are
+# duplicated per job. All four sit on one 06:00 UTC schedule row — the
+# platform orders the tick by what each job reads and writes, so the
+# publishes wait for the refresh instead of racing it on a wall-clock
+# stagger.
+#
+# `key` is identity (immutable — editing one deploys a new job and orphans
+# the old); `name` is display only and free to change.
+[cloud]
+org = "trilogy-data"
+workspace = "space-data"
+schedule = "0 0 6 * * *"
+# DuckDB writes parquet/JSON outputs to gcs:// itself; these org secrets are
+# the only credentials that work for that bucket.
+secret_env = ["GOOGLE_HMAC_KEY", "GOOGLE_HMAC_SECRET"]
+# Local-only scratch: debug/local/test scripts and locally materialized JSON
+# never ship. (A stray debug file took down the tree refresh on 2026-08-14 —
+# whole-tree bundles must filter these.)
+exclude = ["*_local.preql", "*debug*.preql", "test.preql", "raw_*.json"]
+
+[[cloud.job]]
+key = "refresh"
+name = "space-refresh"
+operation = "refresh"
+# refresh.preql's import closure is the entire raw tree, so refreshing from
+# this one entrypoint probes every GCAT datasource.
+entrypoint = "refresh.preql"
+# A fully stale rebuild re-downloads every GCAT table; the common case is a
+# fast "already fresh" exit.
+timeout_seconds = 1800
+
+[[cloud.job]]
+key = "core"
+name = "space-core"
+operation = "run"
+entrypoint = "core.preql"
+timeout_seconds = 900
+
+[[cloud.job]]
+key = "satellite"
+name = "space-satellite"
+operation = "run"
+entrypoint = "satellite_data.preql"
+timeout_seconds = 900
+
+[[cloud.job]]
+key = "engine"
+name = "space-engine"
+operation = "run"
+entrypoint = "engine_data.preql"
+timeout_seconds = 900
