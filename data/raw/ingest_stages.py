@@ -8,16 +8,19 @@
 
 from ingest_core import Layout, emit, ingest_gcat_file
 
+# Shape as of GCAT release 1.8.5 (2026 Aug 28): 14 columns. ThrustSL (sea-level
+# thrust) and Class were added that release.
 STAGES_HEADERS = [
     "Stage_Name", "Stage_Family", "Stage_Manufacturer", "Stage_Alt_Name",
-    "Length", "Diameter", "Launch_Mass", "Dry_Mass", "Thrust", "Duration",
-    "Engine", "NEng",
+    "Length", "Diameter", "Launch_Mass", "Dry_Mass", "Thrust", "ThrustSL",
+    "Duration", "Engine", "NEng", "Class",
 ]
 
 STAGES_LAYOUT = Layout(
     STAGES_HEADERS,
     numeric_columns=[
-        "Length", "Diameter", "Launch_Mass", "Dry_Mass", "Thrust", "Duration", "NEng",
+        "Length", "Diameter", "Launch_Mass", "Dry_Mass", "Thrust", "ThrustSL",
+        "Duration", "NEng",
     ],
 )
 

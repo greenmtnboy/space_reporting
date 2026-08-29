@@ -75,6 +75,18 @@ def is_numeric(value: str) -> bool:
     return True
 
 
+def strip_numeric_qualifier(value: str) -> str:
+    """
+    GCAT suffixes some numeric values with a qualifier character instead of a
+    separate flag column: '?' for an estimate (e.g. '1650.0?'), plus rare '-'
+    and 's' suffixes (e.g. '0-', '650.0s'). Return the bare number for such a
+    value; anything else comes back unchanged, so a slid column of text still
+    fails the numeric check.
+    """
+    trimmed = value.rstrip("?-s")
+    return trimmed if trimmed != value and is_numeric(trimmed) else value
+
+
 @dataclass(frozen=True)
 class Layout:
     """
@@ -115,7 +127,12 @@ class Layout:
         problems = []
         for name in self.numeric_columns:
             idx = self.headers.index(name)
-            bad = [r[idx] for r in rows if not is_blank(r[idx]) and not is_numeric(r[idx])]
+            bad = [
+                r[idx]
+                for r in rows
+                if not is_blank(r[idx])
+                and not is_numeric(strip_numeric_qualifier(r[idx]))
+            ]
             if bad:
                 problems.append(
                     f"'{name}' (index {idx}) should be numeric but {len(bad)} of "
@@ -130,6 +147,8 @@ def clean_tsv_content(raw_bytes: io.BytesIO, layout: Layout) -> io.BytesIO:
     1. Removing comment lines (lines starting with #)
     2. Stripping trailing/leading spaces from all fields
     3. Converting '-' to empty string in numeric columns
+    4. Stripping GCAT's inline qualifier suffixes ('1650.0?' -> '1650.0') in
+       numeric columns
 
     GCAT's own header line is ignored - it has proven unreliable, and column names
     come from the layout instead. Data that does not match the layout raises rather
@@ -169,13 +188,17 @@ def clean_tsv_content(raw_bytes: io.BytesIO, layout: Layout) -> io.BytesIO:
         non_dash_values = [
             row[col_idx] for row in data_rows if row[col_idx] not in ("-", "")
         ]
-        if non_dash_values and all(is_numeric(val) for val in non_dash_values):
+        if non_dash_values and all(
+            is_numeric(strip_numeric_qualifier(val)) for val in non_dash_values
+        ):
             dash_to_empty.add(col_idx)
 
-    # Replace '-' with empty string in numeric columns
+    # Replace '-' with empty string and drop qualifier suffixes in numeric columns
     for row in data_rows:
         for col_idx in dash_to_empty:
-            row[col_idx] = "" if row[col_idx] == "-" else row[col_idx]
+            row[col_idx] = (
+                "" if row[col_idx] == "-" else strip_numeric_qualifier(row[col_idx])
+            )
 
     # Write cleaned TSV to buffer
     out = io.StringIO()
