@@ -9,11 +9,13 @@
 
 from ingest_core import Layout, emit, ingest_gcat_file
 
+# Shape as of GCAT release 1.8.5 (2026 Aug 28): 20 columns. GenericName was
+# added that release.
 LV_HEADERS = [
     "LV_Name", "LV_Family", "LV_Manufacturer", "LV_Variant", "LV_Alias",
     "LV_Min_Stage", "LV_Max_Stage", "Length", "LFlag", "Diameter", "DFlag",
     "Launch_Mass", "MFlag", "LEO_Capacity", "GTO_Capacity", "TO_Thrust",
-    "Class", "Apogee", "Range",
+    "Class", "Apogee", "Range", "GenericName",
 ]
 
 LV_LAYOUT = Layout(

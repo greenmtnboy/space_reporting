@@ -10,17 +10,23 @@ import pyarrow as pa
 
 from ingest_core import Layout, emit, ingest_gcat_file
 
+# Shape as of GCAT release 1.8.5 (2026 Aug 28): 17 columns. TimeOn, TimeOff,
+# AltOn, AltOff, VelOn and VelOff (stage ignition/cutoff time, altitude and
+# velocity) were added that release and are not populated upstream yet.
 LVS_HEADERS = [
     "LV_Name", "LV_Variant", "Stage_No", "Stage_Name", "Qualifier",
     "Dummy", "Multiplicity", "Stage_Impulse", "Stage_Apogee", "Stage_Perigee",
-    "Perigee_Qual",
+    "Perigee_Qual", "TimeOn", "TimeOff", "AltOn", "AltOff", "VelOn", "VelOff",
 ]
 
 # Stage_No is deliberately absent: GCAT uses letters for non-numbered positions
 # such as 'F' for a fairing.
 LVS_LAYOUT = Layout(
     LVS_HEADERS,
-    numeric_columns=["Multiplicity", "Stage_Impulse", "Stage_Apogee", "Stage_Perigee"],
+    numeric_columns=[
+        "Multiplicity", "Stage_Impulse", "Stage_Apogee", "Stage_Perigee",
+        "TimeOn", "TimeOff", "AltOn", "AltOff", "VelOn", "VelOff",
+    ],
 )
 
 
