@@ -114,6 +114,37 @@ The surfaces stay translucent because the library pairs them with
 `backdrop-filter: blur()`, and follow upstream's dark convention where `-strong`
 is the more opaque resting surface and the plain one is the lighter hover.
 
+### Empty-Message Guard (2026-09-01)
+
+The artifact-carrier messages this view relies on are empty assistant turns, and
+the installed library sends the chat's raw message list to the provider
+(`getMessages: () => chat.messages`), so they reach the wire as
+`{role: "assistant", content: ""}`. Verified in the 0.1.22 bundle — the adapter's
+message loop has three branches, and a carrier falls through to the last one,
+which pushes `{role, content}` with no emptiness check:
+
+```js
+} else
+  a.push({ role: y.role, content: y.content });   // installed 0.1.22, minified
+```
+
+Upstream `main` strips them in `Chat.getLLMMessages()` with the note that
+"Anthropic rejects empty-content messages mid-history". Whether the API actually
+rejects them is *unverified* — no credentials were available to test it, and the
+Messages API reference documents `minLength: 1` only on explicit `TextBlockParam`
+blocks, not on a bare `content` string. `utils/llmHistoryGuard.ts` drops them
+regardless, since sending them buys nothing either way.
+
+| Choice | Rationale |
+|--------|-----------|
+| The guard wraps `llmConnectionStore.generateCompletion` | The only interception point the app owns. For a persisted chat `handleChatMessageWithTools` hands straight to `chatStore.executeMessage` and **ignores the history argument its caller passed** — filtering in `ChatView` before the call would be a no-op. Every provider adapter is reached through this one method, so the guard also covers OpenAI and Google. |
+| Drops only on text AND tool calls AND tool results all being absent | A tool-call turn legitimately has empty content and must survive; that is the exact shape a carrier lacks. |
+| Idempotent, flagged on the store | `ChatView` can remount; without the flag each mount would stack another wrapper. |
+
+Monkey-patching a store method is invasive, and it can be deleted the moment the
+library ships `getLLMMessages()` — at which point the carriers are filtered
+upstream and this becomes dead weight. Check on the next version bump.
+
 ### Upstream Notes
 
 Checked against `trilogy-data/trilogy-studio-core` @ `d85ef50` while the app is

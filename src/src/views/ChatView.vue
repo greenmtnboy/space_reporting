@@ -9,6 +9,7 @@ import type { ChatArtifact } from '@trilogy-data/trilogy-studio-components/llm'
 import ViewHeader from '../components/ViewHeader.vue'
 import ChatArtifactView from '../components/ChatArtifactView.vue'
 import { useChatSharing } from '../composables/useChatSharing'
+import { installEmptyMessageGuard } from '../utils/llmHistoryGuard'
 import { PREQL_MODELS } from '../models'
 
 // Initialize Trilogy core (all stores/services)
@@ -52,6 +53,11 @@ const dbError = ref<string>('')
 
 // LLM connection state (for provider selection)
 const llmStore = trilogy.llmConnectionStore
+
+// Artifact-carrier messages are empty assistant turns; keep them out of provider
+// requests. See utils/llmHistoryGuard.ts for why this sits on the store.
+installEmptyMessageGuard(llmStore)
+
 const showProviderSelector = ref(true)
 const selectedProvider = ref('')
 const apiKeyInput = ref('')
