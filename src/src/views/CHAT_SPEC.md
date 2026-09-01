@@ -18,7 +18,7 @@ stream. The wide-screen side panel is unchanged.
 | `ChatArtifactView` — renders one artifact's body (chart/table/report/code) | `components/ChatArtifactView.vue` |
 | Artifact body styles, including the `inline` variant | `views/chat-styles/_artifact-content.css` |
 | Card chrome, split pane, tab bar | `views/chat-styles/_artifacts.css` |
-| `isNarrow`, artifact anchoring, `messageBlocks` | `views/ChatView.vue` |
+| `isNarrow`, `conversation` (messages + artifacts interleaved) | `views/ChatView.vue` |
 
 The artifact body was previously inlined in `ChatView`'s template. It is now one
 component used by both layouts, with a `variant` prop (`'panel'` | `'inline'`)
@@ -27,42 +27,81 @@ has to size itself.
 
 ### Placement
 
-The library keeps artifacts as a single flat per-session list with an active
-index — nothing on a `ChatArtifact` says which answer produced it. So `ChatView`
-records it as it happens: the watcher that already auto-selects the newest
-artifact also anchors each new one to whatever the last message was at that
-moment (`artifactAnchors`, keyed by artifact id). `messageBlocks` then walks the
-messages and attaches each artifact to its anchor.
+The library already tracks this. When the tool loop creates a `chart` or
+`markdown` artifact, `chatStore` appends an **artifact-carrier message** — an
+empty assistant message with the artifact attached — so the message stream
+itself records where each artifact belongs:
 
-Artifacts that were already present when a persisted chat is restored have no
-recorded anchor. Those fall to the end of the conversation rather than being
-dropped, which is where the most recent output belongs anyway.
+```ts
+// upstream lib/stores/chatStore.ts
+addArtifact: (artifact) => {
+  this.addArtifactToChat(chatId, artifact)
+  if (artifact.type === 'chart' || artifact.type === 'markdown') {
+    this.addMessageToChat(chatId, { role: 'assistant', content: '', artifact, hidden: false })
+  }
+}
+```
+
+`ChatView` was dropping them: its `visibleMessages` filter required
+`m.content || m.executedToolCalls?.length`, and a carrier has neither. The
+filter now also keeps `m.artifact`, and `conversation` walks the visible
+messages emitting a message item, an artifact item, or both.
+
+Two cases have no carrier and are appended at the end rather than left
+invisible:
+
+- **`results` artifacts** — the installed version only creates carriers for
+  `chart` and `markdown`. Upstream `main` adds `results` to that list, so those
+  will place themselves once it ships.
+- **Anything the chat was seeded with**, e.g. a continued shared chat.
+
+Dedupe is by artifact id, since an artifact reaches the view through both the
+carrier message and the flat `activeChatArtifacts` list.
 
 ### Design Choices
 
-1. **A JS breakpoint, not just CSS**: embedding moves artifacts to a different
+1. **Placement comes from the library, not from us**: an earlier revision of
+   this view recorded its own anchor per artifact as it arrived. That was
+   in-memory only, so reloading a persisted chat dumped every artifact at the
+   end. Carrier messages are persisted with the chat, so the placement survives
+   a reload for free.
+2. **A JS breakpoint, not just CSS**: embedding moves artifacts to a different
    place in the DOM, which a media query cannot do. `isNarrow` comes from
    `matchMedia('(max-width: 768px)')` and must stay in step with the breakpoint
    in `_artifacts.css`.
-2. **Anchor on arrival rather than infer later**: the alternative was counting
-   artifact-producing tool calls per message, which `update_artifact`,
-   `hide_artifact` and `reorder_artifacts` would silently break. Attaching a
-   chart to the wrong answer is worse than grouping unanchored ones at the end.
-3. **One card per artifact, no tab bar**: on a phone you scroll to an artifact
+3. **Carriers are skipped, not rendered blank, on wide screens**: the side panel
+   shows the artifact there, so a carrier contributes no message bubble.
+4. **One card per artifact, no tab bar**: on a phone you scroll to an artifact
    instead of hunting for its tab. The tab bar stays on wide screens where the
    panel shows one artifact at a time.
-4. **Cards are `flex-shrink: 0`**: the message stream is a column flex
+5. **Cards are `flex-shrink: 0`**: the message stream is a column flex
    container, so without this a card is squashed to fit the leftover space
    rather than scrolled to — it rendered 125px tall instead of 351px.
-5. **Fixed 320px card height for charts and tables**: Vega and Tabulator both
+6. **Fixed 320px card height for charts and tables**: Vega and Tabulator both
    need a definite height to lay out into, and the card has no parent height to
    inherit.
-6. **Reports and code flow instead**: a long report inside a short scroll box
+7. **Reports and code flow instead**: a long report inside a short scroll box
    inside a scrolling conversation is the nested-scrolling trap this layout
    exists to remove, so those run to their natural height, capped at `70vh`.
-7. **Each card owns its chart/table toggle**: the state moved into
+8. **Each card owns its chart/table toggle**: the state moved into
    `ChatArtifactView`, so flipping one card to its table view does not flip
    every other card.
+
+### Upstream Notes
+
+Checked against `trilogy-data/trilogy-studio-core` @ `d85ef50` while the app is
+on `@trilogy-data/trilogy-studio-components` 0.1.22 (0.1.23 is the latest
+published).
+
+- `ChatArtifact.vue` and `ArtifactsPane.vue` exist upstream but are **not**
+  exported from any package entry point (`entry.dashboard.ts`, `entry.llm.ts`).
+  Only `MarkdownRenderer`, `DataTable` and `VegaLiteChart` are public, which is
+  what `ChatArtifactView` composes — there is nothing to swap it for today.
+- On `main`, `Chat` gains `getLLMMessages()`, which strips carrier messages from
+  LLM history with the note that "Anthropic rejects empty-content messages
+  mid-history". 0.1.22 and 0.1.23 pass `chat.messages` to the loop unfiltered,
+  so carriers do reach the provider on the version we run. Not reproduced here,
+  but worth watching if Anthropic chats start erroring after a chart is made.
 
 ## Library Upgrade & Demo Login (2026-04-07)
 

@@ -119,10 +119,19 @@ async function injectSuggestion(text: string) {
   await chat.handleChatMessageWithTools(text, chat.activeChatMessages.value)
 }
 
-// Visible messages — filter out hidden/system messages
+/*
+  Visible messages — filter out hidden/system messages.
+
+  `m.artifact` keeps the library's artifact-carrier messages. When a chart or
+  markdown artifact is created, chatStore appends an empty assistant message
+  carrying it, so the message stream already records where each artifact belongs
+  (see stores/chatStore.ts upstream). The empty-content test below used to drop
+  them on the floor.
+*/
 const visibleMessages = computed(() =>
   (chat.activeChatMessages.value || []).filter(
-    (m: any) => m.role !== 'system' && !m.hidden && (m.content || m.executedToolCalls?.length),
+    (m: any) =>
+      m.role !== 'system' && !m.hidden && (m.content || m.executedToolCalls?.length || m.artifact),
   ),
 )
 
@@ -154,53 +163,52 @@ const activeArtifactIndex = computed({
 })
 const activeArtifact = computed(() => visibleArtifacts.value[activeArtifactIndex.value] || null)
 
-/*
-  Where each artifact belongs in the conversation.
-
-  The library keeps artifacts as one flat per-session list with an active index;
-  nothing on an artifact says which answer produced it. So we record it as it
-  happens: when new artifacts show up, they belong after whatever the last
-  message was at that moment. Artifacts already present when a persisted chat is
-  restored have no recorded anchor and fall to the end of the conversation,
-  which is where the reader expects the most recent output anyway.
-*/
-const artifactAnchors = ref<Record<string, number>>({})
-
-// Auto-select latest artifact when new ones arrive, and anchor the new ones.
-watch(() => visibleArtifacts.value.length, (newLen, oldLen) => {
-  if (newLen === 0) return
-  activeArtifactIndex.value = newLen - 1
-  const anchor = visibleMessages.value.length - 1
-  if (anchor < 0) return
-  for (const artifact of visibleArtifacts.value.slice(oldLen ?? 0)) {
-    if (!(artifact.id in artifactAnchors.value)) {
-      artifactAnchors.value[artifact.id] = anchor
-    }
-  }
+// Auto-select the latest artifact for the wide-screen panel.
+watch(() => visibleArtifacts.value.length, (newLen) => {
+  if (newLen > 0) activeArtifactIndex.value = newLen - 1
 })
 
-/*
-  The message stream with artifacts interleaved, used on narrow screens.
-  Anything without an anchor is appended after the last message rather than
-  dropped, so an artifact is never invisible.
-*/
-const messageBlocks = computed(() => {
-  const blocks = visibleMessages.value.map((msg: any) => ({ msg, artifacts: [] as ChatArtifact[] }))
-  const trailing: ChatArtifact[] = []
+interface MessageItem {
+  kind: 'message'
+  msg: any
+}
+interface ArtifactItem {
+  kind: 'artifact'
+  artifact: ChatArtifact
+}
+type ConversationItem = MessageItem | ArtifactItem
 
-  for (const artifact of visibleArtifacts.value) {
-    const anchor = artifactAnchors.value[artifact.id]
-    if (anchor !== undefined && blocks[anchor]) {
-      blocks[anchor].artifacts.push(artifact)
-    } else {
-      trailing.push(artifact)
+/*
+  The conversation as rendered on narrow screens: messages, with each artifact
+  in the place its carrier message occupies.
+
+  Carriers are persisted with the chat, so this placement survives a reload.
+  Two cases have no carrier and are appended at the end rather than left
+  invisible: `results` artifacts, which the installed version does not create a
+  carrier for, and anything the chat was seeded with. Dedupe is by artifact id,
+  since an artifact reaches us through both the carrier and the panel list.
+*/
+const conversation = computed<ConversationItem[]>(() => {
+  const items: ConversationItem[] = []
+  const carried = new Set<string>()
+
+  for (const msg of visibleMessages.value) {
+    const artifact: ChatArtifact | undefined = msg.artifact
+    // A carrier holds an artifact and nothing else; a message can also carry
+    // one alongside real text, in which case both are rendered.
+    if (msg.content || msg.executedToolCalls?.length) {
+      items.push({ kind: 'message', msg })
+    }
+    if (artifact && !artifact.hidden) {
+      items.push({ kind: 'artifact', artifact })
+      carried.add(artifact.id)
     }
   }
 
-  if (trailing.length && blocks.length) {
-    blocks[blocks.length - 1].artifacts.push(...trailing)
+  for (const artifact of visibleArtifacts.value) {
+    if (!carried.has(artifact.id)) items.push({ kind: 'artifact', artifact })
   }
-  return blocks
+  return items
 })
 
 
@@ -743,13 +751,16 @@ function artifactIcon(type: string): string {
               </div>
             </div>
 
-            <template v-for="(block, i) in messageBlocks" :key="i">
-              <div :class="['chat-msg', `chat-msg--${block.msg.role}`]">
+            <template v-for="(item, i) in conversation" :key="i">
+              <div
+                v-if="item.kind === 'message'"
+                :class="['chat-msg', `chat-msg--${item.msg.role}`]"
+              >
                 <div class="chat-msg-content">
-                  <MarkdownRenderer v-if="block.msg.content" :markdown="block.msg.content" />
-                  <div v-if="getToolSummary(block.msg)" class="chat-tool-pills">
+                  <MarkdownRenderer v-if="item.msg.content" :markdown="item.msg.content" />
+                  <div v-if="getToolSummary(item.msg)" class="chat-tool-pills">
                     <span
-                      v-for="tc in (block.msg.executedToolCalls || block.msg.toolCalls || [])"
+                      v-for="tc in (item.msg.executedToolCalls || item.msg.toolCalls || [])"
                       :key="tc.id"
                       class="chat-tool-pill"
                     >{{ tc.name }}</span>
@@ -758,17 +769,16 @@ function artifactIcon(type: string): string {
               </div>
 
               <!-- Narrow screens embed artifacts in the conversation; wide ones
-                   show them in the side panel. -->
+                   show them in the side panel instead. -->
               <div
-                v-for="artifact in (isNarrow ? block.artifacts : [])"
-                :key="artifact.id"
+                v-else-if="isNarrow"
                 class="chat-artifact-card"
               >
                 <div class="chat-artifact-card-header">
-                  <i :class="artifactIcon(artifact.type)"></i>
-                  <span>{{ artifactLabel(artifact) }}</span>
+                  <i :class="artifactIcon(item.artifact.type)"></i>
+                  <span>{{ artifactLabel(item.artifact) }}</span>
                 </div>
-                <ChatArtifactView :artifact="artifact" variant="inline" />
+                <ChatArtifactView :artifact="item.artifact" variant="inline" />
               </div>
             </template>
 
