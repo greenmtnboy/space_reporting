@@ -1,5 +1,69 @@
 # Chat View Spec
 
+## Embedded Artifacts on Narrow Screens (2026-09-01)
+
+### Overview
+
+Below 768px the chat used to split into two 50% rows — conversation on top,
+artifact panel below. Neither half was tall enough to be useful: a chart got
+about a third of a phone screen, and reading the answer that produced it meant
+scrolling a second, nested scroll area. Artifacts are now embedded in the
+conversation itself on narrow screens, as full-width cards in the message
+stream. The wide-screen side panel is unchanged.
+
+### Implementation
+
+| Piece | Location |
+|-------|----------|
+| `ChatArtifactView` — renders one artifact's body (chart/table/report/code) | `components/ChatArtifactView.vue` |
+| Artifact body styles, including the `inline` variant | `views/chat-styles/_artifact-content.css` |
+| Card chrome, split pane, tab bar | `views/chat-styles/_artifacts.css` |
+| `isNarrow`, artifact anchoring, `messageBlocks` | `views/ChatView.vue` |
+
+The artifact body was previously inlined in `ChatView`'s template. It is now one
+component used by both layouts, with a `variant` prop (`'panel'` | `'inline'`)
+for the one thing that genuinely differs: a panel fills its container, a card
+has to size itself.
+
+### Placement
+
+The library keeps artifacts as a single flat per-session list with an active
+index — nothing on a `ChatArtifact` says which answer produced it. So `ChatView`
+records it as it happens: the watcher that already auto-selects the newest
+artifact also anchors each new one to whatever the last message was at that
+moment (`artifactAnchors`, keyed by artifact id). `messageBlocks` then walks the
+messages and attaches each artifact to its anchor.
+
+Artifacts that were already present when a persisted chat is restored have no
+recorded anchor. Those fall to the end of the conversation rather than being
+dropped, which is where the most recent output belongs anyway.
+
+### Design Choices
+
+1. **A JS breakpoint, not just CSS**: embedding moves artifacts to a different
+   place in the DOM, which a media query cannot do. `isNarrow` comes from
+   `matchMedia('(max-width: 768px)')` and must stay in step with the breakpoint
+   in `_artifacts.css`.
+2. **Anchor on arrival rather than infer later**: the alternative was counting
+   artifact-producing tool calls per message, which `update_artifact`,
+   `hide_artifact` and `reorder_artifacts` would silently break. Attaching a
+   chart to the wrong answer is worse than grouping unanchored ones at the end.
+3. **One card per artifact, no tab bar**: on a phone you scroll to an artifact
+   instead of hunting for its tab. The tab bar stays on wide screens where the
+   panel shows one artifact at a time.
+4. **Cards are `flex-shrink: 0`**: the message stream is a column flex
+   container, so without this a card is squashed to fit the leftover space
+   rather than scrolled to — it rendered 125px tall instead of 351px.
+5. **Fixed 320px card height for charts and tables**: Vega and Tabulator both
+   need a definite height to lay out into, and the card has no parent height to
+   inherit.
+6. **Reports and code flow instead**: a long report inside a short scroll box
+   inside a scrolling conversation is the nested-scrolling trap this layout
+   exists to remove, so those run to their natural height, capped at `70vh`.
+7. **Each card owns its chart/table toggle**: the state moved into
+   `ChatArtifactView`, so flipping one card to its table view does not flip
+   every other card.
+
 ## Library Upgrade & Demo Login (2026-04-07)
 
 ### Overview

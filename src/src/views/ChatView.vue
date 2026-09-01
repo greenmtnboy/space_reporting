@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, provide, computed, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, provide, computed, nextTick, watch } from 'vue'
 import {
   useTrilogyChat,
   useTrilogyCore,
   MarkdownRenderer,
-  DataTable,
-  VegaLiteChart,
 } from '@trilogy-data/trilogy-studio-components/dashboard'
 import type { ChatArtifact } from '@trilogy-data/trilogy-studio-components/llm'
 import ViewHeader from '../components/ViewHeader.vue'
+import ChatArtifactView from '../components/ChatArtifactView.vue'
 import { useChatSharing } from '../composables/useChatSharing'
 import { PREQL_MODELS } from '../models'
 
@@ -127,6 +126,23 @@ const visibleMessages = computed(() =>
   ),
 )
 
+// ── Narrow-screen detection ──
+// A side-by-side panel has nowhere to go on a phone, so below this width the
+// artifacts are embedded in the conversation instead. Matches the breakpoint in
+// chat-styles/_artifacts.css.
+const NARROW_QUERY = '(max-width: 768px)'
+const isNarrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+function syncNarrow(event: MediaQueryListEvent | MediaQueryList) {
+  isNarrow.value = event.matches
+}
+if (typeof window !== 'undefined' && window.matchMedia) {
+  narrowQuery = window.matchMedia(NARROW_QUERY)
+  isNarrow.value = narrowQuery.matches
+  narrowQuery.addEventListener('change', syncNarrow)
+}
+onUnmounted(() => narrowQuery?.removeEventListener('change', syncNarrow))
+
 // Artifact panel state
 const visibleArtifacts = computed(() =>
   (chat.activeChatArtifacts.value || []).filter((a: ChatArtifact) => !a.hidden),
@@ -137,17 +153,60 @@ const activeArtifactIndex = computed({
   set: (v: number) => chat.handleActiveArtifactUpdate(v),
 })
 const activeArtifact = computed(() => visibleArtifacts.value[activeArtifactIndex.value] || null)
-// Tab state per artifact: 'chart' or 'table'
-const artifactTab = ref<'chart' | 'table'>('chart')
 
-// Auto-select latest artifact when new ones arrive
-watch(() => visibleArtifacts.value.length, (newLen) => {
-  if (newLen > 0) {
-    activeArtifactIndex.value = newLen - 1
-    const latest = visibleArtifacts.value[newLen - 1]
-    artifactTab.value = latest.type === 'results' ? 'table' : 'chart'
+/*
+  Where each artifact belongs in the conversation.
+
+  The library keeps artifacts as one flat per-session list with an active index;
+  nothing on an artifact says which answer produced it. So we record it as it
+  happens: when new artifacts show up, they belong after whatever the last
+  message was at that moment. Artifacts already present when a persisted chat is
+  restored have no recorded anchor and fall to the end of the conversation,
+  which is where the reader expects the most recent output anyway.
+*/
+const artifactAnchors = ref<Record<string, number>>({})
+
+// Auto-select latest artifact when new ones arrive, and anchor the new ones.
+watch(() => visibleArtifacts.value.length, (newLen, oldLen) => {
+  if (newLen === 0) return
+  activeArtifactIndex.value = newLen - 1
+  const anchor = visibleMessages.value.length - 1
+  if (anchor < 0) return
+  for (const artifact of visibleArtifacts.value.slice(oldLen ?? 0)) {
+    if (!(artifact.id in artifactAnchors.value)) {
+      artifactAnchors.value[artifact.id] = anchor
+    }
   }
 })
+
+/*
+  The message stream with artifacts interleaved, used on narrow screens.
+  Anything without an anchor is appended after the last message rather than
+  dropped, so an artifact is never invisible.
+*/
+const messageBlocks = computed(() => {
+  const blocks = visibleMessages.value.map((msg: any) => ({ msg, artifacts: [] as ChatArtifact[] }))
+  const trailing: ChatArtifact[] = []
+
+  for (const artifact of visibleArtifacts.value) {
+    const anchor = artifactAnchors.value[artifact.id]
+    if (anchor !== undefined && blocks[anchor]) {
+      blocks[anchor].artifacts.push(artifact)
+    } else {
+      trailing.push(artifact)
+    }
+  }
+
+  if (trailing.length && blocks.length) {
+    blocks[blocks.length - 1].artifacts.push(...trailing)
+  }
+  return blocks
+})
+
+
+function artifactLabel(artifact: ChatArtifact): string {
+  return artifact.type === 'results' ? 'table' : artifact.type
+}
 
 // Auto-scroll to bottom on new messages
 async function scrollToBottom() {
@@ -161,6 +220,9 @@ watch(
   () => visibleMessages.value[visibleMessages.value.length - 1]?.content,
   scrollToBottom,
 )
+// An embedded artifact grows the stream without adding a message, so the
+// watches above would leave it below the fold.
+watch(() => (isNarrow.value ? visibleArtifacts.value.length : 0), scrollToBottom)
 
 // Initialize DuckDB connection on mount
 onMounted(async () => {
@@ -417,22 +479,6 @@ function artifactIcon(type: string): string {
     default: return 'mdi mdi-file-document-outline'
   }
 }
-
-// For chart/results artifacts, data is a Results instance directly.
-// For markdown artifacts, data is { markdown: string, queryResults: Results }.
-function getArtifactResults(artifact: ChatArtifact): any {
-  if (artifact.type === 'chart' || artifact.type === 'results') return artifact.data
-  if (artifact.type === 'markdown') return artifact.data?.queryResults ?? null
-  return null
-}
-
-// Helper: extract markdown text from artifact data
-function getArtifactMarkdown(artifact: ChatArtifact): string {
-  if (!artifact.data) return ''
-  if (typeof artifact.data === 'string') return artifact.data
-  if (artifact.data.markdown) return artifact.data.markdown
-  return JSON.stringify(artifact.data, null, 2)
-}
 </script>
 
 <template>
@@ -682,7 +728,7 @@ function getArtifactMarkdown(artifact: ChatArtifact): string {
 
       <div class="chat-split-pane" data-testid="chat-container">
         <!-- Left: messages + input -->
-        <div class="chat-container" :class="{ 'has-artifacts': hasArtifacts }">
+        <div class="chat-container" :class="{ 'has-artifacts': hasArtifacts && !isNarrow }">
           <div class="chat-messages" ref="messagesContainer">
             <div v-if="visibleMessages.length === 0 && !chat.isChatLoading.value" class="chat-empty">
               Ask me about space launch data. Try:
@@ -697,22 +743,34 @@ function getArtifactMarkdown(artifact: ChatArtifact): string {
               </div>
             </div>
 
-            <div
-              v-for="(msg, i) in visibleMessages"
-              :key="i"
-              :class="['chat-msg', `chat-msg--${msg.role}`]"
-            >
-              <div class="chat-msg-content">
-                <MarkdownRenderer v-if="msg.content" :markdown="msg.content" />
-                <div v-if="getToolSummary(msg)" class="chat-tool-pills">
-                  <span
-                    v-for="tc in (msg.executedToolCalls || msg.toolCalls || [])"
-                    :key="tc.id"
-                    class="chat-tool-pill"
-                  >{{ tc.name }}</span>
+            <template v-for="(block, i) in messageBlocks" :key="i">
+              <div :class="['chat-msg', `chat-msg--${block.msg.role}`]">
+                <div class="chat-msg-content">
+                  <MarkdownRenderer v-if="block.msg.content" :markdown="block.msg.content" />
+                  <div v-if="getToolSummary(block.msg)" class="chat-tool-pills">
+                    <span
+                      v-for="tc in (block.msg.executedToolCalls || block.msg.toolCalls || [])"
+                      :key="tc.id"
+                      class="chat-tool-pill"
+                    >{{ tc.name }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+
+              <!-- Narrow screens embed artifacts in the conversation; wide ones
+                   show them in the side panel. -->
+              <div
+                v-for="artifact in (isNarrow ? block.artifacts : [])"
+                :key="artifact.id"
+                class="chat-artifact-card"
+              >
+                <div class="chat-artifact-card-header">
+                  <i :class="artifactIcon(artifact.type)"></i>
+                  <span>{{ artifactLabel(artifact) }}</span>
+                </div>
+                <ChatArtifactView :artifact="artifact" variant="inline" />
+              </div>
+            </template>
 
             <!-- Loading indicator -->
             <div v-if="chat.isChatLoading.value" class="chat-msg chat-msg--assistant">
@@ -735,15 +793,16 @@ function getArtifactMarkdown(artifact: ChatArtifact): string {
           </div>
         </div>
 
-        <!-- Right: artifact panel -->
-        <div v-if="hasArtifacts" class="artifact-panel">
+        <!-- Right: artifact panel (wide screens only — narrow screens embed
+             artifacts in the conversation above) -->
+        <div v-if="hasArtifacts && !isNarrow" class="artifact-panel">
           <!-- Artifact tab bar -->
           <div class="artifact-tabs">
             <button
               v-for="(art, idx) in visibleArtifacts"
               :key="art.id"
               :class="['artifact-tab', { active: idx === activeArtifactIndex }]"
-              @click="activeArtifactIndex = idx; artifactTab = art.type === 'results' ? 'table' : 'chart'"
+              @click="activeArtifactIndex = idx"
               :title="art.id"
             >
               <i :class="artifactIcon(art.type)"></i>
@@ -751,102 +810,7 @@ function getArtifactMarkdown(artifact: ChatArtifact): string {
             </button>
           </div>
 
-          <!-- Active artifact content -->
-          <div v-if="activeArtifact" class="artifact-content">
-            <!-- Chart artifact: chart/table toggle -->
-            <template v-if="activeArtifact.type === 'chart' && getArtifactResults(activeArtifact)">
-              <div class="artifact-view-toggle">
-                <button
-                  :class="['toggle-btn', { active: artifactTab === 'chart' }]"
-                  @click="artifactTab = 'chart'"
-                >
-                  <i class="mdi mdi-chart-bar"></i> Chart
-                </button>
-                <button
-                  :class="['toggle-btn', { active: artifactTab === 'table' }]"
-                  @click="artifactTab = 'table'"
-                >
-                  <i class="mdi mdi-table"></i> Table
-                </button>
-              </div>
-
-              <div class="artifact-render-area">
-                <VegaLiteChart
-                  v-if="artifactTab === 'chart'"
-                  :data="getArtifactResults(activeArtifact)!.data"
-                  :columns="getArtifactResults(activeArtifact)!.headers"
-                  :initial-config="activeArtifact.config?.chartConfig || undefined"
-                  :show-controls="false"
-                />
-                <DataTable
-                  v-else
-                  :headers="getArtifactResults(activeArtifact)!.headers"
-                  :results="getArtifactResults(activeArtifact)!.data"
-                  :flush-chrome="true"
-                  :fit-parent="true"
-                />
-              </div>
-            </template>
-
-            <!-- Results artifact: table only -->
-            <template v-else-if="activeArtifact.type === 'results' && getArtifactResults(activeArtifact)">
-              <div class="artifact-render-area">
-                <DataTable
-                  :headers="getArtifactResults(activeArtifact)!.headers"
-                  :results="getArtifactResults(activeArtifact)!.data"
-                  :flush-chrome="true"
-                  :fit-parent="true"
-                />
-              </div>
-            </template>
-
-            <!-- Markdown artifact (may also have queryResults for table view) -->
-            <template v-else-if="activeArtifact.type === 'markdown'">
-              <div v-if="getArtifactResults(activeArtifact)" class="artifact-view-toggle">
-                <button
-                  :class="['toggle-btn', { active: artifactTab === 'chart' }]"
-                  @click="artifactTab = 'chart'"
-                >
-                  <i class="mdi mdi-language-markdown"></i> Report
-                </button>
-                <button
-                  :class="['toggle-btn', { active: artifactTab === 'table' }]"
-                  @click="artifactTab = 'table'"
-                >
-                  <i class="mdi mdi-table"></i> Table
-                </button>
-              </div>
-
-              <div v-if="artifactTab === 'table' && getArtifactResults(activeArtifact)" class="artifact-render-area">
-                <DataTable
-                  :headers="getArtifactResults(activeArtifact)!.headers"
-                  :results="getArtifactResults(activeArtifact)!.data"
-                  :flush-chrome="true"
-                  :fit-parent="true"
-                />
-              </div>
-              <div v-else class="artifact-render-area artifact-markdown">
-                <MarkdownRenderer
-                  :markdown="getArtifactMarkdown(activeArtifact)"
-                  :results="getArtifactResults(activeArtifact)"
-                />
-              </div>
-            </template>
-
-            <!-- Code artifact -->
-            <template v-else-if="activeArtifact.type === 'code'">
-              <div class="artifact-render-area artifact-code">
-                <pre><code>{{ typeof activeArtifact.data === 'string' ? activeArtifact.data : JSON.stringify(activeArtifact.data, null, 2) }}</code></pre>
-              </div>
-            </template>
-
-            <!-- Fallback -->
-            <template v-else>
-              <div class="artifact-render-area artifact-fallback">
-                <pre>{{ JSON.stringify(activeArtifact.data, null, 2) }}</pre>
-              </div>
-            </template>
-          </div>
+          <ChatArtifactView v-if="activeArtifact" :artifact="activeArtifact" />
         </div>
       </div>
     </div>
