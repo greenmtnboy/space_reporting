@@ -87,6 +87,33 @@ carrier message and the flat `activeChatArtifacts` list.
    `ChatArtifactView`, so flipping one card to its table view does not flip
    every other card.
 
+### Floating Chrome Theming (2026-09-01)
+
+`DataTable`'s copy/download buttons and `VegaLiteChart`'s controls were
+rendering as near-white rectangles over the dark theme. They are not broken —
+the library reads four custom properties for them and falls back to light-mode
+values when nobody defines them:
+
+```css
+/* upstream lib/components/DataTable.vue */
+border: 1px solid var(--overlay-border, rgba(148, 163, 184, 0.24));
+background-color: var(--floating-surface-strong, rgba(255, 255, 255, 0.96));
+color: var(--floating-text, var(--text-color, #333333));
+```
+
+`style.css` already maps a block of these library tokens onto our palette; the
+floating set was simply missing from it. Added there — `--floating-surface`,
+`--floating-surface-strong`, `--floating-text`, `--overlay-border`,
+`--surface-shadow`, plus `--text-color-muted` for the disabled state.
+
+Deliberately *not* done with `:deep(.control-btn)` overrides: the custom
+properties are the library's own theming seam (it defines the same four in
+`lib/embedTheme.css`), so this keeps working if the button markup changes, and
+it covers every consumer — tooltips and error cards read the same variables.
+The surfaces stay translucent because the library pairs them with
+`backdrop-filter: blur()`, and follow upstream's dark convention where `-strong`
+is the more opaque resting surface and the plain one is the lighter hover.
+
 ### Upstream Notes
 
 Checked against `trilogy-data/trilogy-studio-core` @ `d85ef50` while the app is

@@ -27,6 +27,7 @@
   /* trilogy-studio-components theming variables */
   --bg-color: var(--color-bg-primary);
   --text-color: var(--color-text);
+  --text-color-muted: var(--color-text-muted);
   --text-faint: var(--color-text-muted);
   --text-subtle: var(--color-text-muted);
   --border: var(--color-border);
@@ -49,6 +50,21 @@
   --small-font-size: 0.75rem;
   --bg-loading: var(--color-bg-tertiary);
   --link-color: var(--color-accent-bright);
+
+  /*
+    Floating chrome the library overlays on charts and tables — DataTable's
+    copy/download buttons, VegaLiteChart's controls, tooltips, error cards.
+    These default to a near-white surface, which read as white rectangles over
+    our dark theme. Same hue/alpha convention as the library's own dark theme
+    (lib/embedTheme.css): -strong is the resting, more opaque surface, and the
+    plain one is the lighter hover. They stay translucent because the library
+    pairs them with backdrop-filter: blur().
+  */
+  --floating-surface: rgba(13, 15, 20, 0.86);
+  --floating-surface-strong: rgba(13, 15, 20, 0.94);
+  --floating-text: var(--color-text);
+  --overlay-border: var(--color-border-bright);
+  --surface-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 
   /* Editor/code related variables */
   --editor-bg: var(--color-bg-tertiary);
