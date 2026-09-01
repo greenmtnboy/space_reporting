@@ -7,9 +7,25 @@ import type { LLMMessage } from '@trilogy-data/trilogy-studio-components/llm'
  * content: '', artifact }` — every time the tool loop creates a chart or
  * markdown artifact, so the message stream records where each artifact belongs.
  * They are UI-only, but the installed version passes the chat's raw message list
- * to the provider (`getMessages: () => chat.messages`), so they reach the wire as
- * empty assistant turns. Upstream `main` strips them in `Chat.getLLMMessages()`
- * with the note that "Anthropic rejects empty-content messages mid-history".
+ * to the provider (`getMessages: () => chat.messages`), so they reach the wire.
+ *
+ * What each provider adapter does with one, and what that costs:
+ *
+ * - **Anthropic** renders it as a bare `{role, content: ''}`. Measured against
+ *   the live API on claude-opus-5, claude-opus-4-8 and claude-sonnet-4-6: all
+ *   three accept it (HTTP 200). Upstream `main` strips carriers in
+ *   `Chat.getLLMMessages()` citing "Anthropic rejects empty-content messages
+ *   mid-history" — that is imprecise. The API rejects an empty *text block*
+ *   (`[{type: 'text', text: ''}]` → 400 "text content blocks must be
+ *   non-empty"), which this adapter never builds; both places it constructs a
+ *   text block guard on `if (msg.content)` first.
+ * - **Google** renders it as `parts: [{text: ''}]` — the block-shaped form,
+ *   i.e. the shape Anthropic demonstrably rejects. Untested against Gemini (no
+ *   key), but this is the concrete risk the guard exists for.
+ * - **OpenAI** renders a bare `{role, content: ''}`, like Anthropic.
+ *
+ * So this is not a fix for a live Anthropic break — it is cheap insurance for
+ * the Google path and for anything the library sends in block form later.
  *
  * A message is only dropped when it has no text AND no tool calls AND no tool
  * results — a tool-call turn legitimately has empty content and must survive.

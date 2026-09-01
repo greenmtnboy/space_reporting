@@ -118,32 +118,40 @@ is the more opaque resting surface and the plain one is the lighter hover.
 
 The artifact-carrier messages this view relies on are empty assistant turns, and
 the installed library sends the chat's raw message list to the provider
-(`getMessages: () => chat.messages`), so they reach the wire as
-`{role: "assistant", content: ""}`. Verified in the 0.1.22 bundle — the adapter's
-message loop has three branches, and a carrier falls through to the last one,
-which pushes `{role, content}` with no emptiness check:
+(`getMessages: () => chat.messages`), so they reach the wire.
 
-```js
-} else
-  a.push({ role: y.role, content: y.content });   // installed 0.1.22, minified
-```
+**Measured against the live Anthropic API** (claude-opus-5, claude-opus-4-8,
+claude-sonnet-4-6 — the app's Anthropic default):
 
-Upstream `main` strips them in `Chat.getLLMMessages()` with the note that
-"Anthropic rejects empty-content messages mid-history". Whether the API actually
-rejects them is *unverified* — no credentials were available to test it, and the
-Messages API reference documents `minLength: 1` only on explicit `TextBlockParam`
-blocks, not on a bare `content` string. `utils/llmHistoryGuard.ts` drops them
-regardless, since sending them buys nothing either way.
+| Message shape | Result |
+|---|---|
+| control, no empty content | 200 |
+| `{role: "assistant", content: ""}` mid-history | **200 — accepted** |
+| `{role: "assistant", content: [{type: "text", text: ""}]}` mid-history | **400** `text content blocks must be non-empty` |
+| `{role: "assistant", content: ""}` trailing | 200 |
+
+So upstream's note on `Chat.getLLMMessages()` — "Anthropic rejects empty-content
+messages mid-history" — is imprecise. The constraint is on empty *text blocks*,
+not bare empty strings, and the Anthropic adapter emits the bare form for a
+carrier (both places it builds a text block guard on `if (msg.content)` first).
+**Anthropic was never broken by this.**
+
+The Google adapter is the actual exposure. Its regular-message branch builds
+`parts: [{text: message.content}]`, so a carrier becomes `parts: [{text: ""}]` —
+the block-shaped form, i.e. the one Anthropic demonstrably rejects. Untested
+against Gemini (no key available), but that is the concrete risk
+`utils/llmHistoryGuard.ts` exists for. OpenAI emits the bare form, like
+Anthropic.
 
 | Choice | Rationale |
 |--------|-----------|
-| The guard wraps `llmConnectionStore.generateCompletion` | The only interception point the app owns. For a persisted chat `handleChatMessageWithTools` hands straight to `chatStore.executeMessage` and **ignores the history argument its caller passed** — filtering in `ChatView` before the call would be a no-op. Every provider adapter is reached through this one method, so the guard also covers OpenAI and Google. |
+| The guard wraps `llmConnectionStore.generateCompletion` | The only interception point the app owns. For a persisted chat `handleChatMessageWithTools` hands straight to `chatStore.executeMessage` and **ignores the history argument its caller passed** — filtering in `ChatView` before the call would be a no-op. Wrapping the one method every adapter routes through is also what makes it cover Google, which is the provider that needs it. |
 | Drops only on text AND tool calls AND tool results all being absent | A tool-call turn legitimately has empty content and must survive; that is the exact shape a carrier lacks. |
 | Idempotent, flagged on the store | `ChatView` can remount; without the flag each mount would stack another wrapper. |
 
-Monkey-patching a store method is invasive, and it can be deleted the moment the
-library ships `getLLMMessages()` — at which point the carriers are filtered
-upstream and this becomes dead weight. Check on the next version bump.
+Kept as cheap insurance rather than a fix for a live break. Monkey-patching a
+store method is invasive, so it can go the moment the library ships
+`getLLMMessages()` — check on the next version bump.
 
 ### Upstream Notes
 
