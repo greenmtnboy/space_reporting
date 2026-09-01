@@ -1,5 +1,15 @@
 import { ref, computed, type Ref } from 'vue'
-import { TILE_SIZE, MIN_ZOOM, MAX_ZOOM } from '../utils/constants'
+import {
+  TILE_SIZE,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  CARTO_API_KEY,
+  CARTO_BASEMAP_STYLE
+} from '../utils/constants'
+
+function tileUrl(zoom: number, tileX: number, tileY: number): string {
+  return `https://a.basemaps.cartocdn.com/${CARTO_BASEMAP_STYLE}/${zoom}/${tileX}/${tileY}.png?api_key=${CARTO_API_KEY}`
+}
 
 export interface TileData {
   url: string
@@ -51,7 +61,7 @@ export function useMapTiles(
           const y = mapHeight.value / 2 + (j * TILE_SIZE - offsetY) * scale
 
           tiles.push({
-            url: `https://a.basemaps.cartocdn.com/light_all/${targetZoom}/${tileX}/${tileY}.png`,
+            url: tileUrl(targetZoom, tileX, tileY),
             x,
             y,
             scale,

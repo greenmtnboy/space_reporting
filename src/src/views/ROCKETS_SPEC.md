@@ -42,3 +42,37 @@ Bar charts now support interactive cross-filtering, allowing users to click on b
 4. **Dimming non-selected**: When filters active, non-matching bars shown at 40% opacity for context
 5. **Map filtering**: Launch markers on the map are filtered to only show matching launches
 6. **Sound integration**: Audio cues only play for filtered launches when filters are active
+
+## Basemap Tiles (2026-09-01)
+
+### Overview
+
+The map background is built from CARTO raster basemap tiles fetched directly by
+the browser in `composables/useMapTiles.ts`. Tile requests now carry a CARTO API
+key so they are attributed to our account rather than hitting the anonymous
+tier.
+
+### Implementation
+
+| Piece | Location |
+|-------|----------|
+| `CARTO_API_KEY`, `CARTO_BASEMAP_STYLE` | `utils/constants.ts` |
+| `tileUrl(zoom, tileX, tileY)` | `composables/useMapTiles.ts` |
+
+Tile URL shape:
+`https://a.basemaps.cartocdn.com/{style}/{z}/{x}/{y}.png?api_key={key}`
+
+### Design Choices
+
+1. **Single URL builder**: The URL is assembled in one `tileUrl()` helper so the
+   key and style cannot drift between the current-zoom and fallback-zoom tile
+   passes.
+2. **Key lives in constants, not inline**: `utils/constants.ts` already owns map
+   configuration (`TILE_SIZE`, `DEFAULT_CENTER`), so the key and style sit
+   alongside it instead of being buried in a template literal.
+3. **Key is public by design**: This is a static site — the key ships in the
+   bundle and is visible in every tile request, so it is checked in rather than
+   plumbed through an env var that would offer no real secrecy. Access control
+   for it belongs on the CARTO side (domain restrictions), not in this repo.
+4. **Style is a constant**: `light_all` was previously hardcoded; it is now
+   named so swapping to a dark basemap is a one-line change.
