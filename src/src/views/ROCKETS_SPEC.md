@@ -76,3 +76,36 @@ Tile URL shape:
    for it belongs on the CARTO side (domain restrictions), not in this repo.
 4. **Style is a constant**: `light_all` was previously hardcoded; it is now
    named so swapping to a dark basemap is a one-line change.
+
+## Time Bar Scrubbing (2026-09-01)
+
+### Overview
+
+`components/ControlPanel.vue` is shared by the Rockets, Satellites and Engines
+views, so this applies to all three. Its progress bar handled `mousedown` /
+`mousemove` / `mouseup` only. A tap on a phone still seeked, via the browser's
+synthesized mouse events, but a drag produced no `mousemove` at all — the bar
+could not be scrubbed. Stage sections aside, this was the one control that
+simply did not work on touch.
+
+### Implementation
+
+| Change | Effect |
+|--------|--------|
+| Pointer events replace mouse events | One code path covers mouse, touch and pen. |
+| `setPointerCapture` on pointerdown | Move/up stay on the bar when the finger slides off it, so the listeners live on the element instead of on `window` — and are cleaned up by the browser rather than by hand. |
+| `touch-action: none` on `.progress-bar` | Without it the browser claims a horizontal drag as a page pan and cancels the pointer stream mid-scrub. |
+
+### Design Choices
+
+1. **Hover styles gated behind `@media (hover: hover)`**: on touch the `:hover`
+   state sticks after a tap, which left the bar stuck at its hover height.
+2. **Handle always visible on coarse pointers**: it was opacity-gated on hover,
+   so on a phone it never appeared and the bar looked inert.
+3. **40px hit area via `::before`, coarse pointers only**: a 12px bar is a hard
+   target for a fingertip. It is scoped to touch because on desktop the extra
+   height would overhang the map above the panel and swallow pan gestures near
+   its bottom edge; `.progress-container` gains matching padding so the area
+   stays inside the panel.
+4. **`setPointerCapture` wrapped in try/catch**: the seek is emitted first, so a
+   browser that rejects the capture loses drag tracking but still seeks.

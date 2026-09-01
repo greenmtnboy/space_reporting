@@ -24,6 +24,7 @@ const emit = defineEmits<{
 
 const progressBarRef = ref<HTMLElement | null>(null)
 const isDragging = ref(false)
+const activePointerId = ref<number | null>(null)
 
 function calculateProgress(clientX: number): number {
   if (!progressBarRef.value) return 0
@@ -32,25 +33,37 @@ function calculateProgress(clientX: number): number {
   return Math.max(0, Math.min(100, (x / rect.width) * 100))
 }
 
-function handleMouseDown(event: MouseEvent) {
+// Pointer events cover mouse, touch and pen with one code path. Capturing the
+// pointer keeps move/up on the bar even when the finger slides off it, so the
+// listeners live on the element rather than on window.
+function handlePointerDown(event: PointerEvent) {
+  if (event.button !== 0) return
+  // Claim the gesture before the browser can turn it into a page scroll.
+  event.preventDefault()
   isDragging.value = true
-  const progress = calculateProgress(event.clientX)
-  emit('seek', progress)
-
-  window.addEventListener('mousemove', handleMouseMove)
-  window.addEventListener('mouseup', handleMouseUp)
+  activePointerId.value = event.pointerId
+  emit('seek', calculateProgress(event.clientX))
+  try {
+    progressBarRef.value?.setPointerCapture(event.pointerId)
+  } catch {
+    // Only reachable for a pointer id the browser no longer considers active;
+    // the seek above has already landed, so drag tracking is all that is lost.
+  }
 }
 
-function handleMouseMove(event: MouseEvent) {
-  if (!isDragging.value) return
-  const progress = calculateProgress(event.clientX)
-  emit('seek', progress)
+function handlePointerMove(event: PointerEvent) {
+  if (!isDragging.value || event.pointerId !== activePointerId.value) return
+  event.preventDefault()
+  emit('seek', calculateProgress(event.clientX))
 }
 
-function handleMouseUp() {
+function handlePointerUp(event: PointerEvent) {
+  if (event.pointerId !== activePointerId.value) return
   isDragging.value = false
-  window.removeEventListener('mousemove', handleMouseMove)
-  window.removeEventListener('mouseup', handleMouseUp)
+  activePointerId.value = null
+  if (progressBarRef.value?.hasPointerCapture(event.pointerId)) {
+    progressBarRef.value.releasePointerCapture(event.pointerId)
+  }
 }
 </script>
 
@@ -61,7 +74,10 @@ function handleMouseUp() {
         ref="progressBarRef"
         class="progress-bar"
         :class="{ dragging: isDragging }"
-        @mousedown="handleMouseDown"
+        @pointerdown="handlePointerDown"
+        @pointermove="handlePointerMove"
+        @pointerup="handlePointerUp"
+        @pointercancel="handlePointerUp"
       >
         <div class="progress-fill" :style="{ width: progress + '%' }"></div>
         <div class="progress-handle" :style="{ left: progress + '%' }"></div>
@@ -121,18 +137,33 @@ function handleMouseUp() {
   cursor: pointer;
   position: relative;
   user-select: none;
+  /* Without this the browser claims a horizontal drag as a page pan/zoom
+     gesture and cancels the pointer stream mid-scrub. */
+  touch-action: none;
 }
 
-.progress-bar:hover,
 .progress-bar.dragging {
   height: 10px;
   margin: 3px 0;
 }
 
-.progress-bar:hover .progress-handle,
 .progress-bar.dragging .progress-handle {
   opacity: 1;
   transform: translateX(-50%) translateY(-50%) scale(1);
+}
+
+/* Gated on real hover: on touch the state sticks after a tap and would leave
+   the bar stuck in its hover size. */
+@media (hover: hover) {
+  .progress-bar:hover {
+    height: 10px;
+    margin: 3px 0;
+  }
+
+  .progress-bar:hover .progress-handle {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-50%) scale(1);
+  }
 }
 
 .progress-fill {
@@ -156,6 +187,52 @@ function handleMouseUp() {
   transition: opacity 0.15s, transform 0.15s;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   pointer-events: none;
+}
+
+/*
+  Touch devices have no hover, so the hover-gated handle would never show and
+  the bar would look inert. Keep it visible and give the bar a taller resting
+  height instead of a hover height.
+*/
+@media (hover: none), (pointer: coarse) {
+  /* Reserves room for the enlarged hit area below, so it stays inside the
+     panel instead of overhanging whatever sits above it (e.g. the map). */
+  .progress-container {
+    padding-top: 12px;
+  }
+
+  .progress-bar {
+    height: 12px;
+    margin: 2px 0;
+    border-radius: 6px;
+  }
+
+  .progress-bar.dragging {
+    height: 12px;
+    margin: 2px 0;
+  }
+
+  /*
+    A 12px bar is a hard target for a fingertip. This pseudo-element widens the
+    hit area to 40px without changing the bar's visual height; pointer events on
+    it are attributed to the bar itself.
+  */
+  .progress-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 40px;
+    transform: translateY(-50%);
+  }
+
+  .progress-handle {
+    opacity: 1;
+    width: 20px;
+    height: 20px;
+    transform: translateX(-50%) translateY(-50%) scale(1);
+  }
 }
 
 .progress-labels {

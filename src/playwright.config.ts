@@ -36,27 +36,27 @@ export default defineConfig({
         {
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
-            testIgnore: /chat-mobile/,
+            testIgnore: /-mobile\.spec\.ts$/,
         },
         {
             name: 'chromium-mobile',
             use: { ...devices['Desktop Chrome'], ...mobileViewport },
-            testMatch: /chat-mobile/,
+            testMatch: /-mobile\.spec\.ts$/,
         },
         {
             name: 'firefox',
             use: { ...devices['Desktop Firefox'] },
-            testIgnore: /chat-mobile/,
+            testIgnore: /-mobile\.spec\.ts$/,
         },
         {
             name: 'webkit',
             use: { ...devices['Desktop Safari'] },
-            testIgnore: /chat-mobile/,
+            testIgnore: /-mobile\.spec\.ts$/,
         },
         {
             name: 'webkit-mobile',
             use: { ...devices['Desktop Safari'], ...mobileViewport },
-            testMatch: /chat-mobile/,
+            testMatch: /-mobile\.spec\.ts$/,
         },
     ],
     webServer:
