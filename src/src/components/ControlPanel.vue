@@ -46,8 +46,12 @@ function handlePointerDown(event: PointerEvent) {
   try {
     progressBarRef.value?.setPointerCapture(event.pointerId)
   } catch {
-    // Only reachable for a pointer id the browser no longer considers active;
-    // the seek above has already landed, so drag tracking is all that is lost.
+    // Only reachable for a pointer id the browser no longer considers active.
+    // Without capture no pointerup lands on the bar, so nothing would ever
+    // clear these — and handlePointerMove would then scrub on plain hover.
+    // The seek above has already landed; give up the drag instead.
+    isDragging.value = false
+    activePointerId.value = null
   }
 }
 

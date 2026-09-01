@@ -28,12 +28,27 @@ watch(
   },
 )
 
+/*
+  DataTable and VegaLiteChart both iterate `headers` as a Map (`headers.values()`),
+  so anything that has been through JSON — where the Map flattens to a plain
+  object — throws on mount. Treat that as "no results": chart and results
+  artifacts fall through to the JSON fallback branch and markdown renders its
+  text without the table toggle, instead of taking the view down.
+*/
+function isRenderableResults(results: any): boolean {
+  return !!results && results.headers instanceof Map
+}
+
 // For chart/results artifacts, data is a Results instance directly.
 // For markdown artifacts, data is { markdown: string, queryResults: Results }.
 function getResults(artifact: ChatArtifact): any {
-  if (artifact.type === 'chart' || artifact.type === 'results') return artifact.data
-  if (artifact.type === 'markdown') return artifact.data?.queryResults ?? null
-  return null
+  const results =
+    artifact.type === 'chart' || artifact.type === 'results'
+      ? artifact.data
+      : artifact.type === 'markdown'
+        ? (artifact.data?.queryResults ?? null)
+        : null
+  return isRenderableResults(results) ? results : null
 }
 
 function getMarkdown(artifact: ChatArtifact): string {

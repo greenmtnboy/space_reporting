@@ -176,10 +176,18 @@ watch(() => visibleArtifacts.value.length, (newLen) => {
 
 interface MessageItem {
   kind: 'message'
+  /*
+    Stable across renders so Vue patches rather than remounts. The item's own
+    position cannot be used: an artifact with no carrier is appended at the end,
+    so every new message shifts it by one and would tear down and rebuild its
+    chart or table. Message indices only ever grow, since messages append.
+  */
+  key: string
   msg: any
 }
 interface ArtifactItem {
   kind: 'artifact'
+  key: string
   artifact: ChatArtifact
 }
 type ConversationItem = MessageItem | ArtifactItem
@@ -198,24 +206,27 @@ const conversation = computed<ConversationItem[]>(() => {
   const items: ConversationItem[] = []
   const carried = new Set<string>()
 
-  for (const msg of visibleMessages.value) {
+  visibleMessages.value.forEach((msg: any, index: number) => {
     const artifact: ChatArtifact | undefined = msg.artifact
     // A carrier holds an artifact and nothing else; a message can also carry
     // one alongside real text, in which case both are rendered.
     if (msg.content || msg.executedToolCalls?.length) {
-      items.push({ kind: 'message', msg })
+      items.push({ kind: 'message', key: `msg:${index}`, msg })
     }
     if (artifact && !artifact.hidden) {
-      items.push({ kind: 'artifact', artifact })
+      items.push({ kind: 'artifact', key: `art:${artifact.id}`, artifact })
       carried.add(artifact.id)
     }
-  }
+  })
 
   for (const artifact of visibleArtifacts.value) {
-    if (!carried.has(artifact.id)) items.push({ kind: 'artifact', artifact })
+    if (!carried.has(artifact.id)) {
+      items.push({ kind: 'artifact', key: `art:${artifact.id}`, artifact })
+    }
   }
   return items
 })
+
 
 
 function artifactLabel(artifact: ChatArtifact): string {
@@ -451,7 +462,18 @@ function continueSharedChat() {
     const chatId = trilogy.chatStore.activeChatId
     const chatData = trilogy.chatStore.chats[chatId]
     if (chatData) {
-      chatData.messages = [...sharing.sharedChatData.value.messages] as any
+      /*
+        Drop the `artifact` a carrier message holds. A share round-trips through
+        JSON, which flattens a Results instance's `headers` Map into a plain
+        object, and nothing here calls Results.fromJSON to put it back — so the
+        artifact would render a chart or table against data DataTable cannot
+        read. The messages themselves restore fine.
+      */
+      chatData.messages = sharing.sharedChatData.value.messages.map((msg: any) => {
+        if (!msg.artifact) return msg
+        const { artifact: _dropped, ...rest } = msg
+        return rest
+      }) as any
     }
   }
 
@@ -471,10 +493,20 @@ function startFreshChat() {
   selectedModel.value = ''
 }
 
-// Get shared messages for display
+/*
+  Get shared messages for display.
+
+  Empty ones are dropped, not just system ones: a share carries the chat's raw
+  message list, which includes the artifact-carrier messages chatStore appends
+  for each chart or markdown artifact. This read-only view has no artifact
+  renderer, and a carrier's content is '', so each one showed up as a blank
+  message bubble.
+*/
 const sharedMessagesForDisplay = computed(() => {
   if (!sharing.sharedChatData.value?.messages) return []
-  return sharing.sharedChatData.value.messages.filter(m => m.role !== 'system')
+  return sharing.sharedChatData.value.messages.filter(
+    (m) => m.role !== 'system' && typeof m.content === 'string' && m.content.trim().length > 0,
+  )
 })
 
 // Helper: get tool display text from a message
@@ -757,7 +789,7 @@ function artifactIcon(type: string): string {
               </div>
             </div>
 
-            <template v-for="(item, i) in conversation" :key="i">
+            <template v-for="item in conversation" :key="item.key">
               <div
                 v-if="item.kind === 'message'"
                 :class="['chat-msg', `chat-msg--${item.msg.role}`]"

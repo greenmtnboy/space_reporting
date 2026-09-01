@@ -153,6 +153,32 @@ Kept as cheap insurance rather than a fix for a live break. Monkey-patching a
 store method is invasive, so it can go the moment the library ships
 `getLLMMessages()` — check on the next version bump.
 
+### Audit Fixes (2026-09-01)
+
+Found while auditing this branch; the first two are regressions from the
+embedded-artifact work, the third predates it.
+
+| Issue | Fix |
+|---|---|
+| **Shared chats could crash the view.** A share round-trips through JSON, which flattens a `Results` instance's `headers` Map into a plain object, and `continueSharedChat` copied the messages back without calling `Results.fromJSON`. Once carriers render inline, `DataTable` mounted against that data and threw on `headers.values()`. | `continueSharedChat` drops the `artifact` from restored messages, and `ChatArtifactView.getResults` treats results whose `headers` is not a `Map` as absent — chart/results fall through to the JSON fallback, markdown renders text-only. |
+| **Artifact cards remounted on every turn.** The conversation `v-for` keyed on the array index, but an artifact with no carrier is appended last, so each new message shifted it and rebuilt its whole Tabulator table. | Each item carries a stable `key` — `art:<id>` for artifacts, `msg:<index>` for messages, which only grows because messages append. Verified: with the index key the trailing card remounted; with the stable key all three survive. |
+| **Shared chats showed blank bubbles.** `sharedMessagesForDisplay` filtered only system messages, so every carrier rendered as an empty bubble in the read-only view, which has no artifact renderer. | Also drop messages with no text. Covered by an e2e test. |
+
+### Testing
+
+`pnpm test` runs Vitest over `src/**/*.test.ts`; `vitest.config.ts` excludes
+`e2e/`, whose Playwright specs throw when a non-Playwright runner collects them.
+CI runs it as its own job rather than once per browser.
+
+`utils/llmHistoryGuard.test.ts` covers the guard — including that it keeps
+empty turns carrying `toolCalls`/`toolResults`, so tool_use/tool_result pairing
+survives, and that installing twice does not stack wrappers.
+
+The inline artifact rendering itself still has no automated coverage: artifacts
+require a live LLM round-trip, and the shared-chat format is too lossy to stand
+in. It was verified manually against a fixture shaped like real `chatStore`
+output.
+
 ### Upstream Notes
 
 Checked against `trilogy-data/trilogy-studio-core` @ `d85ef50` while the app is
