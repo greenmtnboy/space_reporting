@@ -338,7 +338,7 @@ const connectProvider = async () => {
 
     if (isDemo.value) {
       await llmStore.newConnection(connName, 'demo', {
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-3.8-flash',
         saveCredential: false,
       })
     } else {

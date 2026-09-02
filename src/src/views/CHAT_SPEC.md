@@ -81,14 +81,28 @@ screen; the tint alone was easy to miss beside the green pills.
 
 ### Demo model
 
-The demo connection pins `google/gemini-3-flash-preview` through OpenRouter.
-With the connection working it answered well in 10 calls, so the loop was not
-a model-quality problem and there is no reason to pay for a larger default.
-Two things to watch: each call took 10–20 seconds on the 30 KB prompt, and a
-Flash model is the kind most likely to retry on a real query error, which the
-library's failure-streak guard now bounds. If demo turns still feel slow or
-loop-prone after 0.1.25, the next lever is `DemoProvider.preferredModels` or
-the pinned model in `ChatView.connectProvider`, at a cost trade-off.
+The demo connection now pins `google/gemini-3.8-flash` through OpenRouter,
+previously `google/gemini-3-flash-preview`. Both were measured on the same
+Rocket Lab launch-cadence question with the connection fix in place,
+phone viewport, every OpenRouter request captured:
+
+| Model | Calls | Wall time | Median per call | Failed queries | Prompt / completion tokens | Est. cost per turn |
+|-------|-------|-----------|-----------------|----------------|----------------------------|--------------------|
+| gemini-3-flash-preview | 10 | 145 s | 5.8 s | 3 of 9 | 225k / 0.9k | $0.12 |
+| gemini-3.8-flash | 21 | 70 s | 2.8 s | 3 of 20 | 547k / 2.8k | $0.42 |
+
+The preview model answered for the Electron family only (81 launches); 3.8
+found both Rocket Lab organisations (94 launches), reported the success rate,
+broke the cadence down by vehicle and by outcome, titled every artifact, and
+finished in half the wall time because each call is about twice as fast. It
+also explores more: twice the calls and 2.4× the prompt tokens, so a turn
+costs about 3.7× as much. The demo key is dollar-limited per IP, so that is
+fewer demo turns per visitor, not a bill. Failure counts were the same
+(three query errors each, all corrected on the next attempt).
+
+Neither model was the cause of the loop; see above. The pin lives in
+`ChatView.connectProvider`; the library's `DemoProvider.preferredModels` is
+untouched and only applies when no model is pinned.
 
 ### Tool inspector
 
