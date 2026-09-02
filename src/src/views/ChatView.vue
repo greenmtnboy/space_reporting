@@ -94,11 +94,42 @@ const viewMode = computed(() => {
   return 'setup'
 })
 
+// ── Narrow-screen detection ──
+// A side-by-side panel has nowhere to go on a phone, so below this width the
+// artifacts are embedded in the conversation instead. Matches the breakpoint in
+// chat-styles/_artifacts.css.
+const NARROW_QUERY = '(max-width: 768px)'
+const isNarrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+function syncNarrow(event: MediaQueryListEvent | MediaQueryList) {
+  isNarrow.value = event.matches
+}
+if (typeof window !== 'undefined' && window.matchMedia) {
+  narrowQuery = window.matchMedia(NARROW_QUERY)
+  isNarrow.value = narrowQuery.matches
+  narrowQuery.addEventListener('change', syncNarrow)
+}
+onUnmounted(() => narrowQuery?.removeEventListener('change', syncNarrow))
+
+/*
+  Tools withheld from the model. The app opens its one DuckDB connection
+  itself, so connect_data_connection has nothing to do; there is no tutorial
+  screen for open_documentation to navigate to. Below the narrow breakpoint
+  artifacts sit inline where their carrier message is: there is no panel for
+  reorder_artifacts to reorder, and hide_artifact would delete a card the user
+  already scrolled past. The toolset is part of the provider's prompt-cache
+  prefix, so crossing the breakpoint mid-chat costs one cache miss.
+*/
+const ALWAYS_DISABLED_TOOLS = ['connect_data_connection', 'open_documentation']
+const INLINE_DISABLED_TOOLS = ['reorder_artifacts', 'hide_artifact']
+
 // Use the chat composable with tools — handles tool loop internally
 const chat = useTrilogyChat({
   dataConnectionName,
   initialTitle: 'Space Data Chat',
   persistChat: true,
+  disabledTools: () =>
+    isNarrow.value ? [...ALWAYS_DISABLED_TOOLS, ...INLINE_DISABLED_TOOLS] : ALWAYS_DISABLED_TOOLS,
 })
 
 // ── Chat UI state ──
@@ -135,22 +166,6 @@ async function injectSuggestion(text: string) {
 // for the folding rules (tool runs, artifact placement).
 const visibleMessages = computed(() => buildVisibleMessages(chat.activeChatMessages.value || []))
 
-// ── Narrow-screen detection ──
-// A side-by-side panel has nowhere to go on a phone, so below this width the
-// artifacts are embedded in the conversation instead. Matches the breakpoint in
-// chat-styles/_artifacts.css.
-const NARROW_QUERY = '(max-width: 768px)'
-const isNarrow = ref(false)
-let narrowQuery: MediaQueryList | null = null
-function syncNarrow(event: MediaQueryListEvent | MediaQueryList) {
-  isNarrow.value = event.matches
-}
-if (typeof window !== 'undefined' && window.matchMedia) {
-  narrowQuery = window.matchMedia(NARROW_QUERY)
-  isNarrow.value = narrowQuery.matches
-  narrowQuery.addEventListener('change', syncNarrow)
-}
-onUnmounted(() => narrowQuery?.removeEventListener('change', syncNarrow))
 
 // Artifact panel state
 const visibleArtifacts = computed(() =>
@@ -171,6 +186,24 @@ watch(() => visibleArtifacts.value.length, (newLen) => {
 const conversation = computed<ConversationItem[]>(() =>
   buildConversation(chat.activeChatMessages.value || [], visibleArtifacts.value),
 )
+
+/*
+  Table actions. DataTable's own copy/download buttons floated over the rows
+  (bottom-right on a phone, covering data); ChatArtifactView renders the table
+  without them and exposes the two actions, and the host puts buttons in the
+  card header (narrow) or the panel toolbar (wide). Inline cards are keyed by
+  artifact id; the panel shows one artifact at a time.
+*/
+type ArtifactViewHandle = InstanceType<typeof ChatArtifactView>
+const inlineViews = ref(new Map<string, ArtifactViewHandle>())
+const panelView = ref<ArtifactViewHandle | null>(null)
+function registerInlineView(id: string, el: unknown) {
+  if (el) inlineViews.value.set(id, el as ArtifactViewHandle)
+  else inlineViews.value.delete(id)
+}
+function inlineHasTable(id: string): boolean {
+  return !!inlineViews.value.get(id)?.hasTable
+}
 
 
 // Auto-scroll to bottom on new messages
@@ -753,8 +786,30 @@ function artifactIcon(type: string): string {
                 <div class="chat-artifact-card-header" :title="artifactTitle(item.artifact)">
                   <i :class="artifactIcon(item.artifact.type)"></i>
                   <span class="chat-artifact-card-title">{{ artifactTitle(item.artifact) }}</span>
+                  <div v-if="inlineHasTable(item.artifact.id)" class="artifact-actions">
+                    <button
+                      class="artifact-action-btn"
+                      title="Copy table to clipboard"
+                      data-testid="artifact-copy"
+                      @click="inlineViews.get(item.artifact.id)?.copyTable()"
+                    >
+                      <i class="mdi mdi-content-copy"></i>
+                    </button>
+                    <button
+                      class="artifact-action-btn"
+                      title="Download table as CSV"
+                      data-testid="artifact-download"
+                      @click="inlineViews.get(item.artifact.id)?.downloadTable()"
+                    >
+                      <i class="mdi mdi-download-outline"></i>
+                    </button>
+                  </div>
                 </div>
-                <ChatArtifactView :artifact="item.artifact" variant="inline" />
+                <ChatArtifactView
+                  :ref="(el) => registerInlineView(item.artifact.id, el)"
+                  :artifact="item.artifact"
+                  variant="inline"
+                />
               </div>
             </template>
 
@@ -794,9 +849,27 @@ function artifactIcon(type: string): string {
               <i :class="artifactIcon(art.type)"></i>
               <span class="artifact-tab-label">{{ artifactTitle(art) }}</span>
             </button>
+            <div v-if="panelView?.hasTable" class="artifact-actions artifact-actions--panel">
+              <button
+                class="artifact-action-btn"
+                title="Copy table to clipboard"
+                data-testid="artifact-copy"
+                @click="panelView?.copyTable()"
+              >
+                <i class="mdi mdi-content-copy"></i>
+              </button>
+              <button
+                class="artifact-action-btn"
+                title="Download table as CSV"
+                data-testid="artifact-download"
+                @click="panelView?.downloadTable()"
+              >
+                <i class="mdi mdi-download-outline"></i>
+              </button>
+            </div>
           </div>
 
-          <ChatArtifactView v-if="activeArtifact" :artifact="activeArtifact" />
+          <ChatArtifactView v-if="activeArtifact" ref="panelView" :artifact="activeArtifact" />
         </div>
       </div>
     </div>

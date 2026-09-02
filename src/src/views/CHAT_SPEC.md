@@ -46,21 +46,34 @@ toolset): it navigates the studio's tutorial screen, which this app does not
 have; `search_docs` and `read_doc` from the same pack stay, so the model can
 look up Trilogy idioms instead of guessing.
 
-Upstream (same branch in trilogy-studio-core) now takes `disabledTools` on
-`useTrilogyChat`. It withholds the named tools from the request and drops the
-prompt lines that ask for them, renumbering the curation steps. The wiring here
-will be:
+Library 0.1.24 (trilogy-data/trilogy-studio-core#254) added `disabledTools`
+to `useTrilogyChat`: it withholds the named tools from the request and drops
+the prompt lines that ask for them, renumbering the curation steps. Wired in
+`ChatView` as a getter over `isNarrow`, so the list follows the layout:
 
 ```ts
-const ALWAYS_DISABLED = ['connect_data_connection', 'open_documentation']
-const INLINE_DISABLED = ['reorder_artifacts', 'hide_artifact']
-const chat = useTrilogyChat({
-  dataConnectionName,
-  initialTitle: 'Space Data Chat',
-  persistChat: true,
-  disabledTools: () => (isNarrow.value ? [...ALWAYS_DISABLED, ...INLINE_DISABLED] : ALWAYS_DISABLED),
-})
+const ALWAYS_DISABLED_TOOLS = ['connect_data_connection', 'open_documentation']
+const INLINE_DISABLED_TOOLS = ['reorder_artifacts', 'hide_artifact']
+disabledTools: () =>
+  isNarrow.value ? [...ALWAYS_DISABLED_TOOLS, ...INLINE_DISABLED_TOOLS] : ALWAYS_DISABLED_TOOLS
 ```
+
+The toolset is part of the provider's prompt-cache prefix, so rotating a phone
+across the breakpoint mid-conversation costs one cache miss on the next send.
+If a curated (panel) view is ever offered on narrow screens as a toggle, the
+getter reads that toggle instead.
+
+### Copy/download in the host chrome (done with 0.1.24)
+
+`DataTable`'s copy and download buttons floated over the rows: bottom-right on
+a phone, where they covered data. 0.1.24 adds `showControls` to `DataTable` and
+documents `copyToClipboard()` / `downloadData()` as public. `ChatArtifactView`
+now mounts every table with `showControls=false`, holds a ref to it, and
+exposes `hasTable`, `copyTable` and `downloadTable`. `ChatView` renders the two
+buttons in the artifact card header on narrow screens and at the end of the
+panel tab bar on wide ones, driving the active view through that ref. Inline
+cards are tracked in a map keyed by artifact id since they live in a `v-for`;
+the panel shows one artifact at a time so a single ref covers it.
 
 ### Deferred: a deep-link tool into the visualisations
 
