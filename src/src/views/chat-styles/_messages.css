@@ -137,6 +137,8 @@
   opacity: 0.8;
 }
 
+/* A pill is a button: it opens the tool inspector on its calls. Failed
+   calls are tinted red so a retry loop is visible at a glance. */
 .chat-tool-pill {
   display: inline-flex;
   align-items: center;
@@ -149,6 +151,27 @@
   border: 1px solid rgba(34, 197, 94, 0.15);
   color: var(--color-text-muted);
   line-height: 1.4;
+  cursor: pointer;
+  appearance: none;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.chat-tool-pill:hover,
+.chat-tool-pill:focus-visible {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: var(--color-text);
+  outline: none;
+}
+
+.chat-tool-pill--error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #f0a8a8;
+}
+
+.chat-tool-pill--error:hover,
+.chat-tool-pill--error:focus-visible {
+  border-color: rgba(239, 68, 68, 0.6);
 }
 
 /* Loading indicator */

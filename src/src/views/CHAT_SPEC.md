@@ -1,5 +1,75 @@
 # Chat View Spec
 
+## Query Loops, the Tool Inspector and Friendly Tool Names (2026-09-02)
+
+### The loop
+
+Reported after the 0.1.24 upgrade: "Run a select 1" produced `run_trilogy_query`,
+`list_available_imports`, `run_trilogy_query`, `search_docs`, `select_active_import`,
+`run_trilogy_query`, `search_docs`, … and a spinner. The agent never returned.
+
+What was actually missing was an *exit rule for failure*. The chat prompt says
+"if a query fails, explain the error clearly and try a corrected version" and
+"return_to_user is always your final tool call", and nothing in between: no cap
+on corrections, no instruction to hand back when stuck. The loop itself only
+stops at 50 iterations (`chatStore.executeMessage`) or after three text-only
+replies, and a model that keeps *calling tools* — retrying the query with
+small edits, searching the docs again — never trips either. 0.1.24 made this
+more visible rather than causing it: the docs pack gave a stuck model one
+more thing to do instead of a query retry, and `select 1` is an ask whose
+error a small model does not know how to correct (Trilogy wants a name on a
+constant, `select 1 -> one;`).
+
+Fixed upstream (trilogy-data/trilogy-studio-core, same branch, 0.1.25), in two
+layers so it does not depend on the model reading the prompt carefully:
+
+| Layer | Change |
+|-------|--------|
+| Prompt | Guideline 3 caps corrections at two attempts and says what to do on the third failure: `return_to_user` with the error, what was tried, and what is needed. "Completing your response" adds: a simple question is one query and a return; if stuck (failing query, missing data, unclear ask), return and ask rather than retry or search further. |
+| Loop | `runToolLoop` counts consecutive failed tool calls. From the third in a row each failed result carries a `<system_input>` note ("this is failed tool call N in a row … change approach or call return_to_user now"); at the eighth the loop stops itself and persists `(Stopped after N failed tool calls in a row — last error: …)` as the final assistant message. Any success resets the streak. Thresholds and the note text are `ToolLoopConfig` options. |
+
+Nothing on this side changes for the loop: the prompt and the loop are both
+library code and `useTrilogyChat` exposes neither. **Bump to 0.1.25 when it is
+published** — until then the app runs the 0.1.24 behaviour described above.
+
+### Tool inspector
+
+Clicking a pill now opens a dialog with the calls behind it: for each, the
+tool's friendly and raw names, ok/failed, the input as JSON, and the result.
+The run's other pills are tabs across the top so a whole turn reads in one
+dialog. Escape or a click outside closes it.
+
+The result text takes some finding. The library records a call in two places:
+`executedToolCalls` on the assistant message (`success`, `error`, a short
+`message` — enough for a pill) and the hidden user message that follows it,
+whose `toolResults` carry the *full* text the model was sent: query rows, the
+error with context, the docs that matched. Hidden messages never reach the
+stream, so `buildConversation` indexes every message's `toolResults` by call
+id first and joins them onto the pills' calls. Persisted chats from before
+this change render with the short form.
+
+Pills also stopped folding across outcomes: two failed queries then a working
+one is `Run query ×2` (red) then `Run query`, which is the shape of a retry
+loop, rather than `Run query ×3`.
+
+| Choice | Reason |
+|--------|--------|
+| A dialog, not an expanding row | A query result is a page of JSON; inline it would push the conversation off the phone screen. |
+| Inside `.chat-view`, not teleported | Same as the share modal, so scoped styles apply without a second stylesheet. |
+| Result text falls back to `error`, then `message` | Older persisted chats have no results message; the pill's own record is still shown. |
+| No copy button | Text in a `pre` selects and copies; the value is the raw text, not a button. |
+
+### Friendly names
+
+`utils/toolNames.ts` maps tool names to the chat's vocabulary: an import is a
+*data source* here, an artifact is a *result*. `select_active_import` reads
+"Select data source", `run_trilogy_query` "Run query", `return_to_user`
+"Reply". Used on the pills, the inspector, and the "Running …" status line.
+The raw name is in the pill tooltip and beside the label in the inspector.
+The library's own map (`getToolDisplayName`) is studio-flavoured and not
+exported from any entry point, so this is app-owned; unknown tools open up
+their underscores rather than showing raw.
+
 ## Folded Tool Runs and the Reorder Tool (2026-09-02)
 
 ### Tool runs

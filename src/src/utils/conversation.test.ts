@@ -1,8 +1,21 @@
 import { describe, it, expect } from 'vitest'
 import { artifactTitle, buildConversation, visibleMessages } from './conversation'
+import { toolLabel } from './toolNames'
 
-const tool = (name: string) => ({ id: `${name}-${Math.random()}`, name })
+let nextId = 0
+const tool = (name: string, result?: { success: boolean; error?: string; message?: string }) => ({
+  id: `${name}-${++nextId}`,
+  name,
+  input: { q: name },
+  ...(result ? { result } : {}),
+})
 const artifact = (id: string, hidden = false) => ({ id, type: 'results' as const, data: null, hidden })
+
+/** The shape the earlier tests asserted on: name and count per pill. */
+const summarize = (items: ReturnType<typeof buildConversation>, index: number) => {
+  const item = items[index]
+  return item.kind === 'tools' ? item.calls.map((c) => ({ name: c.name, count: c.count })) : null
+}
 
 describe('visibleMessages', () => {
   it('drops system, hidden and empty messages but keeps artifact carriers', () => {
@@ -33,8 +46,7 @@ describe('buildConversation tool runs', () => {
       [],
     )
     expect(items.map((i) => i.kind)).toEqual(['message', 'tools', 'message'])
-    const run = items[1]
-    expect(run.kind === 'tools' && run.calls).toEqual([
+    expect(summarize(items, 1)).toEqual([
       { name: 'select_active_import', count: 1 },
       { name: 'run_trilogy_query', count: 1 },
       { name: 'list_artifacts', count: 1 },
@@ -51,7 +63,7 @@ describe('buildConversation tool runs', () => {
       [],
     )
     expect(items).toHaveLength(1)
-    expect(items[0].kind === 'tools' && items[0].calls).toEqual([
+    expect(summarize(items, 0)).toEqual([
       { name: 'run_trilogy_query', count: 3 },
       { name: 'hide_artifact', count: 1 },
       { name: 'run_trilogy_query', count: 1 },
@@ -81,10 +93,7 @@ describe('buildConversation tool runs', () => {
       [],
     )
     expect(items.map((i) => i.kind)).toEqual(['message', 'tools'])
-    expect(items[1].kind === 'tools' && items[1].calls.map((c) => c.name)).toEqual([
-      'run_trilogy_query',
-      'return_to_user',
-    ])
+    expect(summarize(items, 1)?.map((c) => c.name)).toEqual(['run_trilogy_query', 'return_to_user'])
   })
 
   it('keys a run by its first message so it is patched, not remounted, as it grows', () => {
@@ -95,7 +104,101 @@ describe('buildConversation tool runs', () => {
       [],
     )
     expect(before[1].key).toBe(after[1].key)
-    expect(after[1].kind === 'tools' && after[1].calls.map((c) => c.name)).toEqual(['a', 'b'])
+    expect(summarize(after, 1)?.map((c) => c.name)).toEqual(['a', 'b'])
+  })
+})
+
+describe('buildConversation tool call details', () => {
+  const failed = { success: false, error: 'Syntax error near select' }
+  const ok = { success: true }
+
+  it('labels each pill with the friendly tool name', () => {
+    const items = buildConversation(
+      [{ role: 'assistant', content: '', executedToolCalls: [tool('select_active_import')] }],
+      [],
+    )
+    const run = items[0]
+    expect(run.kind === 'tools' && run.calls[0].label).toBe('Select data source')
+    expect(run.kind === 'tools' && run.calls[0].calls[0].label).toBe('Select data source')
+  })
+
+  it('does not fold a failed call into a successful one of the same tool', () => {
+    // The shape of a retry loop: two broken queries, then one that works.
+    const items = buildConversation(
+      [
+        {
+          role: 'assistant',
+          content: '',
+          executedToolCalls: [
+            tool('run_trilogy_query', failed),
+            tool('run_trilogy_query', failed),
+            tool('run_trilogy_query', ok),
+          ],
+        },
+      ],
+      [],
+    )
+    const run = items[0]
+    expect(run.kind === 'tools' && run.calls.map((c) => [c.count, c.failed])).toEqual([
+      [2, true],
+      [1, false],
+    ])
+  })
+
+  it('joins the full result text from the hidden results message by call id', () => {
+    const query = tool('run_trilogy_query', ok)
+    const bad = tool('run_trilogy_query', failed)
+    const items = buildConversation(
+      [
+        { role: 'user', content: 'q' },
+        { role: 'assistant', content: '', executedToolCalls: [bad] },
+        {
+          role: 'user',
+          content: '',
+          hidden: true,
+          toolResults: [{ toolCallId: bad.id, toolName: bad.name, result: 'Error: Syntax error near select' }],
+        },
+        { role: 'assistant', content: '', executedToolCalls: [query] },
+        {
+          role: 'user',
+          content: '',
+          hidden: true,
+          toolResults: [{ toolCallId: query.id, toolName: query.name, result: 'Success. Artifact ID: a1. 3 rows' }],
+        },
+      ],
+      [],
+    )
+    // Hidden results messages are indexed, never rendered.
+    expect(items.map((i) => i.kind)).toEqual(['message', 'tools'])
+    const run = items[1]
+    if (run.kind !== 'tools') throw new Error('expected a tool run')
+    expect(run.calls).toHaveLength(2)
+    const [first, second] = run.calls
+    expect(first.calls[0]).toMatchObject({
+      id: bad.id,
+      name: 'run_trilogy_query',
+      input: { q: 'run_trilogy_query' },
+      success: false,
+      error: 'Syntax error near select',
+      result: 'Error: Syntax error near select',
+    })
+    expect(second.calls[0]).toMatchObject({
+      id: query.id,
+      success: true,
+      result: 'Success. Artifact ID: a1. 3 rows',
+    })
+    expect(second.calls[0].error).toBeUndefined()
+  })
+
+  it('leaves the result undefined when no results message was persisted', () => {
+    const items = buildConversation(
+      [{ role: 'assistant', content: '', executedToolCalls: [tool('list_artifacts', { success: true, message: 'none' })] }],
+      [],
+    )
+    const run = items[0]
+    if (run.kind !== 'tools') throw new Error('expected a tool run')
+    expect(run.calls[0].calls[0].result).toBeUndefined()
+    expect(run.calls[0].calls[0].message).toBe('none')
   })
 })
 
@@ -131,5 +234,17 @@ describe('artifactTitle', () => {
     expect(artifactTitle(artifact('a'))).toBe('table')
     expect(artifactTitle({ ...artifact('a'), type: 'chart', config: { title: '  ' } })).toBe('chart')
     expect(artifactTitle({ ...artifact('a'), type: 'markdown', config: {} })).toBe('markdown')
+  })
+})
+
+describe('toolLabel', () => {
+  it('maps known tools to chat vocabulary', () => {
+    expect(toolLabel('select_active_import')).toBe('Select data source')
+    expect(toolLabel('run_trilogy_query')).toBe('Run query')
+    expect(toolLabel('return_to_user')).toBe('Reply')
+  })
+
+  it('opens up an unknown tool name rather than showing it raw', () => {
+    expect(toolLabel('some_new_tool')).toBe('Some new tool')
   })
 })

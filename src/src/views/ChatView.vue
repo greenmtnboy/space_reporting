@@ -16,7 +16,9 @@ import {
   buildConversation,
   visibleMessages as buildVisibleMessages,
   type ConversationItem,
+  type ToolRunItem,
 } from '../utils/conversation'
+import { toolLabel } from '../utils/toolNames'
 
 // Initialize Trilogy core (all stores/services)
 const trilogy = useTrilogyCore()
@@ -203,6 +205,36 @@ function registerInlineView(id: string, el: unknown) {
 }
 function inlineHasTable(id: string): boolean {
   return !!inlineViews.value.get(id)?.hasTable
+}
+
+/*
+  Tool inspector. Clicking a pill opens the run it belongs to with that pill
+  selected; the modal shows each call's input and the result text the model
+  was sent, which is what you need when the agent loops on a failing query.
+  The run's other pills are tabs in the modal so a whole turn can be read
+  without closing and reopening. See utils/conversation.ts for where the
+  result text comes from.
+*/
+const inspector = ref<{ run: ToolRunItem; pill: number } | null>(null)
+const inspectedPill = computed(() => inspector.value?.run.calls[inspector.value.pill] ?? null)
+function openInspector(run: ToolRunItem, pill: number) {
+  inspector.value = { run, pill }
+}
+function closeInspector() {
+  inspector.value = null
+}
+function onInspectorKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && inspector.value) closeInspector()
+}
+onMounted(() => window.addEventListener('keydown', onInspectorKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onInspectorKeydown))
+function formatInput(input: unknown): string {
+  if (input === undefined) return '(no input)'
+  try {
+    return JSON.stringify(input, null, 2)
+  } catch {
+    return String(input)
+  }
 }
 
 
@@ -562,6 +594,60 @@ function artifactIcon(type: string): string {
       </div>
     </div>
 
+    <!-- Tool inspector: the calls behind one tool run, input and result. -->
+    <div
+      v-if="inspector && inspectedPill"
+      class="tool-inspector-overlay"
+      data-testid="tool-inspector"
+      @click.self="closeInspector"
+    >
+      <div class="tool-inspector" role="dialog" aria-modal="true" aria-label="Tool call details">
+        <div class="tool-inspector-header">
+          <div class="tool-inspector-tabs">
+            <button
+              v-for="(pill, idx) in inspector.run.calls"
+              :key="idx"
+              type="button"
+              class="tool-inspector-tab"
+              :class="{ active: idx === inspector.pill, 'tool-inspector-tab--error': pill.failed }"
+              @click="inspector.pill = idx"
+            >{{ pill.label }}<span v-if="pill.count > 1" class="chat-tool-pill-count">×{{ pill.count }}</span></button>
+          </div>
+          <button class="close-btn" title="Close" @click="closeInspector">
+            <i class="mdi mdi-close"></i>
+          </button>
+        </div>
+        <div class="tool-inspector-body">
+          <div
+            v-for="(call, idx) in inspectedPill.calls"
+            :key="call.id || idx"
+            class="tool-inspector-call"
+          >
+            <div class="tool-inspector-call-title">
+              <span class="tool-inspector-call-name">{{ call.label }}</span>
+              <code class="tool-inspector-call-raw">{{ call.name }}</code>
+              <span v-if="inspectedPill.calls.length > 1" class="tool-inspector-call-index">
+                {{ idx + 1 }} of {{ inspectedPill.calls.length }}
+              </span>
+              <span
+                v-if="call.success !== undefined"
+                class="tool-inspector-status"
+                :class="call.success ? 'ok' : 'error'"
+              >{{ call.success ? 'ok' : 'failed' }}</span>
+            </div>
+            <div class="tool-inspector-section">
+              <div class="tool-inspector-section-label">Input</div>
+              <pre class="tool-inspector-pre">{{ formatInput(call.input) }}</pre>
+            </div>
+            <div class="tool-inspector-section">
+              <div class="tool-inspector-section-label">Result</div>
+              <pre class="tool-inspector-pre">{{ call.result || call.error || call.message || '(no output recorded)' }}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Shared Chat View - read-only mode -->
     <div v-if="viewMode === 'shared'" class="chat-interface shared-mode">
       <ViewHeader :title="sharing.sharedChatData.value?.title || 'Shared Conversation'">
@@ -765,15 +851,21 @@ function artifactIcon(type: string): string {
                 </div>
               </div>
 
-              <!-- A run of consecutive tool calls, folded into one compact row. -->
+              <!-- A run of consecutive tool calls, folded into one compact row.
+                   Each pill opens the inspector on that call. -->
               <div v-else-if="item.kind === 'tools'" class="chat-tool-run" data-testid="chat-tool-run">
                 <i class="mdi mdi-cog-outline chat-tool-run-icon"></i>
                 <div class="chat-tool-pills">
-                  <span
+                  <button
                     v-for="(call, idx) in item.calls"
                     :key="idx"
+                    type="button"
                     class="chat-tool-pill"
-                  >{{ call.name }}<span v-if="call.count > 1" class="chat-tool-pill-count">×{{ call.count }}</span></span>
+                    :class="{ 'chat-tool-pill--error': call.failed }"
+                    :title="`${call.name}${call.failed ? ' — failed' : ''}. Click for details.`"
+                    data-testid="chat-tool-pill"
+                    @click="openInspector(item, idx)"
+                  >{{ call.label }}<span v-if="call.count > 1" class="chat-tool-pill-count">×{{ call.count }}</span></button>
                 </div>
               </div>
 
@@ -817,7 +909,7 @@ function artifactIcon(type: string): string {
             <div v-if="chat.isChatLoading.value" class="chat-msg chat-msg--assistant">
               <div class="chat-loading">
                 <span class="chat-loading-spinner"></span>
-                {{ chat.activeToolName.value ? `Running ${chat.activeToolName.value}...` : 'Thinking...' }}
+                {{ chat.activeToolName.value ? `${toolLabel(chat.activeToolName.value)}...` : 'Thinking...' }}
               </div>
             </div>
           </div>

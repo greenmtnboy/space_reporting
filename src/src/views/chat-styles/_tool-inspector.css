@@ -1,0 +1,184 @@
+/* ChatView Tool Inspector - the calls behind one tool run: input and result.
+   Same overlay/dialog pattern as the share modal (_sharing.css). */
+
+.tool-inspector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.tool-inspector {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.tool-inspector-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* The run's pills as tabs, so a whole turn can be read in one dialog. */
+.tool-inspector-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tool-inspector-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  appearance: none;
+}
+
+.tool-inspector-tab:hover {
+  color: var(--color-text);
+}
+
+.tool-inspector-tab.active {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.tool-inspector-tab--error {
+  color: #f0a8a8;
+}
+
+.tool-inspector-tab--error.active {
+  border-color: rgba(239, 68, 68, 0.7);
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+.tool-inspector-body {
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tool-inspector-call {
+  padding-top: 12px;
+}
+
+.tool-inspector-call + .tool-inspector-call {
+  border-top: 1px solid var(--color-border);
+}
+
+.tool-inspector-call-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+}
+
+.tool-inspector-call-name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.tool-inspector-call-raw,
+.tool-inspector-call-index {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.tool-inspector-status {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.tool-inspector-status.ok {
+  color: var(--color-accent-bright);
+  background-color: rgba(34, 197, 94, 0.12);
+}
+
+.tool-inspector-status.error {
+  color: #f0a8a8;
+  background-color: rgba(239, 68, 68, 0.15);
+}
+
+.tool-inspector-section + .tool-inspector-section {
+  margin-top: 10px;
+}
+
+.tool-inspector-section-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+/* Result text can be a full query result: scroll it inside the dialog. */
+.tool-inspector-pre {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 40vh;
+  overflow: auto;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #c8ccd4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .tool-inspector-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .tool-inspector {
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+  }
+
+  .tool-inspector-pre {
+    font-size: 0.6875rem;
+    max-height: 45vh;
+  }
+}
