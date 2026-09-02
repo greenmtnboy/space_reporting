@@ -630,7 +630,7 @@ function artifactIcon(type: string): string {
               class="tool-inspector-tab"
               :class="{ active: idx === inspector.pill, 'tool-inspector-tab--error': pill.failed }"
               @click="inspector.pill = idx"
-            >{{ pill.label }}<span v-if="pill.count > 1" class="chat-tool-pill-count">×{{ pill.count }}</span></button>
+            ><i v-if="pill.failed" class="mdi mdi-alert-circle chat-tool-pill-icon"></i>{{ pill.label }}<span v-if="pill.count > 1" class="chat-tool-pill-count">×{{ pill.count }}</span></button>
           </div>
           <button class="close-btn" title="Close" @click="closeInspector">
             <i class="mdi mdi-close"></i>
@@ -884,7 +884,7 @@ function artifactIcon(type: string): string {
                     :title="`${call.name}${call.failed ? ' — failed' : ''}. Click for details.`"
                     data-testid="chat-tool-pill"
                     @click="openInspector(item, idx)"
-                  >{{ call.label }}<span v-if="call.count > 1" class="chat-tool-pill-count">×{{ call.count }}</span></button>
+                  ><i v-if="call.failed" class="mdi mdi-alert-circle chat-tool-pill-icon"></i>{{ call.label }}<span v-if="call.count > 1" class="chat-tool-pill-count">×{{ call.count }}</span></button>
                 </div>
               </div>
 

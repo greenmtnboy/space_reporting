@@ -49,6 +49,36 @@ After the app fix, the same question against the demo provider completed in
 find the organisation name, a chart, a markdown summary, list, retitle,
 return. That is the pre-upgrade shape.
 
+### Regression test with a scripted model
+
+`e2e/chat-agent.spec.ts` runs the agent loop end to end with the model
+replaced by a script. The demo provider's three endpoints are mocked with
+`page.route` (token mint, model list, chat completions); everything else is
+real: DuckDB-wasm opens in the browser, the Trilogy resolver compiles the
+query, the library's tool loop runs the calls. Each scripted turn is one tool
+call, and every request the app sends is recorded so the test can assert on
+the system prompt and on the tool results the model was fed, not only on the
+DOM.
+
+Two tests: `select_active_import` → `run_trilogy_query('select 1 -> one;')`
+→ `return_to_user`, asserting the prompt never says `NOT CONNECTED`, the
+query result is `Success … 1 rows`, the pills read `Select data source`,
+`Run query`, `Reply` with no failure; and an invalid query → return,
+asserting the red pill, its alert icon, and the inspector's `failed` status
+and error text. Verified against the bug: with the old name-keyed lookup
+restored, the first test fails on the `NOT CONNECTED` assertion.
+
+The tests do not gate on CI's Playwright matrix for mobile (the file is not
+`-mobile.spec.ts`); the loop is layout-independent. They need the resolver
+reachable, as the DuckDB badge test does.
+
+### Failed-call indicator
+
+A failed pill is tinted red and carries an alert glyph (`mdi-alert-circle`)
+before its label, in the message stream and in the inspector's tabs. The
+glyph is there so the state survives colour-blind viewing and a dim phone
+screen; the tint alone was easy to miss beside the green pills.
+
 ### Demo model
 
 The demo connection pins `google/gemini-3-flash-preview` through OpenRouter.

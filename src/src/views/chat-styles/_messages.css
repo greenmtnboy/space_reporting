@@ -163,10 +163,18 @@
   outline: none;
 }
 
+/* Failed: red tint plus an alert glyph, so the state survives colour-blind
+   viewing and a dim screen. */
 .chat-tool-pill--error {
-  background-color: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.25);
-  color: #f0a8a8;
+  background-color: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #f5b5b5;
+}
+
+.chat-tool-pill-icon {
+  margin-right: 4px;
+  font-size: 0.75rem;
+  color: #ef4444;
 }
 
 .chat-tool-pill--error:hover,
