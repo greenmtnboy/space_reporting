@@ -123,3 +123,15 @@ export function buildConversation(
   }
   return items
 }
+
+/**
+ * What to call an artifact in the card header and tab bar. The agent's
+ * update_artifact tool sets `config.title`; until it does, or for artifacts the
+ * tool loop never titles (raw results), fall back to the type, with `results`
+ * read as "table" since that is what renders.
+ */
+export function artifactTitle(artifact: ChatArtifact): string {
+  const title = artifact.config?.title
+  if (typeof title === 'string' && title.trim()) return title.trim()
+  return artifact.type === 'results' ? 'table' : artifact.type
+}

@@ -34,19 +34,42 @@ meaningless there, and the prompt's curation step 4 ("reorder for maximum
 impact, the panel is the primary view the user sees") sends the model on a
 detour every turn.
 
+The same goes for `hide_artifact` inline: the curation prompt tells the model
+to hide "results from earlier questions no longer relevant to the current ask",
+which on a panel is tidying and inline deletes a card the user already scrolled
+past.
+
+Two more are pointless on every layout here. `connect_data_connection`: the
+app opens its one DuckDB connection itself, and when that fails the model
+cannot fix it. `open_documentation` (0.1.24 adds the docs pack to the chat
+toolset): it navigates the studio's tutorial screen, which this app does not
+have; `search_docs` and `read_doc` from the same pack stay, so the model can
+look up Trilogy idioms instead of guessing.
+
 Upstream (same branch in trilogy-studio-core) now takes `disabledTools` on
 `useTrilogyChat`. It withholds the named tools from the request and drops the
 prompt lines that ask for them, renumbering the curation steps. The wiring here
 will be:
 
 ```ts
+const ALWAYS_DISABLED = ['connect_data_connection', 'open_documentation']
+const INLINE_DISABLED = ['reorder_artifacts', 'hide_artifact']
 const chat = useTrilogyChat({
   dataConnectionName,
   initialTitle: 'Space Data Chat',
   persistChat: true,
-  disabledTools: () => (isNarrow.value ? ['reorder_artifacts'] : []),
+  disabledTools: () => (isNarrow.value ? [...ALWAYS_DISABLED, ...INLINE_DISABLED] : ALWAYS_DISABLED),
 })
 ```
+
+### Artifact titles (done now)
+
+The curation prompt spends a step on `update_artifact` titles, but the view
+never showed them: the mobile card header and the desktop tab bar both showed
+the artifact *type*. Both now show `config.title` when the agent has set one,
+falling back to the type (`results` reads as "table"), via `artifactTitle` in
+`utils/conversation.ts`. Tab labels are capped at 180px with the full title in
+the tooltip so one long title cannot push its siblings off the bar.
 
 Not done against 0.1.22, where the option does not exist. One consequence to
 keep in mind when it lands: the toolset is part of the provider's prompt-cache

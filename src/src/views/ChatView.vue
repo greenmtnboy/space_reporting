@@ -12,6 +12,7 @@ import { useChatSharing } from '../composables/useChatSharing'
 import { installEmptyMessageGuard } from '../utils/llmHistoryGuard'
 import { PREQL_MODELS } from '../models'
 import {
+  artifactTitle,
   buildConversation,
   visibleMessages as buildVisibleMessages,
   type ConversationItem,
@@ -171,9 +172,6 @@ const conversation = computed<ConversationItem[]>(() =>
   buildConversation(chat.activeChatMessages.value || [], visibleArtifacts.value),
 )
 
-function artifactLabel(artifact: ChatArtifact): string {
-  return artifact.type === 'results' ? 'table' : artifact.type
-}
 
 // Auto-scroll to bottom on new messages
 async function scrollToBottom() {
@@ -752,9 +750,9 @@ function artifactIcon(type: string): string {
                 v-else-if="isNarrow"
                 class="chat-artifact-card"
               >
-                <div class="chat-artifact-card-header">
+                <div class="chat-artifact-card-header" :title="artifactTitle(item.artifact)">
                   <i :class="artifactIcon(item.artifact.type)"></i>
-                  <span>{{ artifactLabel(item.artifact) }}</span>
+                  <span class="chat-artifact-card-title">{{ artifactTitle(item.artifact) }}</span>
                 </div>
                 <ChatArtifactView :artifact="item.artifact" variant="inline" />
               </div>
@@ -791,10 +789,10 @@ function artifactIcon(type: string): string {
               :key="art.id"
               :class="['artifact-tab', { active: idx === activeArtifactIndex }]"
               @click="activeArtifactIndex = idx"
-              :title="art.id"
+              :title="artifactTitle(art)"
             >
               <i :class="artifactIcon(art.type)"></i>
-              <span class="artifact-tab-label">{{ art.type }}</span>
+              <span class="artifact-tab-label">{{ artifactTitle(art) }}</span>
             </button>
           </div>
 

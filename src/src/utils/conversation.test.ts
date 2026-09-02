@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildConversation, visibleMessages } from './conversation'
+import { artifactTitle, buildConversation, visibleMessages } from './conversation'
 
 const tool = (name: string) => ({ id: `${name}-${Math.random()}`, name })
 const artifact = (id: string, hidden = false) => ({ id, type: 'results' as const, data: null, hidden })
@@ -117,5 +117,19 @@ describe('buildConversation artifacts', () => {
       'message',
       'art:a2',
     ])
+  })
+})
+
+describe('artifactTitle', () => {
+  it('prefers the title the agent set', () => {
+    expect(artifactTitle({ ...artifact('a'), config: { title: 'Launches by site' } })).toBe(
+      'Launches by site',
+    )
+  })
+
+  it('falls back to the type, reading results as table', () => {
+    expect(artifactTitle(artifact('a'))).toBe('table')
+    expect(artifactTitle({ ...artifact('a'), type: 'chart', config: { title: '  ' } })).toBe('chart')
+    expect(artifactTitle({ ...artifact('a'), type: 'markdown', config: {} })).toBe('markdown')
   })
 })
