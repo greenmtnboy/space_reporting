@@ -93,3 +93,16 @@ test.describe('Chat page - active chat header', () => {
         expect(missing).toEqual([])
     })
 })
+
+test.describe('Chat page - local database', () => {
+    test('the DuckDB badge reports ready only once the connection is open', async ({ page }) => {
+        // The badge used to flip to "ready" without opening the connection when
+        // the store's key format changed underneath the view; every agent query
+        // then failed as "not connected". Ready must mean connected.
+        await page.goto('./chat')
+        const badge = page.locator('.db-status-badge')
+        await expect(badge).toHaveClass(/ready/, { timeout: 120000 })
+        await expect(badge).toHaveText(/Database Ready/)
+        await expect(badge).not.toHaveClass(/error/)
+    })
+})
