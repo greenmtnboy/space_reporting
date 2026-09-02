@@ -106,12 +106,35 @@
   color: var(--color-accent-bright);
 }
 
-/* Tool call pills */
+/* Tool call runs: one compact row per run of consecutive calls, instead of a
+   full message block per call. */
+.chat-tool-run {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 20px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.chat-tool-run-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
 .chat-tool-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
-  margin-top: 4px;
+}
+
+.chat-tool-pill-count {
+  margin-left: 4px;
+  color: var(--color-accent-bright);
+  opacity: 0.8;
 }
 
 .chat-tool-pill {

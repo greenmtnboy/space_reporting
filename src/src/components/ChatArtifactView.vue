@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   MarkdownRenderer,
   DataTable,
@@ -51,6 +51,23 @@ function getResults(artifact: ChatArtifact): any {
   return isRenderableResults(results) ? results : null
 }
 
+/*
+  The table's copy/download actions live in the host's chrome (the card header
+  on narrow screens, the panel toolbar on wide ones) rather than floating over
+  the rows, so DataTable renders no controls of its own and the host drives it
+  through this ref. Only one DataTable is mounted at a time per view, so a
+  single ref covers every branch below.
+*/
+const table = ref<InstanceType<typeof DataTable> | null>(null)
+const hasTable = computed(() => tab.value === 'table' || props.artifact.type === 'results')
+
+defineExpose({
+  /** Whether a table is currently rendered, i.e. the actions below apply. */
+  hasTable,
+  copyTable: () => table.value?.copyToClipboard(),
+  downloadTable: () => table.value?.downloadData(),
+})
+
 function getMarkdown(artifact: ChatArtifact): string {
   if (!artifact.data) return ''
   if (typeof artifact.data === 'string') return artifact.data
@@ -88,10 +105,12 @@ function getMarkdown(artifact: ChatArtifact): string {
         />
         <DataTable
           v-else
+          ref="table"
           :headers="getResults(artifact)!.headers"
           :results="getResults(artifact)!.data"
           :flush-chrome="true"
           :fit-parent="true"
+          :show-controls="false"
         />
       </div>
     </template>
@@ -100,10 +119,12 @@ function getMarkdown(artifact: ChatArtifact): string {
     <template v-else-if="artifact.type === 'results' && getResults(artifact)">
       <div class="artifact-render-area">
         <DataTable
+          ref="table"
           :headers="getResults(artifact)!.headers"
           :results="getResults(artifact)!.data"
           :flush-chrome="true"
           :fit-parent="true"
+          :show-controls="false"
         />
       </div>
     </template>
@@ -121,10 +142,12 @@ function getMarkdown(artifact: ChatArtifact): string {
 
       <div v-if="tab === 'table' && getResults(artifact)" class="artifact-render-area">
         <DataTable
+          ref="table"
           :headers="getResults(artifact)!.headers"
           :results="getResults(artifact)!.data"
           :flush-chrome="true"
           :fit-parent="true"
+          :show-controls="false"
         />
       </div>
       <div v-else class="artifact-render-area artifact-markdown">

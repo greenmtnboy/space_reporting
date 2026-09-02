@@ -1,5 +1,176 @@
 # Chat View Spec
 
+## Folded Tool Runs and the Reorder Tool (2026-09-02)
+
+### Tool runs
+
+An agent turn is several tool-only assistant messages in a row: select the
+import, run the query, list the artifacts, hide one, retitle one, return. Each
+rendered as its own message block, so a single answer spent six or seven full
+rows of padding on pills before any text appeared.
+
+Consecutive tool calls now fold into one **tool run**: a single compact row
+with a cog and the pills in call order, adjacent repeats of the same tool
+shown once with a count (`run_trilogy_query ×2`). The rules live in
+`utils/conversation.ts`, which also owns the artifact placement that used to
+sit in `ChatView`:
+
+| Rule | Reason |
+|------|--------|
+| Calls fold across message boundaries | The library persists one message per call; the boundary is an implementation detail, not a beat in the conversation. |
+| A text message or an inline artifact ends a run | Those are the things the calls were for; the run reads as "what happened between". |
+| A message with both text and calls renders as text, then its calls join the following run | Keeps one visual grammar: text is a message, calls are a run. |
+| A run is keyed by its first message's index | The tail run grows as calls stream in; a stable key means Vue patches it rather than remounting. |
+
+`buildConversation` is a pure function of the store's messages and artifacts
+and is unit-tested in `utils/conversation.test.ts`; `ChatView` only wraps it in
+a computed.
+
+### Reorder tool on narrow screens
+
+`reorder_artifacts` orders the artifact *panel*. Below 768px there is no
+panel — artifacts sit inline where their carrier message is — so the tool is
+meaningless there, and the prompt's curation step 4 ("reorder for maximum
+impact, the panel is the primary view the user sees") sends the model on a
+detour every turn.
+
+The same goes for `hide_artifact` inline: the curation prompt tells the model
+to hide "results from earlier questions no longer relevant to the current ask",
+which on a panel is tidying and inline deletes a card the user already scrolled
+past.
+
+Two more are pointless on every layout here. `connect_data_connection`: the
+app opens its one DuckDB connection itself, and when that fails the model
+cannot fix it. `open_documentation` (0.1.24 adds the docs pack to the chat
+toolset): it navigates the studio's tutorial screen, which this app does not
+have; `search_docs` and `read_doc` from the same pack stay, so the model can
+look up Trilogy idioms instead of guessing.
+
+Library 0.1.24 (trilogy-data/trilogy-studio-core#254) added `disabledTools`
+to `useTrilogyChat`: it withholds the named tools from the request and drops
+the prompt lines that ask for them, renumbering the curation steps. Wired in
+`ChatView` as a getter over `isNarrow`, so the list follows the layout:
+
+```ts
+const ALWAYS_DISABLED_TOOLS = ['connect_data_connection', 'open_documentation']
+const INLINE_DISABLED_TOOLS = ['reorder_artifacts', 'hide_artifact']
+disabledTools: () =>
+  isNarrow.value ? [...ALWAYS_DISABLED_TOOLS, ...INLINE_DISABLED_TOOLS] : ALWAYS_DISABLED_TOOLS
+```
+
+The toolset is part of the provider's prompt-cache prefix, so rotating a phone
+across the breakpoint mid-conversation costs one cache miss on the next send.
+If a curated (panel) view is ever offered on narrow screens as a toggle, the
+getter reads that toggle instead.
+
+### Copy/download in the host chrome (done with 0.1.24)
+
+`DataTable`'s copy and download buttons floated over the rows: bottom-right on
+a phone, where they covered data. 0.1.24 adds `showControls` to `DataTable` and
+documents `copyToClipboard()` / `downloadData()` as public. `ChatArtifactView`
+now mounts every table with `showControls=false`, holds a ref to it, and
+exposes `hasTable`, `copyTable` and `downloadTable`. `ChatView` renders the two
+buttons in the artifact card header on narrow screens and at the end of the
+panel tab bar on wide ones, driving the active view through that ref. Inline
+cards are tracked in a map keyed by artifact id since they live in a `v-for`;
+the panel shows one artifact at a time so a single ref covers it.
+
+### Deferred: a deep-link tool into the visualisations
+
+Chat is a dead end beside the rockets, satellites and engines views today.
+0.1.24 also adds `extraTools` to `useTrilogyChat`: host-defined tools, each a
+definition for the model plus the function that runs it, sent ahead of
+`return_to_user` and executed here rather than in the library. The plan is
+one tool, `show_in_view`, that returns a link card into a view with a filter
+applied (a launch site, a year range, a rocket family), so an answer can end
+with "see it on the globe" and the phone user taps through.
+
+Prerequisite on this side, independent of the release: the views do not read
+any route query today (`useRoute` is not used anywhere under `views/`). Each
+view needs to accept its filter state from the query string before the tool
+has anything to link to. Do that first, then the tool is:
+
+```ts
+extraTools: [{
+  definition: {
+    name: 'show_in_view',
+    description: 'Open one of the app views filtered to what the user asked about.',
+    input_schema: { type: 'object', properties: { view: { enum: ['rockets', 'satellites', 'engines'] }, /* filters */ } },
+  },
+  execute: async (input) => ({ success: true, message: `[Open in ${input.view}](${buildViewUrl(input)})` }),
+}]
+```
+
+### Artifact titles (done now)
+
+The curation prompt spends a step on `update_artifact` titles, but the view
+never showed them: the mobile card header and the desktop tab bar both showed
+the artifact *type*. Both now show `config.title` when the agent has set one,
+falling back to the type (`results` reads as "table"), via `artifactTitle` in
+`utils/conversation.ts`. Tab labels are capped at 180px with the full title in
+the tooltip so one long title cannot push its siblings off the bar.
+
+Not done against 0.1.22, where the option does not exist. One consequence to
+keep in mind when it lands: the toolset is part of the provider's prompt-cache
+prefix, so rotating a phone across the breakpoint mid-conversation costs one
+cache miss on the next send. If a curated (panel) view is ever offered on
+narrow screens as a toggle, the getter simply reads that toggle instead.
+
+
+## Header Chips, Table Layout and Icons (2026-09-02)
+
+### What was wrong
+
+Three faults on the active-chat view, all reproduced in Chromium at 390px and 1280px:
+
+| Symptom | Root cause |
+|---------|------------|
+| The Share button rendered as a solid grey square | The component library injects an SVG-mask stylesheet at runtime for the `mdi-*` icons *it* uses. Its base rule was a bare `.mdi::before { content: ""; background-color: currentColor }`, which out-cascades the Material Design Icons webfont this app loads from the CDN and paints a 1em box for any class the library has not registered. `mdi-share-variant` and `mdi-connection` were the two unregistered icons here. |
+| Header chips came out at three different heights | Each chip sized itself from its own padding and font size: buttons at 31px, the DuckDB status and connection badge at 28px (mobile: 24 / 20 / 20). `_base.css` also carried two conflicting `.db-status.mini` / `.mini.db-status` rules. |
+| Table headers wrapped onto several lines and overlapped the first rows; cells were squashed | Tabulator's own stylesheet was never loaded. The library depends on `tabulator-tables` but ships none of its CSS (the studio app imports it itself), so the table had no layout rules: no `white-space: nowrap` on the header, no `inline-block` cells. `_tabulator.css` had been papering over this with `display: flex` on rows and `display: inline-block !important` on cells, which is what squashed them. |
+
+### Fixes
+
+| Change | Where |
+|--------|-------|
+| Import `tabulator-tables/dist/css/tabulator.min.css` ahead of the library stylesheet; `tabulator-tables` pinned as a direct dependency at the version the library resolves | `main.ts`, `package.json` |
+| `_tabulator.css` reduced to colour overrides. Layout belongs to Tabulator now | `views/chat-styles/_tabulator.css` |
+| One `--chip-height` custom property on `.header-actions` (28px, 24px on mobile) that buttons, the status dot and the badge all read | `_header.css`, `_base.css`, `_mobile.css` |
+| Share and Connect use icons the library registers: `mdi-export-variant` (Material's own share glyph) and `mdi-power-plug-outline` | `ChatView.vue` |
+| e2e: every header chip is one height; every header icon draws either a mask or font content | `e2e/chat.spec.ts`, `e2e/chat-mobile.spec.ts` |
+
+### Design choices
+
+1. **Tabulator's sheet comes from us, not from `:deep()` reimplementation.** The previous
+   `_tabulator.css` was a partial reimplementation of Tabulator's layout that fought the real
+   thing. The studio app upstream imports Tabulator's CSS itself, and the library README now
+   says consumers must; doing the same is the supported path. The one specificity trap: Tabulator
+   paints `.tabulator-table` white at (0,3,0), and the alternate-row tint is translucent, so that
+   override has to match at that specificity or even rows show white through.
+2. **Icons the library ships, rather than waiting on the font fallback.** Upstream (same branch
+   in trilogy-studio-core) now scopes the mask box to registered classes, so unregistered icons
+   fall through to the webfont. That lands with the next release; switching the two icons to
+   registered ones fixes the installed version today and stays correct afterwards. Both
+   replacements are the Material glyphs for those actions anyway.
+3. **A shared height, not matched paddings.** Chips have different content (icon-only, icon +
+   text, dot + text), so matching paddings would drift again at the next edit. A single custom
+   property is the one place to change it.
+
+### Deferred: copy/download in the card header
+
+The table's copy and download buttons float over the rows (bottom-right on mobile, where they
+cover data). Moving them into the artifact card header needs two things from the library, both
+now on the upstream branch and waiting on a release:
+
+- `DataTable`'s new `showControls` prop (default `true`) to drop the floating buttons.
+- `copyToClipboard()` / `downloadData()` being documented as public, callable through a template
+  ref.
+
+The wiring here is then: `ChatArtifactView` holds a ref to its `DataTable`, passes
+`:show-controls="false"`, and exposes the two actions to the card header in `ChatView`. Not done
+against 0.1.22: the prop would be ignored and the buttons would appear twice.
+
+
 ## Embedded Artifacts on Narrow Screens (2026-09-01)
 
 ### Overview

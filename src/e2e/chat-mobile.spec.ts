@@ -261,3 +261,46 @@ test.describe('Chat page - shared chat with artifact carriers', () => {
         expect(blanks).toBe(0)
     })
 })
+
+/*
+  Connect the demo provider, which needs no key and makes no request until a
+  message is sent, so the header of the active-chat layout renders.
+*/
+async function openActiveChat(page: import('@playwright/test').Page) {
+    await page.goto('./chat')
+    await page.getByTestId('provider-select').selectOption('demo')
+    await page.locator('.connect-btn').click()
+    await expect(page.locator('.chat-interface')).toBeVisible()
+}
+
+test.describe('Chat page - active chat header', () => {
+    test('every header chip is the same height', async ({ page }) => {
+        await openActiveChat(page)
+        const chips = page.locator('.header-actions > *')
+        await expect(chips).toHaveCount(5)
+        const heights = await chips.evaluateAll((els) =>
+            els.map((el) => Math.round(el.getBoundingClientRect().height)),
+        )
+        expect(new Set(heights).size).toBe(1)
+        expect(heights[0]).toBeGreaterThan(0)
+    })
+
+    test('every header icon draws a glyph', async ({ page }) => {
+        await openActiveChat(page)
+        // The component library injects an SVG-mask stylesheet for the icons it
+        // registers. A class it does not know used to paint as a solid square,
+        // so check each icon either has a mask (registered) or real font
+        // content (fell through to the Material Design Icons webfont).
+        const missing = await page.locator('.header-actions i.mdi').evaluateAll((els) =>
+            els
+                .filter((el) => {
+                    const before = getComputedStyle(el, '::before')
+                    const mask = before.maskImage || before.webkitMaskImage || 'none'
+                    const content = before.content.replace(/^"|"$/g, '')
+                    return mask === 'none' && content.length === 0
+                })
+                .map((el) => el.className),
+        )
+        expect(missing).toEqual([])
+    })
+})

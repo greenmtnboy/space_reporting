@@ -97,12 +97,13 @@
   }
 
   .header-actions {
+    --chip-height: 24px;
     flex-wrap: wrap;
     gap: 4px;
   }
 
   .header-action-btn {
-    padding: 0.2rem 0.5rem;
+    padding: 0 0.5rem;
     font-size: 0.5rem;
     gap: 4px;
   }
@@ -114,7 +115,6 @@
   .connection-badge {
     font-size: 0.5rem;
     padding: 0 5px;
-    height: 20px;
     max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -139,8 +139,7 @@
   }
 
   .db-status.mini {
-    padding: 2px 6px;
-    height: 20px;
+    padding: 0 6px;
   }
 
   .db-status .status-text {

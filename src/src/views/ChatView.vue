@@ -11,6 +11,12 @@ import ChatArtifactView from '../components/ChatArtifactView.vue'
 import { useChatSharing } from '../composables/useChatSharing'
 import { installEmptyMessageGuard } from '../utils/llmHistoryGuard'
 import { PREQL_MODELS } from '../models'
+import {
+  artifactTitle,
+  buildConversation,
+  visibleMessages as buildVisibleMessages,
+  type ConversationItem,
+} from '../utils/conversation'
 
 // Initialize Trilogy core (all stores/services)
 const trilogy = useTrilogyCore()
@@ -88,11 +94,42 @@ const viewMode = computed(() => {
   return 'setup'
 })
 
+// ── Narrow-screen detection ──
+// A side-by-side panel has nowhere to go on a phone, so below this width the
+// artifacts are embedded in the conversation instead. Matches the breakpoint in
+// chat-styles/_artifacts.css.
+const NARROW_QUERY = '(max-width: 768px)'
+const isNarrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+function syncNarrow(event: MediaQueryListEvent | MediaQueryList) {
+  isNarrow.value = event.matches
+}
+if (typeof window !== 'undefined' && window.matchMedia) {
+  narrowQuery = window.matchMedia(NARROW_QUERY)
+  isNarrow.value = narrowQuery.matches
+  narrowQuery.addEventListener('change', syncNarrow)
+}
+onUnmounted(() => narrowQuery?.removeEventListener('change', syncNarrow))
+
+/*
+  Tools withheld from the model. The app opens its one DuckDB connection
+  itself, so connect_data_connection has nothing to do; there is no tutorial
+  screen for open_documentation to navigate to. Below the narrow breakpoint
+  artifacts sit inline where their carrier message is: there is no panel for
+  reorder_artifacts to reorder, and hide_artifact would delete a card the user
+  already scrolled past. The toolset is part of the provider's prompt-cache
+  prefix, so crossing the breakpoint mid-chat costs one cache miss.
+*/
+const ALWAYS_DISABLED_TOOLS = ['connect_data_connection', 'open_documentation']
+const INLINE_DISABLED_TOOLS = ['reorder_artifacts', 'hide_artifact']
+
 // Use the chat composable with tools — handles tool loop internally
 const chat = useTrilogyChat({
   dataConnectionName,
   initialTitle: 'Space Data Chat',
   persistChat: true,
+  disabledTools: () =>
+    isNarrow.value ? [...ALWAYS_DISABLED_TOOLS, ...INLINE_DISABLED_TOOLS] : ALWAYS_DISABLED_TOOLS,
 })
 
 // ── Chat UI state ──
@@ -125,38 +162,10 @@ async function injectSuggestion(text: string) {
   await chat.handleChatMessageWithTools(text, chat.activeChatMessages.value)
 }
 
-/*
-  Visible messages — filter out hidden/system messages.
+// Visible messages and the rendered conversation: see utils/conversation.ts
+// for the folding rules (tool runs, artifact placement).
+const visibleMessages = computed(() => buildVisibleMessages(chat.activeChatMessages.value || []))
 
-  `m.artifact` keeps the library's artifact-carrier messages. When a chart or
-  markdown artifact is created, chatStore appends an empty assistant message
-  carrying it, so the message stream already records where each artifact belongs
-  (see stores/chatStore.ts upstream). The empty-content test below used to drop
-  them on the floor.
-*/
-const visibleMessages = computed(() =>
-  (chat.activeChatMessages.value || []).filter(
-    (m: any) =>
-      m.role !== 'system' && !m.hidden && (m.content || m.executedToolCalls?.length || m.artifact),
-  ),
-)
-
-// ── Narrow-screen detection ──
-// A side-by-side panel has nowhere to go on a phone, so below this width the
-// artifacts are embedded in the conversation instead. Matches the breakpoint in
-// chat-styles/_artifacts.css.
-const NARROW_QUERY = '(max-width: 768px)'
-const isNarrow = ref(false)
-let narrowQuery: MediaQueryList | null = null
-function syncNarrow(event: MediaQueryListEvent | MediaQueryList) {
-  isNarrow.value = event.matches
-}
-if (typeof window !== 'undefined' && window.matchMedia) {
-  narrowQuery = window.matchMedia(NARROW_QUERY)
-  isNarrow.value = narrowQuery.matches
-  narrowQuery.addEventListener('change', syncNarrow)
-}
-onUnmounted(() => narrowQuery?.removeEventListener('change', syncNarrow))
 
 // Artifact panel state
 const visibleArtifacts = computed(() =>
@@ -174,64 +183,28 @@ watch(() => visibleArtifacts.value.length, (newLen) => {
   if (newLen > 0) activeArtifactIndex.value = newLen - 1
 })
 
-interface MessageItem {
-  kind: 'message'
-  /*
-    Stable across renders so Vue patches rather than remounts. The item's own
-    position cannot be used: an artifact with no carrier is appended at the end,
-    so every new message shifts it by one and would tear down and rebuild its
-    chart or table. Message indices only ever grow, since messages append.
-  */
-  key: string
-  msg: any
-}
-interface ArtifactItem {
-  kind: 'artifact'
-  key: string
-  artifact: ChatArtifact
-}
-type ConversationItem = MessageItem | ArtifactItem
+const conversation = computed<ConversationItem[]>(() =>
+  buildConversation(chat.activeChatMessages.value || [], visibleArtifacts.value),
+)
 
 /*
-  The conversation as rendered on narrow screens: messages, with each artifact
-  in the place its carrier message occupies.
-
-  Carriers are persisted with the chat, so this placement survives a reload.
-  Two cases have no carrier and are appended at the end rather than left
-  invisible: `results` artifacts, which the installed version does not create a
-  carrier for, and anything the chat was seeded with. Dedupe is by artifact id,
-  since an artifact reaches us through both the carrier and the panel list.
+  Table actions. DataTable's own copy/download buttons floated over the rows
+  (bottom-right on a phone, covering data); ChatArtifactView renders the table
+  without them and exposes the two actions, and the host puts buttons in the
+  card header (narrow) or the panel toolbar (wide). Inline cards are keyed by
+  artifact id; the panel shows one artifact at a time.
 */
-const conversation = computed<ConversationItem[]>(() => {
-  const items: ConversationItem[] = []
-  const carried = new Set<string>()
-
-  visibleMessages.value.forEach((msg: any, index: number) => {
-    const artifact: ChatArtifact | undefined = msg.artifact
-    // A carrier holds an artifact and nothing else; a message can also carry
-    // one alongside real text, in which case both are rendered.
-    if (msg.content || msg.executedToolCalls?.length) {
-      items.push({ kind: 'message', key: `msg:${index}`, msg })
-    }
-    if (artifact && !artifact.hidden) {
-      items.push({ kind: 'artifact', key: `art:${artifact.id}`, artifact })
-      carried.add(artifact.id)
-    }
-  })
-
-  for (const artifact of visibleArtifacts.value) {
-    if (!carried.has(artifact.id)) {
-      items.push({ kind: 'artifact', key: `art:${artifact.id}`, artifact })
-    }
-  }
-  return items
-})
-
-
-
-function artifactLabel(artifact: ChatArtifact): string {
-  return artifact.type === 'results' ? 'table' : artifact.type
+type ArtifactViewHandle = InstanceType<typeof ChatArtifactView>
+const inlineViews = ref(new Map<string, ArtifactViewHandle>())
+const panelView = ref<ArtifactViewHandle | null>(null)
+function registerInlineView(id: string, el: unknown) {
+  if (el) inlineViews.value.set(id, el as ArtifactViewHandle)
+  else inlineViews.value.delete(id)
 }
+function inlineHasTable(id: string): boolean {
+  return !!inlineViews.value.get(id)?.hasTable
+}
+
 
 // Auto-scroll to bottom on new messages
 async function scrollToBottom() {
@@ -509,13 +482,6 @@ const sharedMessagesForDisplay = computed(() => {
   )
 })
 
-// Helper: get tool display text from a message
-function getToolSummary(msg: any): string {
-  const tools = msg.executedToolCalls || msg.toolCalls || []
-  if (!tools.length) return ''
-  return tools.map((tc: any) => tc.name).join(', ')
-}
-
 function artifactIcon(type: string): string {
   switch (type) {
     case 'chart': return 'mdi mdi-chart-bar'
@@ -600,7 +566,7 @@ function artifactIcon(type: string): string {
     <div v-if="viewMode === 'shared'" class="chat-interface shared-mode">
       <ViewHeader :title="sharing.sharedChatData.value?.title || 'Shared Conversation'">
         <div class="shared-badge">
-          <i class="mdi mdi-share-variant"></i>
+          <i class="mdi mdi-export-variant"></i>
           Shared Chat
           <span v-if="sharing.sharedChatData.value?.sharedAt" class="shared-timestamp">
             · {{ new Date(sharing.sharedChatData.value.sharedAt).toLocaleDateString() }}
@@ -633,7 +599,7 @@ function artifactIcon(type: string): string {
           <div class="shared-input-cta">
             <span class="cta-text">Connect an LLM provider to continue this conversation</span>
             <button class="cta-connect-btn" @click="continueSharedChat">
-              <i class="mdi mdi-connection"></i>
+              <i class="mdi mdi-power-plug-outline"></i>
               Connect & Continue
             </button>
           </div>
@@ -747,7 +713,7 @@ function artifactIcon(type: string): string {
               title="Share Chat"
               :disabled="!chat.activeChatMessages.value?.length"
             >
-              <i class="mdi mdi-share-variant"></i>
+              <i class="mdi mdi-export-variant"></i>
               <span class="desktop-only">Share</span>
             </button>
 
@@ -796,13 +762,18 @@ function artifactIcon(type: string): string {
               >
                 <div class="chat-msg-content">
                   <MarkdownRenderer v-if="item.msg.content" :markdown="item.msg.content" />
-                  <div v-if="getToolSummary(item.msg)" class="chat-tool-pills">
-                    <span
-                      v-for="tc in (item.msg.executedToolCalls || item.msg.toolCalls || [])"
-                      :key="tc.id"
-                      class="chat-tool-pill"
-                    >{{ tc.name }}</span>
-                  </div>
+                </div>
+              </div>
+
+              <!-- A run of consecutive tool calls, folded into one compact row. -->
+              <div v-else-if="item.kind === 'tools'" class="chat-tool-run" data-testid="chat-tool-run">
+                <i class="mdi mdi-cog-outline chat-tool-run-icon"></i>
+                <div class="chat-tool-pills">
+                  <span
+                    v-for="(call, idx) in item.calls"
+                    :key="idx"
+                    class="chat-tool-pill"
+                  >{{ call.name }}<span v-if="call.count > 1" class="chat-tool-pill-count">×{{ call.count }}</span></span>
                 </div>
               </div>
 
@@ -812,11 +783,33 @@ function artifactIcon(type: string): string {
                 v-else-if="isNarrow"
                 class="chat-artifact-card"
               >
-                <div class="chat-artifact-card-header">
+                <div class="chat-artifact-card-header" :title="artifactTitle(item.artifact)">
                   <i :class="artifactIcon(item.artifact.type)"></i>
-                  <span>{{ artifactLabel(item.artifact) }}</span>
+                  <span class="chat-artifact-card-title">{{ artifactTitle(item.artifact) }}</span>
+                  <div v-if="inlineHasTable(item.artifact.id)" class="artifact-actions">
+                    <button
+                      class="artifact-action-btn"
+                      title="Copy table to clipboard"
+                      data-testid="artifact-copy"
+                      @click="inlineViews.get(item.artifact.id)?.copyTable()"
+                    >
+                      <i class="mdi mdi-content-copy"></i>
+                    </button>
+                    <button
+                      class="artifact-action-btn"
+                      title="Download table as CSV"
+                      data-testid="artifact-download"
+                      @click="inlineViews.get(item.artifact.id)?.downloadTable()"
+                    >
+                      <i class="mdi mdi-download-outline"></i>
+                    </button>
+                  </div>
                 </div>
-                <ChatArtifactView :artifact="item.artifact" variant="inline" />
+                <ChatArtifactView
+                  :ref="(el) => registerInlineView(item.artifact.id, el)"
+                  :artifact="item.artifact"
+                  variant="inline"
+                />
               </div>
             </template>
 
@@ -851,14 +844,32 @@ function artifactIcon(type: string): string {
               :key="art.id"
               :class="['artifact-tab', { active: idx === activeArtifactIndex }]"
               @click="activeArtifactIndex = idx"
-              :title="art.id"
+              :title="artifactTitle(art)"
             >
               <i :class="artifactIcon(art.type)"></i>
-              <span class="artifact-tab-label">{{ art.type }}</span>
+              <span class="artifact-tab-label">{{ artifactTitle(art) }}</span>
             </button>
+            <div v-if="panelView?.hasTable" class="artifact-actions artifact-actions--panel">
+              <button
+                class="artifact-action-btn"
+                title="Copy table to clipboard"
+                data-testid="artifact-copy"
+                @click="panelView?.copyTable()"
+              >
+                <i class="mdi mdi-content-copy"></i>
+              </button>
+              <button
+                class="artifact-action-btn"
+                title="Download table as CSV"
+                data-testid="artifact-download"
+                @click="panelView?.downloadTable()"
+              >
+                <i class="mdi mdi-download-outline"></i>
+              </button>
+            </div>
           </div>
 
-          <ChatArtifactView v-if="activeArtifact" :artifact="activeArtifact" />
+          <ChatArtifactView v-if="activeArtifact" ref="panelView" :artifact="activeArtifact" />
         </div>
       </div>
     </div>

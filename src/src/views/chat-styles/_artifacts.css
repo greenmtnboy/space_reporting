@@ -69,6 +69,14 @@
   font-size: 0.85rem;
 }
 
+/* Tabs show the agent's title now, not just the type; cap it so a long one
+   cannot push its siblings off the bar. The full title is in the tooltip. */
+.artifact-tab-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .artifact-tab:hover {
   color: var(--color-text);
   background: var(--color-bg-secondary);
@@ -111,6 +119,13 @@
   color: var(--color-text-muted);
 }
 
+.chat-artifact-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-artifact-card-header i {
   font-family: 'Material Design Icons';
   font-size: 0.85rem;
@@ -123,4 +138,44 @@
   .chat-split-pane {
     flex-direction: column;
   }
+}
+
+/* ── Table actions in the host chrome ──
+   Copy/download for the table an artifact shows. In the card header on narrow
+   screens and at the end of the tab bar on wide ones; DataTable renders none of
+   its own (showControls=false), so nothing floats over the rows. */
+.artifact-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.artifact-actions--panel {
+  align-self: center;
+}
+
+.artifact-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.artifact-action-btn i {
+  font-family: 'Material Design Icons';
+  font-size: 0.85rem;
+}
+
+.artifact-action-btn:hover {
+  color: var(--color-accent-bright);
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.2);
 }
