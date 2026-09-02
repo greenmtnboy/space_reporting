@@ -36,9 +36,9 @@ Fixes:
   connected afterwards. New chats are created with the connection id as well,
   so the store's id-first lookup never falls back to the name. An e2e test
   asserts the badge reaches "Database Ready" without an error class.
-- Library (0.1.25): the connection note and guideline 8 are dropped when
-  `connect_data_connection` is disabled, and the note instead says to tell
-  the user and return. A consecutive-failure guard in the tool loop and a
+- Library (0.1.25, which this app now runs): the connection note and
+  guideline 8 are dropped when `connect_data_connection` is disabled, and
+  the note instead says to tell the user and return. A consecutive-failure guard in the tool loop and a
   retry cap in the prompt were tried and taken out again before release:
   the loop had a concrete cause, and a guard would have hidden the next one
   behind a tidy "stopped after N failures" message instead of a fix.

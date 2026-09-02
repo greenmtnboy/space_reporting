@@ -107,12 +107,12 @@ test.describe('Chat agent loop with a scripted model', () => {
     await expect(page.locator('.chat-loading')).toHaveCount(0)
     await expect(page.locator('textarea')).toBeEnabled()
 
-    // The prompt must never claim the connection the app just opened is down.
-    // (Library 0.1.25 also stops naming connect_data_connection when the app
-    // withholds it; assert that here once the app is on it.)
+    // The prompt must never claim the connection the app just opened is down,
+    // nor name connect_data_connection, which this app withholds.
     expect(requests).toHaveLength(3)
     for (const request of requests) {
       expect(request.system).not.toContain('NOT CONNECTED')
+      expect(request.system).not.toContain('connect_data_connection')
     }
     // Each scripted call succeeded and its result reached the model.
     const final = requests[2].toolResults
