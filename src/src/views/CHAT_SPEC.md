@@ -62,6 +62,32 @@ const chat = useTrilogyChat({
 })
 ```
 
+### Deferred: a deep-link tool into the visualisations
+
+Chat is a dead end beside the rockets, satellites and engines views today.
+0.1.24 also adds `extraTools` to `useTrilogyChat`: host-defined tools, each a
+definition for the model plus the function that runs it, sent ahead of
+`return_to_user` and executed here rather than in the library. The plan is
+one tool, `show_in_view`, that returns a link card into a view with a filter
+applied (a launch site, a year range, a rocket family), so an answer can end
+with "see it on the globe" and the phone user taps through.
+
+Prerequisite on this side, independent of the release: the views do not read
+any route query today (`useRoute` is not used anywhere under `views/`). Each
+view needs to accept its filter state from the query string before the tool
+has anything to link to. Do that first, then the tool is:
+
+```ts
+extraTools: [{
+  definition: {
+    name: 'show_in_view',
+    description: 'Open one of the app views filtered to what the user asked about.',
+    input_schema: { type: 'object', properties: { view: { enum: ['rockets', 'satellites', 'engines'] }, /* filters */ } },
+  },
+  execute: async (input) => ({ success: true, message: `[Open in ${input.view}](${buildViewUrl(input)})` }),
+}]
+```
+
 ### Artifact titles (done now)
 
 The curation prompt spends a step on `update_artifact` titles, but the view
