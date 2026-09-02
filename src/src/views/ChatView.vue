@@ -600,7 +600,7 @@ function artifactIcon(type: string): string {
     <div v-if="viewMode === 'shared'" class="chat-interface shared-mode">
       <ViewHeader :title="sharing.sharedChatData.value?.title || 'Shared Conversation'">
         <div class="shared-badge">
-          <i class="mdi mdi-share-variant"></i>
+          <i class="mdi mdi-export-variant"></i>
           Shared Chat
           <span v-if="sharing.sharedChatData.value?.sharedAt" class="shared-timestamp">
             · {{ new Date(sharing.sharedChatData.value.sharedAt).toLocaleDateString() }}
@@ -633,7 +633,7 @@ function artifactIcon(type: string): string {
           <div class="shared-input-cta">
             <span class="cta-text">Connect an LLM provider to continue this conversation</span>
             <button class="cta-connect-btn" @click="continueSharedChat">
-              <i class="mdi mdi-connection"></i>
+              <i class="mdi mdi-power-plug-outline"></i>
               Connect & Continue
             </button>
           </div>
@@ -747,7 +747,7 @@ function artifactIcon(type: string): string {
               title="Share Chat"
               :disabled="!chat.activeChatMessages.value?.length"
             >
-              <i class="mdi mdi-share-variant"></i>
+              <i class="mdi mdi-export-variant"></i>
               <span class="desktop-only">Share</span>
             </button>
 

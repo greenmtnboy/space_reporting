@@ -1,5 +1,59 @@
 # Chat View Spec
 
+## Header Chips, Table Layout and Icons (2026-09-02)
+
+### What was wrong
+
+Three faults on the active-chat view, all reproduced in Chromium at 390px and 1280px:
+
+| Symptom | Root cause |
+|---------|------------|
+| The Share button rendered as a solid grey square | The component library injects an SVG-mask stylesheet at runtime for the `mdi-*` icons *it* uses. Its base rule was a bare `.mdi::before { content: ""; background-color: currentColor }`, which out-cascades the Material Design Icons webfont this app loads from the CDN and paints a 1em box for any class the library has not registered. `mdi-share-variant` and `mdi-connection` were the two unregistered icons here. |
+| Header chips came out at three different heights | Each chip sized itself from its own padding and font size: buttons at 31px, the DuckDB status and connection badge at 28px (mobile: 24 / 20 / 20). `_base.css` also carried two conflicting `.db-status.mini` / `.mini.db-status` rules. |
+| Table headers wrapped onto several lines and overlapped the first rows; cells were squashed | Tabulator's own stylesheet was never loaded. The library depends on `tabulator-tables` but ships none of its CSS (the studio app imports it itself), so the table had no layout rules: no `white-space: nowrap` on the header, no `inline-block` cells. `_tabulator.css` had been papering over this with `display: flex` on rows and `display: inline-block !important` on cells, which is what squashed them. |
+
+### Fixes
+
+| Change | Where |
+|--------|-------|
+| Import `tabulator-tables/dist/css/tabulator.min.css` ahead of the library stylesheet; `tabulator-tables` pinned as a direct dependency at the version the library resolves | `main.ts`, `package.json` |
+| `_tabulator.css` reduced to colour overrides. Layout belongs to Tabulator now | `views/chat-styles/_tabulator.css` |
+| One `--chip-height` custom property on `.header-actions` (28px, 24px on mobile) that buttons, the status dot and the badge all read | `_header.css`, `_base.css`, `_mobile.css` |
+| Share and Connect use icons the library registers: `mdi-export-variant` (Material's own share glyph) and `mdi-power-plug-outline` | `ChatView.vue` |
+| e2e: every header chip is one height; every header icon draws either a mask or font content | `e2e/chat.spec.ts`, `e2e/chat-mobile.spec.ts` |
+
+### Design choices
+
+1. **Tabulator's sheet comes from us, not from `:deep()` reimplementation.** The previous
+   `_tabulator.css` was a partial reimplementation of Tabulator's layout that fought the real
+   thing. The studio app upstream imports Tabulator's CSS itself, and the library README now
+   says consumers must; doing the same is the supported path. The one specificity trap: Tabulator
+   paints `.tabulator-table` white at (0,3,0), and the alternate-row tint is translucent, so that
+   override has to match at that specificity or even rows show white through.
+2. **Icons the library ships, rather than waiting on the font fallback.** Upstream (same branch
+   in trilogy-studio-core) now scopes the mask box to registered classes, so unregistered icons
+   fall through to the webfont. That lands with the next release; switching the two icons to
+   registered ones fixes the installed version today and stays correct afterwards. Both
+   replacements are the Material glyphs for those actions anyway.
+3. **A shared height, not matched paddings.** Chips have different content (icon-only, icon +
+   text, dot + text), so matching paddings would drift again at the next edit. A single custom
+   property is the one place to change it.
+
+### Deferred: copy/download in the card header
+
+The table's copy and download buttons float over the rows (bottom-right on mobile, where they
+cover data). Moving them into the artifact card header needs two things from the library, both
+now on the upstream branch and waiting on a release:
+
+- `DataTable`'s new `showControls` prop (default `true`) to drop the floating buttons.
+- `copyToClipboard()` / `downloadData()` being documented as public, callable through a template
+  ref.
+
+The wiring here is then: `ChatArtifactView` holds a ref to its `DataTable`, passes
+`:show-controls="false"`, and exposes the two actions to the card header in `ChatView`. Not done
+against 0.1.22: the prop would be ignored and the buttons would appear twice.
+
+
 ## Embedded Artifacts on Narrow Screens (2026-09-01)
 
 ### Overview

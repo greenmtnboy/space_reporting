@@ -17,6 +17,7 @@
     "@duckdb/duckdb-wasm": "1.29.1-dev269.0",
     "@trilogy-data/trilogy-studio-components": "0.1.22",
     "pinia": "^2.3.1",
+    "tabulator-tables": "6.4.0",
     "three": "^0.182.0",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"

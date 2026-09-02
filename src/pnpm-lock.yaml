@@ -17,6 +17,9 @@ importers:
       pinia:
         specifier: ^2.3.1
         version: 2.3.1(typescript@5.9.3)(vue@3.5.26(typescript@5.9.3))
+      tabulator-tables:
+        specifier: 6.4.0
+        version: 6.4.0
       three:
         specifier: ^0.182.0
         version: 0.182.0
