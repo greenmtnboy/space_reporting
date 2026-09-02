@@ -5,6 +5,36 @@ on:
   pull_request:
     branches: [ main, master ]
 jobs:
+  unit:
+    # Runs once rather than per browser: these tests never touch a browser.
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10
+
+    - name: Cache pnpm store
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/share/pnpm/store/v3
+        key: pnpm-store-${{ runner.os }}-${{ hashFiles('src/pnpm-lock.yaml') }}
+        restore-keys: |
+          pnpm-store-${{ runner.os }}-
+
+    - name: Install dependencies
+      working-directory: ./src
+      run: pnpm install
+
+    - name: Run unit tests
+      working-directory: ./src
+      run: pnpm test
+
   test:
     timeout-minutes: 15
     runs-on: ubuntu-latest

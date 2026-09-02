@@ -1267,21 +1267,66 @@ function updateTooltipPosition(event: MouseEvent) {
   }
 }
 
+/*
+  Phone layout. The desktop layout fits everything into the viewport by letting
+  every level shrink; stacked vertically that leaves each stage section a few
+  pixels tall. Here the sections get a floor instead of a ceiling and the
+  content column scrolls.
+*/
 @media (max-width: 700px) {
+  .main-content {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* flex: none stops these from being compressed back into the viewport
+     height — they take their natural height and .main-content scrolls. */
+  .display-section {
+    flex: none;
+  }
+
   .stages-container {
     flex-direction: column;
+    flex: none;
   }
+
   .stage-section {
-    max-height: 200px;
+    flex: none;
+    min-height: 240px;
   }
+
   .flare-area {
-    height: 80px;
+    height: 96px;
   }
+
+  /* Must track .flare-area, or the SVG is drawn at its desktop height and
+     clipped by the area's overflow: hidden. */
+  .flare-display {
+    height: 96px;
+  }
+
+  /* Previously hidden outright, which is most of why a stage section looked
+     empty. Capped so one stage with many engine types cannot push the others
+     off the page; it keeps its own overflow-y from the base rule.
+     158px = two 73px card rows + the 4px row gap + the grid's 4px padding, so
+     the cap lands on a row boundary instead of slicing one in half. Card
+     height is fixed (36px cluster + one nowrap name line + count). */
   .kill-grid {
-    display: none;
+    display: flex;
+    flex: none;
+    max-height: 158px;
   }
 
-
+  /* Now that the stages scroll, the time controls would scroll away with them.
+     Pin them to the bottom of the viewport while the stages are in view. */
+  .control-panel {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-border);
+    padding-bottom: 0.25rem;
+  }
 }
 
 @media (max-width: 600px) {

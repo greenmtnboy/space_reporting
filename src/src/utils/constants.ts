@@ -8,6 +8,11 @@ export const YEAR_DURATION = YEAR_END - YEAR_START
 export const TILE_SIZE = 256
 export const DEFAULT_CENTER = { lat: 0, lng: 10 }
 
+// CARTO basemap tiles. The key is a public, client-side key: it is embedded in
+// the static bundle and every tile request made by the browser.
+export const CARTO_API_KEY = 'cb1_2qn1_1_0c18291c77c73bfb4a5a7417'
+export const CARTO_BASEMAP_STYLE = 'light_all'
+
 // Camera constraints
 export const MIN_ZOOM = .5
 export const MAX_ZOOM = 20

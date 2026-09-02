@@ -216,3 +216,48 @@ test.describe('Chat page - mobile scroll with shared chat', () => {
         expect(hasHorizontalScroll).toBe(false)
     })
 })
+
+test.describe('Chat page - shared chat with artifact carriers', () => {
+    // chatStore appends an "artifact-carrier" message — an empty assistant
+    // message holding the artifact — for every chart or markdown artifact, and
+    // a share carries the chat's raw message list. The read-only shared view has
+    // no artifact renderer, so each carrier used to render as a blank bubble.
+    const sharedChatWithCarriers = {
+        title: 'Chat with charts',
+        sharedAt: Date.now(),
+        messages: [
+            { role: 'user', content: 'Which organizations launched the most?' },
+            { role: 'assistant', content: 'SpaceX led 2025 with 134 launches.' },
+            { role: 'assistant', content: '', artifact: { id: 'a1', type: 'chart' } },
+            { role: 'user', content: 'Summarize that.' },
+            { role: 'assistant', content: '', artifact: { id: 'a2', type: 'markdown' } },
+            { role: 'assistant', content: 'In short: SpaceX dominated.' },
+        ],
+    }
+
+    test('renders no blank message bubbles for carriers', async ({ page }) => {
+        const mockGistId = 'test-mock-gist-carriers'
+        await page.route(`**/api.github.com/gists/${mockGistId}`, route => {
+            route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    id: mockGistId,
+                    files: { 'chat.json': { content: JSON.stringify(sharedChatWithCarriers) } },
+                }),
+            })
+        })
+
+        await page.goto(`./chat#gist=${mockGistId}`)
+        await expect(page.locator('.shared-mode')).toBeVisible({ timeout: 10000 })
+        await expect(page.locator('.chat-msg').first()).toBeVisible({ timeout: 10000 })
+
+        // Only the four messages that carry text should render.
+        await expect(page.locator('.chat-msg')).toHaveCount(4)
+
+        const blanks = await page
+            .locator('.chat-msg')
+            .evaluateAll(nodes => nodes.filter(n => !(n.textContent ?? '').trim()).length)
+        expect(blanks).toBe(0)
+    })
+})

@@ -80,109 +80,47 @@
   border-color: var(--color-accent-dim);
 }
 
-/* ── View Toggle (chart/table) ── */
-.artifact-view-toggle {
-  display: flex;
-  gap: 2px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--color-border);
+/* ── Embedded artifact cards (narrow screens) ──
+   The split pane used to stack into two 50% rows, which left both the
+   conversation and the artifact too short to read. Below 768px ChatView renders
+   each artifact inline in the message stream instead — see the isNarrow branch
+   there — and these style the card that wraps one. */
+.chat-artifact-card {
+  /* The message stream is a column flex container: without this the card is
+     shrunk to whatever space is left instead of scrolled to. */
   flex-shrink: 0;
+  margin: 10px 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  overflow: hidden;
 }
 
-.toggle-btn {
+.chat-artifact-card-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
   font-family: var(--font-mono);
   font-size: 0.6rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.toggle-btn i {
+.chat-artifact-card-header i {
   font-family: 'Material Design Icons';
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  color: var(--color-accent);
 }
 
-.toggle-btn:hover {
-  color: var(--color-text);
-}
-
-.toggle-btn.active {
-  color: var(--color-accent-bright);
-  background: rgba(14, 165, 233, 0.1);
-  border-color: rgba(14, 165, 233, 0.2);
-}
-
-/* ── Artifact Content ── */
-.artifact-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.artifact-render-area {
-  flex: 1;
-  min-height: 300px;
-  overflow: auto;
-  padding: 4px;
-  position: relative;
-}
-
-.artifact-markdown {
-  padding: 16px;
-}
-
-.artifact-code {
-  padding: 12px;
-}
-
-.artifact-code pre {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--color-text);
-}
-
-.artifact-fallback {
-  padding: 12px;
-}
-
-.artifact-fallback pre {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--color-text-muted);
-}
-
-/* ── Mobile: stack vertically ── */
+/* Fallback only: ChatView hides the panel outright below this width, so this
+   matters just if matchMedia is unavailable and the panel still renders. */
 @media (max-width: 768px) {
   .chat-split-pane {
     flex-direction: column;
-  }
-
-  .chat-split-pane > .chat-container.has-artifacts {
-    flex: 0 0 50%;
-    max-width: 100%;
-  }
-
-  .artifact-panel {
-    border-left: none;
-    border-top: 1px solid var(--color-border);
-    max-height: 50%;
   }
 }

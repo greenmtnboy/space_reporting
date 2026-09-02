@@ -1,0 +1,121 @@
+/* Chat Artifact Content Styles
+ *
+ * Scoped to components/ChatArtifactView.vue, which renders a single artifact's
+ * body. These live apart from _artifacts.css because that file is scoped to
+ * ChatView and its selectors cannot reach inside a child component; the panel
+ * chrome (split pane, tab bar) stays there.
+ */
+
+/* ── View Toggle (chart/table) ── */
+.artifact-view-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggle-btn i {
+  font-family: 'Material Design Icons';
+  font-size: 0.8rem;
+}
+
+.toggle-btn:hover {
+  color: var(--color-text);
+}
+
+.toggle-btn.active {
+  color: var(--color-accent-bright);
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.2);
+}
+
+/* ── Artifact Content ── */
+.artifact-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.artifact-render-area {
+  flex: 1;
+  min-height: 300px;
+  overflow: auto;
+  padding: 4px;
+  position: relative;
+}
+
+.artifact-markdown {
+  padding: 16px;
+}
+
+.artifact-code {
+  padding: 12px;
+}
+
+.artifact-code pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text);
+}
+
+.artifact-fallback {
+  padding: 12px;
+}
+
+.artifact-fallback pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text-muted);
+}
+
+/* ── Inline variant ──
+   A card in the scrolling conversation sizes itself; it has no parent height to
+   fill, and both Vega and Tabulator need a definite height to lay out into. */
+.artifact-content--inline {
+  height: 320px;
+}
+
+/* The 300px floor above is meant for a full-height panel. In a 320px card it
+   outgrows the box and the content is clipped rather than fitted. */
+.artifact-content--inline .artifact-render-area {
+  min-height: 0;
+}
+
+/*
+  Text artifacts are the exception: a report in a short scroll box inside a
+  scrolling conversation is the nested-scrolling trap this layout exists to
+  avoid, so let them run to their natural height and cap it instead.
+*/
+.artifact-content--inline.artifact-content--markdown,
+.artifact-content--inline.artifact-content--code {
+  height: auto;
+  max-height: 70vh;
+  overflow-y: auto;
+}
