@@ -1,5 +1,60 @@
 # Chat View Spec
 
+## Folded Tool Runs and the Reorder Tool (2026-09-02)
+
+### Tool runs
+
+An agent turn is several tool-only assistant messages in a row: select the
+import, run the query, list the artifacts, hide one, retitle one, return. Each
+rendered as its own message block, so a single answer spent six or seven full
+rows of padding on pills before any text appeared.
+
+Consecutive tool calls now fold into one **tool run**: a single compact row
+with a cog and the pills in call order, adjacent repeats of the same tool
+shown once with a count (`run_trilogy_query ×2`). The rules live in
+`utils/conversation.ts`, which also owns the artifact placement that used to
+sit in `ChatView`:
+
+| Rule | Reason |
+|------|--------|
+| Calls fold across message boundaries | The library persists one message per call; the boundary is an implementation detail, not a beat in the conversation. |
+| A text message or an inline artifact ends a run | Those are the things the calls were for; the run reads as "what happened between". |
+| A message with both text and calls renders as text, then its calls join the following run | Keeps one visual grammar: text is a message, calls are a run. |
+| A run is keyed by its first message's index | The tail run grows as calls stream in; a stable key means Vue patches it rather than remounting. |
+
+`buildConversation` is a pure function of the store's messages and artifacts
+and is unit-tested in `utils/conversation.test.ts`; `ChatView` only wraps it in
+a computed.
+
+### Reorder tool on narrow screens
+
+`reorder_artifacts` orders the artifact *panel*. Below 768px there is no
+panel — artifacts sit inline where their carrier message is — so the tool is
+meaningless there, and the prompt's curation step 4 ("reorder for maximum
+impact, the panel is the primary view the user sees") sends the model on a
+detour every turn.
+
+Upstream (same branch in trilogy-studio-core) now takes `disabledTools` on
+`useTrilogyChat`. It withholds the named tools from the request and drops the
+prompt lines that ask for them, renumbering the curation steps. The wiring here
+will be:
+
+```ts
+const chat = useTrilogyChat({
+  dataConnectionName,
+  initialTitle: 'Space Data Chat',
+  persistChat: true,
+  disabledTools: () => (isNarrow.value ? ['reorder_artifacts'] : []),
+})
+```
+
+Not done against 0.1.22, where the option does not exist. One consequence to
+keep in mind when it lands: the toolset is part of the provider's prompt-cache
+prefix, so rotating a phone across the breakpoint mid-conversation costs one
+cache miss on the next send. If a curated (panel) view is ever offered on
+narrow screens as a toggle, the getter simply reads that toggle instead.
+
+
 ## Header Chips, Table Layout and Icons (2026-09-02)
 
 ### What was wrong

@@ -11,6 +11,11 @@ import ChatArtifactView from '../components/ChatArtifactView.vue'
 import { useChatSharing } from '../composables/useChatSharing'
 import { installEmptyMessageGuard } from '../utils/llmHistoryGuard'
 import { PREQL_MODELS } from '../models'
+import {
+  buildConversation,
+  visibleMessages as buildVisibleMessages,
+  type ConversationItem,
+} from '../utils/conversation'
 
 // Initialize Trilogy core (all stores/services)
 const trilogy = useTrilogyCore()
@@ -125,21 +130,9 @@ async function injectSuggestion(text: string) {
   await chat.handleChatMessageWithTools(text, chat.activeChatMessages.value)
 }
 
-/*
-  Visible messages — filter out hidden/system messages.
-
-  `m.artifact` keeps the library's artifact-carrier messages. When a chart or
-  markdown artifact is created, chatStore appends an empty assistant message
-  carrying it, so the message stream already records where each artifact belongs
-  (see stores/chatStore.ts upstream). The empty-content test below used to drop
-  them on the floor.
-*/
-const visibleMessages = computed(() =>
-  (chat.activeChatMessages.value || []).filter(
-    (m: any) =>
-      m.role !== 'system' && !m.hidden && (m.content || m.executedToolCalls?.length || m.artifact),
-  ),
-)
+// Visible messages and the rendered conversation: see utils/conversation.ts
+// for the folding rules (tool runs, artifact placement).
+const visibleMessages = computed(() => buildVisibleMessages(chat.activeChatMessages.value || []))
 
 // ── Narrow-screen detection ──
 // A side-by-side panel has nowhere to go on a phone, so below this width the
@@ -174,60 +167,9 @@ watch(() => visibleArtifacts.value.length, (newLen) => {
   if (newLen > 0) activeArtifactIndex.value = newLen - 1
 })
 
-interface MessageItem {
-  kind: 'message'
-  /*
-    Stable across renders so Vue patches rather than remounts. The item's own
-    position cannot be used: an artifact with no carrier is appended at the end,
-    so every new message shifts it by one and would tear down and rebuild its
-    chart or table. Message indices only ever grow, since messages append.
-  */
-  key: string
-  msg: any
-}
-interface ArtifactItem {
-  kind: 'artifact'
-  key: string
-  artifact: ChatArtifact
-}
-type ConversationItem = MessageItem | ArtifactItem
-
-/*
-  The conversation as rendered on narrow screens: messages, with each artifact
-  in the place its carrier message occupies.
-
-  Carriers are persisted with the chat, so this placement survives a reload.
-  Two cases have no carrier and are appended at the end rather than left
-  invisible: `results` artifacts, which the installed version does not create a
-  carrier for, and anything the chat was seeded with. Dedupe is by artifact id,
-  since an artifact reaches us through both the carrier and the panel list.
-*/
-const conversation = computed<ConversationItem[]>(() => {
-  const items: ConversationItem[] = []
-  const carried = new Set<string>()
-
-  visibleMessages.value.forEach((msg: any, index: number) => {
-    const artifact: ChatArtifact | undefined = msg.artifact
-    // A carrier holds an artifact and nothing else; a message can also carry
-    // one alongside real text, in which case both are rendered.
-    if (msg.content || msg.executedToolCalls?.length) {
-      items.push({ kind: 'message', key: `msg:${index}`, msg })
-    }
-    if (artifact && !artifact.hidden) {
-      items.push({ kind: 'artifact', key: `art:${artifact.id}`, artifact })
-      carried.add(artifact.id)
-    }
-  })
-
-  for (const artifact of visibleArtifacts.value) {
-    if (!carried.has(artifact.id)) {
-      items.push({ kind: 'artifact', key: `art:${artifact.id}`, artifact })
-    }
-  }
-  return items
-})
-
-
+const conversation = computed<ConversationItem[]>(() =>
+  buildConversation(chat.activeChatMessages.value || [], visibleArtifacts.value),
+)
 
 function artifactLabel(artifact: ChatArtifact): string {
   return artifact.type === 'results' ? 'table' : artifact.type
@@ -509,13 +451,6 @@ const sharedMessagesForDisplay = computed(() => {
   )
 })
 
-// Helper: get tool display text from a message
-function getToolSummary(msg: any): string {
-  const tools = msg.executedToolCalls || msg.toolCalls || []
-  if (!tools.length) return ''
-  return tools.map((tc: any) => tc.name).join(', ')
-}
-
 function artifactIcon(type: string): string {
   switch (type) {
     case 'chart': return 'mdi mdi-chart-bar'
@@ -796,13 +731,18 @@ function artifactIcon(type: string): string {
               >
                 <div class="chat-msg-content">
                   <MarkdownRenderer v-if="item.msg.content" :markdown="item.msg.content" />
-                  <div v-if="getToolSummary(item.msg)" class="chat-tool-pills">
-                    <span
-                      v-for="tc in (item.msg.executedToolCalls || item.msg.toolCalls || [])"
-                      :key="tc.id"
-                      class="chat-tool-pill"
-                    >{{ tc.name }}</span>
-                  </div>
+                </div>
+              </div>
+
+              <!-- A run of consecutive tool calls, folded into one compact row. -->
+              <div v-else-if="item.kind === 'tools'" class="chat-tool-run" data-testid="chat-tool-run">
+                <i class="mdi mdi-cog-outline chat-tool-run-icon"></i>
+                <div class="chat-tool-pills">
+                  <span
+                    v-for="(call, idx) in item.calls"
+                    :key="idx"
+                    class="chat-tool-pill"
+                  >{{ call.name }}<span v-if="call.count > 1" class="chat-tool-pill-count">×{{ call.count }}</span></span>
                 </div>
               </div>
 
