@@ -59,6 +59,15 @@ const dataConnectionName = 'space-duckdb'
 const dbStatus = ref<'loading' | 'ready' | 'error'>('loading')
 const dbError = ref<string>('')
 
+/*
+  The chat store keeps a connection id alongside the display name, and
+  resolves the id first when it builds the agent's prompt. Pass it whenever a
+  chat is created so that lookup never has to fall back to the name.
+*/
+function dataConnectionId(): string {
+  return trilogy.connectionStore.connectionByName(dataConnectionName)?.id ?? ''
+}
+
 // LLM connection state (for provider selection)
 const llmStore = trilogy.llmConnectionStore
 
@@ -262,20 +271,29 @@ onMounted(async () => {
       console.log('Loaded shared chat:', sharing.sharedChatData.value?.title)
     }
 
-    if (!trilogy.connectionStore.connections[dataConnectionName]) {
+    /*
+      Look the connection up by name, never by store key. Library 0.1.24 keys
+      connectionStore.connections by a derived id (`local:<name>`), so the
+      old `connections[dataConnectionName]` read undefined, the reset below
+      never ran, and the badge reported "ready" over a connection that was
+      never opened. Every query the agent then ran failed with "not
+      connected — use connect_data_connection", a tool this app withholds.
+    */
+    const conn =
+      trilogy.connectionStore.connectionByName(dataConnectionName) ??
       trilogy.connectionStore.newConnection(dataConnectionName, 'duckdb', {})
+    if (!conn.connected) {
+      await trilogy.connectionStore.resetConnection(conn.id)
     }
-
-    const conn = trilogy.connectionStore.connections[dataConnectionName]
-    if (conn && !conn.connected) {
-      await trilogy.connectionStore.resetConnection(dataConnectionName)
+    if (!conn.connected) {
+      throw new Error(conn.error || 'DuckDB did not connect')
     }
 
     console.log('DuckDB connection ready')
     dbStatus.value = 'ready'
 
     if (!trilogy.chatStore.activeChatId && !hasSharedChat) {
-      trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
+      trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data', dataConnectionId())
     }
 
     // Always force production resolver
@@ -307,7 +325,7 @@ function resetChat() {
     trilogy.chatStore.clearChatMessages(trilogy.chatStore.activeChatId)
     chat.handleImportChange([])
   } else {
-    trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat')
+    trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat', dataConnectionId())
     chat.handleImportChange([])
   }
 }
@@ -461,6 +479,7 @@ function continueSharedChat() {
     sharing.sharedChatData.value.title,
     dataConnectionName,
     'Continued from shared chat',
+    dataConnectionId(),
   )
 
   if (trilogy.chatStore.activeChatId) {
@@ -493,7 +512,7 @@ function continueSharedChat() {
 function startFreshChat() {
   sharing.clearSharedChat()
   if (!trilogy.chatStore.activeChatId) {
-    trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
+    trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data', dataConnectionId())
   }
   selectedModel.value = ''
 }

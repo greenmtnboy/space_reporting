@@ -4,33 +4,61 @@
 
 ### The loop
 
-Reported after the 0.1.24 upgrade: "Run a select 1" produced `run_trilogy_query`,
-`list_available_imports`, `run_trilogy_query`, `search_docs`, `select_active_import`,
-`run_trilogy_query`, `search_docs`, … and a spinner. The agent never returned.
+Reported after the 0.1.24 upgrade: a Rocket Lab launch-cadence question that
+used to finish in three to five turns produced `run_trilogy_query`,
+`list_available_imports`, `run_trilogy_query`, `search_docs`,
+`select_active_import`, `run_trilogy_query`, `search_docs`, … and a spinner.
 
-What was actually missing was an *exit rule for failure*. The chat prompt says
-"if a query fails, explain the error clearly and try a corrected version" and
-"return_to_user is always your final tool call", and nothing in between: no cap
-on corrections, no instruction to hand back when stuck. The loop itself only
-stops at 50 iterations (`chatStore.executeMessage`) or after three text-only
-replies, and a model that keeps *calling tools* — retrying the query with
-small edits, searching the docs again — never trips either. 0.1.24 made this
-more visible rather than causing it: the docs pack gave a stuck model one
-more thing to do instead of a query retry, and `select 1` is an ask whose
-error a small model does not know how to correct (Trilogy wants a name on a
-constant, `select 1 -> one;`).
+Reproduced here against the real demo provider (Playwright, phone viewport,
+every OpenRouter request captured): 51 model calls in 130 seconds, then
+"(Max tool iterations reached)". Every query failed with the same result:
 
-Fixed upstream (trilogy-data/trilogy-studio-core, same branch, 0.1.25), in two
-layers so it does not depend on the model reading the prompt carefully:
+```
+Error: Connection "space-duckdb" is not connected. Use connect_data_connection first.
+```
 
-| Layer | Change |
-|-------|--------|
-| Prompt | Guideline 3 caps corrections at two attempts and says what to do on the third failure: `return_to_user` with the error, what was tried, and what is needed. "Completing your response" adds: a simple question is one query and a return; if stuck (failing query, missing data, unclear ask), return and ask rather than retry or search further. |
-| Loop | `runToolLoop` counts consecutive failed tool calls. From the third in a row each failed result carries a `<system_input>` note ("this is failed tool call N in a row … change approach or call return_to_user now"); at the eighth the loop stops itself and persists `(Stopped after N failed tool calls in a row — last error: …)` as the final assistant message. Any success resets the streak. Thresholds and the note text are `ToolLoopConfig` options. |
+and the system prompt itself said `ACTIVE DATA CONNECTION: space-duckdb (NOT
+CONNECTED - use connect_data_connection tool to connect before running
+queries)`. Two regressions from the last PR combined:
 
-Nothing on this side changes for the loop: the prompt and the loop are both
-library code and `useTrilogyChat` exposes neither. **Bump to 0.1.25 when it is
-published** — until then the app runs the 0.1.24 behaviour described above.
+| Regression | Effect |
+|------------|--------|
+| **The DuckDB connection was never opened.** Library 0.1.24 keys `connectionStore.connections` by a derived id (`local:<name>`); 0.1.22 keyed it by name. `onMounted` read `connections['space-duckdb']`, got `undefined`, skipped the reset, and set the badge to "ready" anyway. Nothing in the UI showed it. | The model was told the connection was down, and every query confirmed it. |
+| **The escape hatch was withheld.** The same PR disabled `connect_data_connection`, which is right when the app opens its own connection, but the library still told the model to call it: the "NOT CONNECTED" note and guideline 8 were not tagged to the tool. | The model searched the docs for a tool it could not see, then retried queries, for 50 iterations. |
+
+The demo model was not at fault. Nothing in the prompt or the loop would have
+helped either: the failing call was correct, the environment was broken.
+
+Fixes:
+
+- `onMounted` resolves the connection with `connectionByName`, creates it if
+  missing, resets it **by id**, and throws (badge red) if it is still not
+  connected afterwards. New chats are created with the connection id as well,
+  so the store's id-first lookup never falls back to the name. An e2e test
+  asserts the badge reaches "Database Ready" without an error class.
+- Library (0.1.25): the connection note and guideline 8 are dropped when
+  `connect_data_connection` is disabled, and the note instead says to tell
+  the user and return. `runToolLoop` also now counts consecutive failed calls
+  (nudge from the third, stop at the eighth), and the prompt caps query
+  corrections at two attempts, so a stuck run of any cause ends in a reply
+  rather than a spinner. Those two are library code; **bump to 0.1.25 when
+  it is published**.
+
+After the app fix, the same question against the demo provider completed in
+10 calls and 145 seconds: select source, one chart attempt, two lookups to
+find the organisation name, a chart, a markdown summary, list, retitle,
+return. That is the pre-upgrade shape.
+
+### Demo model
+
+The demo connection pins `google/gemini-3-flash-preview` through OpenRouter.
+With the connection working it answered well in 10 calls, so the loop was not
+a model-quality problem and there is no reason to pay for a larger default.
+Two things to watch: each call took 10–20 seconds on the 30 KB prompt, and a
+Flash model is the kind most likely to retry on a real query error, which the
+library's failure-streak guard now bounds. If demo turns still feel slow or
+loop-prone after 0.1.25, the next lever is `DemoProvider.preferredModels` or
+the pinned model in `ChatView.connectProvider`, at a cost trade-off.
 
 ### Tool inspector
 
