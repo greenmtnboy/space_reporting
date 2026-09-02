@@ -1,4 +1,5 @@
 import type { ChatArtifact } from '@trilogy-data/trilogy-studio-components/llm'
+import { toolLabel } from './toolNames'
 
 /**
  * The conversation as rendered in the message stream: text messages, runs of
@@ -12,6 +13,20 @@ import type { ChatArtifact } from '@trilogy-data/trilogy-studio-components/llm'
 interface ChatToolCallLike {
   id?: string
   name: string
+  input?: Record<string, unknown>
+  /** Set on `executedToolCalls`: the outcome the library recorded for the UI. */
+  result?: {
+    success: boolean
+    message?: string
+    error?: string
+  }
+}
+
+interface ChatToolResultLike {
+  toolCallId: string
+  toolName?: string
+  /** The full text the model received, including query rows and errors. */
+  result: string
 }
 
 export interface ChatMessageLike {
@@ -20,6 +35,8 @@ export interface ChatMessageLike {
   hidden?: boolean
   executedToolCalls?: ChatToolCallLike[]
   toolCalls?: ChatToolCallLike[]
+  /** Carried by the hidden user message that follows each batch of calls. */
+  toolResults?: ChatToolResultLike[]
   artifact?: ChatArtifact
 }
 
@@ -35,11 +52,35 @@ export interface MessageItem {
   msg: ChatMessageLike
 }
 
+/** One executed tool call with everything the inspector shows about it. */
+export interface ToolCallDetail {
+  id?: string
+  name: string
+  label: string
+  input?: Record<string, unknown>
+  /** Undefined when the library recorded no outcome (older persisted chats). */
+  success?: boolean
+  error?: string
+  message?: string
+  /** The text sent back to the model, when the results message is present. */
+  result?: string
+}
+
+/** One pill: adjacent calls to the same tool with the same outcome. */
+export interface ToolPill {
+  name: string
+  label: string
+  count: number
+  /** True when the calls in this pill failed; failures never fold into successes. */
+  failed: boolean
+  calls: ToolCallDetail[]
+}
+
 export interface ToolRunItem {
   kind: 'tools'
   key: string
-  /** Tool names in call order, with adjacent repeats folded into a count. */
-  calls: { name: string; count: number }[]
+  /** Pills in call order. */
+  calls: ToolPill[]
 }
 
 export interface ArtifactItem {
@@ -66,6 +107,40 @@ export function visibleMessages(messages: readonly ChatMessageLike[]): ChatMessa
 }
 
 /**
+ * The text each tool call's result was sent to the model as, by call id.
+ *
+ * The library records a call's outcome in two places. `executedToolCalls` on
+ * the assistant message carries `success`, `error` and a short `message` for
+ * the UI; the full result text — query rows, the error with its context, the
+ * docs that matched — only exists in the hidden user message that follows,
+ * as `toolResults`. Hidden messages never reach the stream, so they are
+ * indexed here first and joined onto the calls by id.
+ */
+function indexToolResults(messages: readonly ChatMessageLike[]): Map<string, string> {
+  const byId = new Map<string, string>()
+  for (const msg of messages) {
+    for (const result of msg.toolResults || []) {
+      if (result.toolCallId) byId.set(result.toolCallId, result.result)
+    }
+  }
+  return byId
+}
+
+function toDetail(call: ChatToolCallLike, results: Map<string, string>): ToolCallDetail {
+  const detail: ToolCallDetail = { name: call.name, label: toolLabel(call.name) }
+  if (call.id) detail.id = call.id
+  if (call.input) detail.input = call.input
+  if (call.result) {
+    detail.success = call.result.success
+    if (call.result.error) detail.error = call.result.error
+    if (call.result.message) detail.message = call.result.message
+  }
+  const text = call.id ? results.get(call.id) : undefined
+  if (text) detail.result = text
+  return detail
+}
+
+/**
  * Build the conversation.
  *
  * Tool calls are folded into runs. An agent turn is several tool-only
@@ -75,6 +150,10 @@ export function visibleMessages(messages: readonly ChatMessageLike[]): ChatMessa
  * number of messages, become one `tools` item: a single compact row of pills,
  * with adjacent repeats of the same tool shown once with a count. A text
  * message or an artifact between two calls ends the run.
+ *
+ * A pill only folds calls with the same outcome: two failed queries and then
+ * a successful one read as `Run query ×2` (failed) then `Run query`, which is
+ * exactly the shape of a retry loop and what the inspector is for.
  *
  * Artifacts sit where their carrier message is. Carriers are persisted with
  * the chat, so this placement survives a reload. Two cases have no carrier and
@@ -89,6 +168,7 @@ export function buildConversation(
 ): ConversationItem[] {
   const items: ConversationItem[] = []
   const carried = new Set<string>()
+  const results = indexToolResults(messages)
 
   const appendToolCalls = (calls: ChatToolCallLike[], messageIndex: number) => {
     const last = items[items.length - 1]
@@ -96,9 +176,15 @@ export function buildConversation(
       last?.kind === 'tools' ? last : { kind: 'tools', key: `tools:${messageIndex}`, calls: [] }
     if (run !== last) items.push(run)
     for (const call of calls) {
+      const detail = toDetail(call, results)
+      const failed = detail.success === false
       const tail = run.calls[run.calls.length - 1]
-      if (tail && tail.name === call.name) tail.count += 1
-      else run.calls.push({ name: call.name, count: 1 })
+      if (tail && tail.name === call.name && tail.failed === failed) {
+        tail.count += 1
+        tail.calls.push(detail)
+      } else {
+        run.calls.push({ name: call.name, label: detail.label, count: 1, failed, calls: [detail] })
+      }
     }
   }
 

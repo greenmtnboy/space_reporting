@@ -1,5 +1,146 @@
 # Chat View Spec
 
+## Query Loops, the Tool Inspector and Friendly Tool Names (2026-09-02)
+
+### The loop
+
+Reported after the 0.1.24 upgrade: a Rocket Lab launch-cadence question that
+used to finish in three to five turns produced `run_trilogy_query`,
+`list_available_imports`, `run_trilogy_query`, `search_docs`,
+`select_active_import`, `run_trilogy_query`, `search_docs`, … and a spinner.
+
+Reproduced here against the real demo provider (Playwright, phone viewport,
+every OpenRouter request captured): 51 model calls in 130 seconds, then
+"(Max tool iterations reached)". Every query failed with the same result:
+
+```
+Error: Connection "space-duckdb" is not connected. Use connect_data_connection first.
+```
+
+and the system prompt itself said `ACTIVE DATA CONNECTION: space-duckdb (NOT
+CONNECTED - use connect_data_connection tool to connect before running
+queries)`. Two regressions from the last PR combined:
+
+| Regression | Effect |
+|------------|--------|
+| **The DuckDB connection was never opened.** Library 0.1.24 keys `connectionStore.connections` by a derived id (`local:<name>`); 0.1.22 keyed it by name. `onMounted` read `connections['space-duckdb']`, got `undefined`, skipped the reset, and set the badge to "ready" anyway. Nothing in the UI showed it. | The model was told the connection was down, and every query confirmed it. |
+| **The escape hatch was withheld.** The same PR disabled `connect_data_connection`, which is right when the app opens its own connection, but the library still told the model to call it: the "NOT CONNECTED" note and guideline 8 were not tagged to the tool. | The model searched the docs for a tool it could not see, then retried queries, for 50 iterations. |
+
+The demo model was not at fault. Nothing in the prompt or the loop would have
+helped either: the failing call was correct, the environment was broken.
+
+Fixes:
+
+- `onMounted` resolves the connection with `connectionByName`, creates it if
+  missing, resets it **by id**, and throws (badge red) if it is still not
+  connected afterwards. New chats are created with the connection id as well,
+  so the store's id-first lookup never falls back to the name. An e2e test
+  asserts the badge reaches "Database Ready" without an error class.
+- Library (0.1.25, which this app now runs): the connection note and
+  guideline 8 are dropped when `connect_data_connection` is disabled, and
+  the note instead says to tell the user and return. A consecutive-failure guard in the tool loop and a
+  retry cap in the prompt were tried and taken out again before release:
+  the loop had a concrete cause, and a guard would have hidden the next one
+  behind a tidy "stopped after N failures" message instead of a fix.
+
+After the app fix, the same question against the demo provider completed in
+10 calls and 145 seconds: select source, one chart attempt, two lookups to
+find the organisation name, a chart, a markdown summary, list, retitle,
+return. That is the pre-upgrade shape.
+
+### Regression test with a scripted model
+
+`e2e/chat-agent.spec.ts` runs the agent loop end to end with the model
+replaced by a script. The demo provider's three endpoints are mocked with
+`page.route` (token mint, model list, chat completions); everything else is
+real: DuckDB-wasm opens in the browser, the Trilogy resolver compiles the
+query, the library's tool loop runs the calls. Each scripted turn is one tool
+call, and every request the app sends is recorded so the test can assert on
+the system prompt and on the tool results the model was fed, not only on the
+DOM.
+
+Two tests: `select_active_import` → `run_trilogy_query('select 1 -> one;')`
+→ `return_to_user`, asserting the prompt never says `NOT CONNECTED`, the
+query result is `Success … 1 rows`, the pills read `Select data source`,
+`Run query`, `Reply` with no failure; and an invalid query → return,
+asserting the red pill, its alert icon, and the inspector's `failed` status
+and error text. Verified against the bug: with the old name-keyed lookup
+restored, the first test fails on the `NOT CONNECTED` assertion.
+
+The tests do not gate on CI's Playwright matrix for mobile (the file is not
+`-mobile.spec.ts`); the loop is layout-independent. They need the resolver
+reachable, as the DuckDB badge test does.
+
+### Failed-call indicator
+
+A failed pill is tinted red and carries an alert glyph (`mdi-alert-circle`)
+before its label, in the message stream and in the inspector's tabs. The
+glyph is there so the state survives colour-blind viewing and a dim phone
+screen; the tint alone was easy to miss beside the green pills.
+
+### Demo model
+
+The demo connection now pins `google/gemini-3.8-flash` through OpenRouter,
+previously `google/gemini-3-flash-preview`. Both were measured on the same
+Rocket Lab launch-cadence question with the connection fix in place,
+phone viewport, every OpenRouter request captured:
+
+| Model | Calls | Wall time | Median per call | Failed queries | Prompt / completion tokens | Est. cost per turn |
+|-------|-------|-----------|-----------------|----------------|----------------------------|--------------------|
+| gemini-3-flash-preview | 10 | 145 s | 5.8 s | 3 of 9 | 225k / 0.9k | $0.12 |
+| gemini-3.8-flash | 21 | 70 s | 2.8 s | 3 of 20 | 547k / 2.8k | $0.42 |
+
+The preview model answered for the Electron family only (81 launches); 3.8
+found both Rocket Lab organisations (94 launches), reported the success rate,
+broke the cadence down by vehicle and by outcome, titled every artifact, and
+finished in half the wall time because each call is about twice as fast. It
+also explores more: twice the calls and 2.4× the prompt tokens, so a turn
+costs about 3.7× as much. The demo key is dollar-limited per IP, so that is
+fewer demo turns per visitor, not a bill. Failure counts were the same
+(three query errors each, all corrected on the next attempt).
+
+Neither model was the cause of the loop; see above. The pin lives in
+`ChatView.connectProvider`; the library's `DemoProvider.preferredModels` is
+untouched and only applies when no model is pinned.
+
+### Tool inspector
+
+Clicking a pill now opens a dialog with the calls behind it: for each, the
+tool's friendly and raw names, ok/failed, the input as JSON, and the result.
+The run's other pills are tabs across the top so a whole turn reads in one
+dialog. Escape or a click outside closes it.
+
+The result text takes some finding. The library records a call in two places:
+`executedToolCalls` on the assistant message (`success`, `error`, a short
+`message` — enough for a pill) and the hidden user message that follows it,
+whose `toolResults` carry the *full* text the model was sent: query rows, the
+error with context, the docs that matched. Hidden messages never reach the
+stream, so `buildConversation` indexes every message's `toolResults` by call
+id first and joins them onto the pills' calls. Persisted chats from before
+this change render with the short form.
+
+Pills also stopped folding across outcomes: two failed queries then a working
+one is `Run query ×2` (red) then `Run query`, which is the shape of a retry
+loop, rather than `Run query ×3`.
+
+| Choice | Reason |
+|--------|--------|
+| A dialog, not an expanding row | A query result is a page of JSON; inline it would push the conversation off the phone screen. |
+| Inside `.chat-view`, not teleported | Same as the share modal, so scoped styles apply without a second stylesheet. |
+| Result text falls back to `error`, then `message` | Older persisted chats have no results message; the pill's own record is still shown. |
+| No copy button | Text in a `pre` selects and copies; the value is the raw text, not a button. |
+
+### Friendly names
+
+`utils/toolNames.ts` maps tool names to the chat's vocabulary: an import is a
+*data source* here, an artifact is a *result*. `select_active_import` reads
+"Select data source", `run_trilogy_query` "Run query", `return_to_user`
+"Reply". Used on the pills, the inspector, and the "Running …" status line.
+The raw name is in the pill tooltip and beside the label in the inspector.
+The library's own map (`getToolDisplayName`) is studio-flavoured and not
+exported from any entry point, so this is app-owned; unknown tools open up
+their underscores rather than showing raw.
+
 ## Folded Tool Runs and the Reorder Tool (2026-09-02)
 
 ### Tool runs

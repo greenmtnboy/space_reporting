@@ -16,7 +16,9 @@ import {
   buildConversation,
   visibleMessages as buildVisibleMessages,
   type ConversationItem,
+  type ToolRunItem,
 } from '../utils/conversation'
+import { toolLabel } from '../utils/toolNames'
 
 // Initialize Trilogy core (all stores/services)
 const trilogy = useTrilogyCore()
@@ -56,6 +58,15 @@ provide('queryExecutionService', trilogy.queryExecutionService)
 const dataConnectionName = 'space-duckdb'
 const dbStatus = ref<'loading' | 'ready' | 'error'>('loading')
 const dbError = ref<string>('')
+
+/*
+  The chat store keeps a connection id alongside the display name, and
+  resolves the id first when it builds the agent's prompt. Pass it whenever a
+  chat is created so that lookup never has to fall back to the name.
+*/
+function dataConnectionId(): string {
+  return trilogy.connectionStore.connectionByName(dataConnectionName)?.id ?? ''
+}
 
 // LLM connection state (for provider selection)
 const llmStore = trilogy.llmConnectionStore
@@ -205,6 +216,36 @@ function inlineHasTable(id: string): boolean {
   return !!inlineViews.value.get(id)?.hasTable
 }
 
+/*
+  Tool inspector. Clicking a pill opens the run it belongs to with that pill
+  selected; the modal shows each call's input and the result text the model
+  was sent, which is what you need when the agent loops on a failing query.
+  The run's other pills are tabs in the modal so a whole turn can be read
+  without closing and reopening. See utils/conversation.ts for where the
+  result text comes from.
+*/
+const inspector = ref<{ run: ToolRunItem; pill: number } | null>(null)
+const inspectedPill = computed(() => inspector.value?.run.calls[inspector.value.pill] ?? null)
+function openInspector(run: ToolRunItem, pill: number) {
+  inspector.value = { run, pill }
+}
+function closeInspector() {
+  inspector.value = null
+}
+function onInspectorKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && inspector.value) closeInspector()
+}
+onMounted(() => window.addEventListener('keydown', onInspectorKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onInspectorKeydown))
+function formatInput(input: unknown): string {
+  if (input === undefined) return '(no input)'
+  try {
+    return JSON.stringify(input, null, 2)
+  } catch {
+    return String(input)
+  }
+}
+
 
 // Auto-scroll to bottom on new messages
 async function scrollToBottom() {
@@ -230,20 +271,29 @@ onMounted(async () => {
       console.log('Loaded shared chat:', sharing.sharedChatData.value?.title)
     }
 
-    if (!trilogy.connectionStore.connections[dataConnectionName]) {
+    /*
+      Look the connection up by name, never by store key. Library 0.1.24 keys
+      connectionStore.connections by a derived id (`local:<name>`), so the
+      old `connections[dataConnectionName]` read undefined, the reset below
+      never ran, and the badge reported "ready" over a connection that was
+      never opened. Every query the agent then ran failed with "not
+      connected — use connect_data_connection", a tool this app withholds.
+    */
+    const conn =
+      trilogy.connectionStore.connectionByName(dataConnectionName) ??
       trilogy.connectionStore.newConnection(dataConnectionName, 'duckdb', {})
+    if (!conn.connected) {
+      await trilogy.connectionStore.resetConnection(conn.id)
     }
-
-    const conn = trilogy.connectionStore.connections[dataConnectionName]
-    if (conn && !conn.connected) {
-      await trilogy.connectionStore.resetConnection(dataConnectionName)
+    if (!conn.connected) {
+      throw new Error(conn.error || 'DuckDB did not connect')
     }
 
     console.log('DuckDB connection ready')
     dbStatus.value = 'ready'
 
     if (!trilogy.chatStore.activeChatId && !hasSharedChat) {
-      trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
+      trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data', dataConnectionId())
     }
 
     // Always force production resolver
@@ -275,7 +325,7 @@ function resetChat() {
     trilogy.chatStore.clearChatMessages(trilogy.chatStore.activeChatId)
     chat.handleImportChange([])
   } else {
-    trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat')
+    trilogy.chatStore.newChat('', dataConnectionName, 'Space Data Chat', dataConnectionId())
     chat.handleImportChange([])
   }
 }
@@ -288,7 +338,7 @@ const connectProvider = async () => {
 
     if (isDemo.value) {
       await llmStore.newConnection(connName, 'demo', {
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-3.8-flash',
         saveCredential: false,
       })
     } else {
@@ -429,6 +479,7 @@ function continueSharedChat() {
     sharing.sharedChatData.value.title,
     dataConnectionName,
     'Continued from shared chat',
+    dataConnectionId(),
   )
 
   if (trilogy.chatStore.activeChatId) {
@@ -461,7 +512,7 @@ function continueSharedChat() {
 function startFreshChat() {
   sharing.clearSharedChat()
   if (!trilogy.chatStore.activeChatId) {
-    trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data')
+    trilogy.chatStore.newChat('', dataConnectionName, 'Chat with GCAT Data', dataConnectionId())
   }
   selectedModel.value = ''
 }
@@ -558,6 +609,60 @@ function artifactIcon(type: string): string {
               </div>
             </div>
           </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tool inspector: the calls behind one tool run, input and result. -->
+    <div
+      v-if="inspector && inspectedPill"
+      class="tool-inspector-overlay"
+      data-testid="tool-inspector"
+      @click.self="closeInspector"
+    >
+      <div class="tool-inspector" role="dialog" aria-modal="true" aria-label="Tool call details">
+        <div class="tool-inspector-header">
+          <div class="tool-inspector-tabs">
+            <button
+              v-for="(pill, idx) in inspector.run.calls"
+              :key="idx"
+              type="button"
+              class="tool-inspector-tab"
+              :class="{ active: idx === inspector.pill, 'tool-inspector-tab--error': pill.failed }"
+              @click="inspector.pill = idx"
+            ><i v-if="pill.failed" class="mdi mdi-alert-circle chat-tool-pill-icon"></i>{{ pill.label }}<span v-if="pill.count > 1" class="chat-tool-pill-count">×{{ pill.count }}</span></button>
+          </div>
+          <button class="close-btn" title="Close" @click="closeInspector">
+            <i class="mdi mdi-close"></i>
+          </button>
+        </div>
+        <div class="tool-inspector-body">
+          <div
+            v-for="(call, idx) in inspectedPill.calls"
+            :key="call.id || idx"
+            class="tool-inspector-call"
+          >
+            <div class="tool-inspector-call-title">
+              <span class="tool-inspector-call-name">{{ call.label }}</span>
+              <code class="tool-inspector-call-raw">{{ call.name }}</code>
+              <span v-if="inspectedPill.calls.length > 1" class="tool-inspector-call-index">
+                {{ idx + 1 }} of {{ inspectedPill.calls.length }}
+              </span>
+              <span
+                v-if="call.success !== undefined"
+                class="tool-inspector-status"
+                :class="call.success ? 'ok' : 'error'"
+              >{{ call.success ? 'ok' : 'failed' }}</span>
+            </div>
+            <div class="tool-inspector-section">
+              <div class="tool-inspector-section-label">Input</div>
+              <pre class="tool-inspector-pre">{{ formatInput(call.input) }}</pre>
+            </div>
+            <div class="tool-inspector-section">
+              <div class="tool-inspector-section-label">Result</div>
+              <pre class="tool-inspector-pre">{{ call.result || call.error || call.message || '(no output recorded)' }}</pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -765,15 +870,21 @@ function artifactIcon(type: string): string {
                 </div>
               </div>
 
-              <!-- A run of consecutive tool calls, folded into one compact row. -->
+              <!-- A run of consecutive tool calls, folded into one compact row.
+                   Each pill opens the inspector on that call. -->
               <div v-else-if="item.kind === 'tools'" class="chat-tool-run" data-testid="chat-tool-run">
                 <i class="mdi mdi-cog-outline chat-tool-run-icon"></i>
                 <div class="chat-tool-pills">
-                  <span
+                  <button
                     v-for="(call, idx) in item.calls"
                     :key="idx"
+                    type="button"
                     class="chat-tool-pill"
-                  >{{ call.name }}<span v-if="call.count > 1" class="chat-tool-pill-count">×{{ call.count }}</span></span>
+                    :class="{ 'chat-tool-pill--error': call.failed }"
+                    :title="`${call.name}${call.failed ? ' — failed' : ''}. Click for details.`"
+                    data-testid="chat-tool-pill"
+                    @click="openInspector(item, idx)"
+                  ><i v-if="call.failed" class="mdi mdi-alert-circle chat-tool-pill-icon"></i>{{ call.label }}<span v-if="call.count > 1" class="chat-tool-pill-count">×{{ call.count }}</span></button>
                 </div>
               </div>
 
@@ -817,7 +928,7 @@ function artifactIcon(type: string): string {
             <div v-if="chat.isChatLoading.value" class="chat-msg chat-msg--assistant">
               <div class="chat-loading">
                 <span class="chat-loading-spinner"></span>
-                {{ chat.activeToolName.value ? `Running ${chat.activeToolName.value}...` : 'Thinking...' }}
+                {{ chat.activeToolName.value ? `${toolLabel(chat.activeToolName.value)}...` : 'Thinking...' }}
               </div>
             </div>
           </div>
