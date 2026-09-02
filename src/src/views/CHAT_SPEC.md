@@ -38,11 +38,10 @@ Fixes:
   asserts the badge reaches "Database Ready" without an error class.
 - Library (0.1.25): the connection note and guideline 8 are dropped when
   `connect_data_connection` is disabled, and the note instead says to tell
-  the user and return. `runToolLoop` also now counts consecutive failed calls
-  (nudge from the third, stop at the eighth), and the prompt caps query
-  corrections at two attempts, so a stuck run of any cause ends in a reply
-  rather than a spinner. Those two are library code; **bump to 0.1.25 when
-  it is published**.
+  the user and return. A consecutive-failure guard in the tool loop and a
+  retry cap in the prompt were tried and taken out again before release:
+  the loop had a concrete cause, and a guard would have hidden the next one
+  behind a tidy "stopped after N failures" message instead of a fix.
 
 After the app fix, the same question against the demo provider completed in
 10 calls and 145 seconds: select source, one chart attempt, two lookups to
