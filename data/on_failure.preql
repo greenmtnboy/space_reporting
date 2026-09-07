@@ -1,0 +1,9 @@
+# Entrypoint for the space-on-failure cloud job (see [cloud] and
+# [dependencies] in trilogy.toml). It runs only when refresh.preql finished
+# `failed` on the same tick, and stands down as `skipped` otherwise — the same
+# rule `trilogy run .` applies locally.
+#
+# The handler is on_failure.py: it opens (or bumps) a GitHub issue labelled
+# `auto-fix`, which .github/workflows/auto-fix.yml answers with a fix PR. The
+# issue link comes back as this run's `issue` output.
+call `./on_failure.py`;

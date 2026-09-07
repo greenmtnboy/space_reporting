@@ -9,6 +9,14 @@
 #
 # Only main syncs, into production. There is no per-branch dev deploy flow
 # yet — PR changes to data/ take effect when they merge.
+#
+# The fifth job, space-on-failure, runs only when the refresh fails and opens
+# an `auto-fix` issue (data/on_failure.py); auto-fix.yml answers it. It reads
+# the org secret SPACE_REPORTING_GITHUB_TOKEN through a job-level
+# `secret_env`, and the platform lets only a `jobs:admin` token change a
+# job's `secret_env` — so TRILOGY_CLOUD_TOKEN here must carry `jobs:admin`
+# (with `schedules:write` + `workspaces:admin`), not the plain `jobs:write`
+# a content-only sync would need.
 
 name: Cloud Sync
 
@@ -41,11 +49,12 @@ env:
   # prod environment (see the job's `environment:` binding), not in repo
   # secrets.
   TRILOGY_CLOUD_TOKEN: ${{ secrets.TRILOGY_CLOUD_TOKEN }}
-  # First release carrying [[cloud.job]] workspaces. Pinned to a floor rather
-  # than an exact version so a CLI fix does not need a commit here, and never
-  # to a git ref — CI installing from a branch means the deployment depends
-  # on whatever that branch happens to say today.
-  TRILOGY_CLI: 'pytrilogy>=0.3.328'
+  # First release carrying [dependencies] + `call` outputs, which the failure
+  # handler needs (0.3.328 introduced [[cloud.job]] workspaces). Pinned to a
+  # floor rather than an exact version so a CLI fix does not need a commit
+  # here, and never to a git ref — CI installing from a branch means the
+  # deployment depends on whatever that branch happens to say today.
+  TRILOGY_CLI: 'pytrilogy>=0.3.342'
   # pytrilogy publishes real platform wheels only for cp311-cp313; pin an
   # interpreter that has wheels so uv never falls back to a source build.
   TRILOGY_CLI_PYTHON: '3.13'

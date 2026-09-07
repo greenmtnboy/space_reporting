@@ -8,13 +8,25 @@ env_file="../.env"
 enable_gcs = true
 enable_python_datasources = true
 
+# What runs *because* something else failed. Edges between scripts are
+# normally derived from what they import and write; this table declares the
+# one edge content cannot express. on_failure.preql waits for refresh.preql
+# on the same tick and runs only if it finished `failed` (`when`: completed |
+# failed | always) — otherwise it stands down as a `skipped` run. `trilogy
+# run .` applies the same rule locally, so the handler is not a cloud-only
+# behaviour. The handler itself (on_failure.py) opens a GitHub issue that the
+# auto-fix workflow picks up; see README "Failure handling".
+[dependencies]
+"on_failure.preql" = { after = ["refresh.preql"], when = "failed" }
+
 # How these jobs deploy to trilogy-cloud (`trilogy cloud sync`, see
 # .github/workflows/cloud-sync.yml). One [[cloud.job]] entry per job; the
 # entries share this directory as a single workspace, so no files are
-# duplicated per job. All four sit on one 06:00 UTC schedule row — the
-# platform orders the tick by what each job reads and writes, so the
-# publishes wait for the refresh instead of racing it on a wall-clock
-# stagger.
+# duplicated per job. All five sit on one 06:00 UTC schedule row — the
+# platform orders the tick by what each job reads and writes (plus the
+# declared [dependencies] edge), so the publishes wait for the refresh
+# instead of racing it on a wall-clock stagger, and the failure handler
+# waits on the refresh's outcome.
 #
 # `key` is identity (immutable — editing one deploys a new job and orphans
 # the old); `name` is display only and free to change.
@@ -23,7 +35,8 @@ org = "trilogy-data"
 workspace = "space-data"
 schedule = "0 0 6 * * *"
 # DuckDB writes parquet/JSON outputs to gcs:// itself; these org secrets are
-# the only credentials that work for that bucket.
+# the only credentials that work for that bucket. A job-level `secret_env`
+# *replaces* this list rather than adding to it.
 secret_env = ["GOOGLE_HMAC_KEY", "GOOGLE_HMAC_SECRET"]
 # Local-only scratch: debug/local/test scripts and locally materialized JSON
 # never ship. (A stray debug file took down the tree refresh on 2026-08-14 —
@@ -61,3 +74,17 @@ name = "space-engine"
 operation = "run"
 entrypoint = "engine_data.preql"
 timeout_seconds = 900
+
+[[cloud.job]]
+key = "on-failure"
+name = "space-on-failure"
+operation = "run"
+# A `call` to on_failure.py and nothing else; it reads no GCAT data and
+# writes nothing to the bucket, so it gets only the token it needs. A
+# fine-grained GitHub token with Issues: read/write on this repository,
+# stored as an org secret (`trilogy cloud secrets set
+# SPACE_REPORTING_GITHUB_TOKEN`). Changing `secret_env` on a job needs a
+# token with `jobs:admin`, which a `jobs:write` sync token lacks.
+entrypoint = "on_failure.preql"
+secret_env = ["SPACE_REPORTING_GITHUB_TOKEN"]
+timeout_seconds = 300
