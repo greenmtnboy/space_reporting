@@ -15,7 +15,7 @@ enable_python_datasources = true
 # failed | always) — otherwise it stands down as a `skipped` run. `trilogy
 # run .` applies the same rule locally, so the handler is not a cloud-only
 # behaviour. The handler itself (on_failure.py) opens a GitHub issue that the
-# auto-fix workflow picks up; see README "Failure handling".
+# auto-fix routine picks up; see README "Failure handling".
 [dependencies]
 "on_failure.preql" = { after = ["refresh.preql"], when = "failed" }
 

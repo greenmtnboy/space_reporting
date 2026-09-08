@@ -70,11 +70,13 @@ runs *because* it failed and files the failure here as a GitHub issue:
    episode) and reports the link as the run's `issue` output. It needs the
    org secret `SPACE_REPORTING_GITHUB_TOKEN`, a fine-grained token with
    Issues: read/write on this repository.
-3. `.github/workflows/auto-fix.yml` runs Claude Code on the `auto-fix` label:
-   it reproduces the failure with the credential-free ingest scripts, fixes
-   it and opens a PR that references the issue. Needs `ANTHROPIC_API_KEY` in
-   the repository secrets. Merging redeploys `data/` and the next tick
-   verifies it.
+3. A Claude Code routine ("space_reporting auto-fix",
+   https://claude.ai/code/routines/trig_01EXq1DkGum5g6oGoHSa4qR1) fires on
+   the `auto-fix` label through a GitHub webhook trigger: it reproduces the
+   failure with the credential-free ingest scripts, fixes it and opens a PR
+   that references the issue. It runs in Anthropic's cloud on the routine
+   owner's account, so this repository holds no model API key. Merging
+   redeploys `data/` and the next tick verifies it.
 
 To see what the handler would file without touching GitHub:
 

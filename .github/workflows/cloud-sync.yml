@@ -11,12 +11,15 @@
 # yet — PR changes to data/ take effect when they merge.
 #
 # The fifth job, space-on-failure, runs only when the refresh fails and opens
-# an `auto-fix` issue (data/on_failure.py); auto-fix.yml answers it. It reads
-# the org secret SPACE_REPORTING_GITHUB_TOKEN through a job-level
-# `secret_env`, and the platform lets only a `jobs:admin` token change a
-# job's `secret_env` — so TRILOGY_CLOUD_TOKEN here must carry `jobs:admin`
-# (with `schedules:write` + `workspaces:admin`), not the plain `jobs:write`
-# a content-only sync would need.
+# an `auto-fix` issue (data/on_failure.py); a Claude Code routine answers it
+# (README "Failure handling"). It reads the org secret
+# SPACE_REPORTING_GITHUB_TOKEN through a job-level `secret_env`, which is
+# fine under plain `jobs:write`: the platform's envelope freeze guards the
+# secrets of an *existing* job, and a job the sync creates is unrestricted.
+# TRILOGY_CLOUD_TOKEN is therefore an org-wide token carrying `jobs:write`,
+# `schedules:write`, `workspaces:write` and `jobs:delete` (for --prune).
+# Org-wide, not job-pinned, because this is a shared-workspace deploy and
+# the platform refuses job-pinned tokens on every workspace write.
 
 name: Cloud Sync
 

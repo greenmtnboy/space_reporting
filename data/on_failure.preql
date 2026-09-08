@@ -4,6 +4,7 @@
 # rule `trilogy run .` applies locally.
 #
 # The handler is on_failure.py: it opens (or bumps) a GitHub issue labelled
-# `auto-fix`, which .github/workflows/auto-fix.yml answers with a fix PR. The
-# issue link comes back as this run's `issue` output.
+# `auto-fix`, which the "space_reporting auto-fix" Claude Code routine answers
+# with a fix PR (README "Failure handling"). The issue link comes back as this
+# run's `issue` output.
 call `./on_failure.py`;

@@ -12,8 +12,8 @@ detail lists as a link.
 
 One open issue per failure episode: a refresh that keeps failing every morning
 adds a comment to the existing `auto-fix` issue rather than opening a new one,
-so the auto-fix workflow (`.github/workflows/auto-fix.yml`, triggered by the
-label) runs once per episode, not once per tick.
+so the auto-fix routine (a Claude Code routine fired by the label; README
+"Failure handling") runs once per episode, not once per tick.
 
 Environment:
   SPACE_REPORTING_GITHUB_TOKEN  Fine-grained token with Issues: read/write on
@@ -43,7 +43,7 @@ from datetime import datetime, timezone
 REPO = "greenmtnboy/space_reporting"
 LABEL = "auto-fix"
 LABEL_COLOR = "b60205"
-LABEL_DESCRIPTION = "Opened by the pipeline's failure handler; the auto-fix workflow picks it up"
+LABEL_DESCRIPTION = "Opened by the pipeline's failure handler; the auto-fix routine picks it up"
 #: The script whose failure this handler answers, as trilogy.toml names it.
 FAILED_SCRIPT = "refresh.preql"
 JOB_NAME = "space-refresh"
