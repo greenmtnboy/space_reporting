@@ -56,6 +56,34 @@ Example for launch data:
 trilogy run C:\Users\ethan\coding_projects\space_reporting\data\core.preql
 ```
 
+### Failure handling
+
+The daily refresh runs on trilogy-cloud (`data/trilogy.toml` `[cloud]`,
+deployed by `.github/workflows/cloud-sync.yml`). When it fails, a fifth job
+runs *because* it failed and files the failure here as a GitHub issue:
+
+1. `[dependencies]` in `data/trilogy.toml` declares that `on_failure.preql`
+   runs after `refresh.preql` only `when = "failed"`. The platform orders the
+   06:00 UTC tick that way; `trilogy run data` applies the same rule locally.
+2. `on_failure.preql` `call`s `data/on_failure.py`, which opens an issue
+   labelled `auto-fix` (or comments on the one already open for this
+   episode) and reports the link as the run's `issue` output. It needs the
+   org secret `SPACE_REPORTING_GITHUB_TOKEN`, a fine-grained token with
+   Issues: read/write on this repository.
+3. A Claude Code routine ("space_reporting auto-fix",
+   https://claude.ai/code/routines/trig_01EXq1DkGum5g6oGoHSa4qR1) fires on
+   the `auto-fix` label through a GitHub webhook trigger: it reproduces the
+   failure with the credential-free ingest scripts, fixes it and opens a PR
+   that references the issue. It runs in Anthropic's cloud on the routine
+   owner's account, so this repository holds no model API key. Merging
+   redeploys `data/` and the next tick verifies it.
+
+To see what the handler would file without touching GitHub:
+
+```bash
+ON_FAILURE_DRY_RUN=1 uv run data/on_failure.py
+```
+
 ### Updating Semantic Model
 
 The `.preql` files under `data/raw/` are automatically loaded at build time via Vite's `import.meta.glob` (see `src/src/models.ts`). No manual bundling step is needed.
