@@ -8,11 +8,17 @@
 
 from ingest_core import Layout, emit, ingest_gcat_file
 
-# Shape as of GCAT release 1.8.5 (2026 Aug 28): 14 columns. ThrustSL (sea-level
-# thrust) and Class were added that release.
+# Shape as of GCAT release 1.8.8 (2026 Sep 3): 20 columns. The estimate
+# qualifier that used to ride along inside a measurement ('1650.0?') now has its
+# own column after each of Length, Diameter, Launch_Mass, Dry_Mass, Thrust and
+# ThrustSL, which widened the file from 14 columns to 20. Duration keeps no
+# flag column. The HTML column reference still renders the qualifier inline, so
+# it shows 14 columns; the TSV header is what these names follow.
 STAGES_HEADERS = [
     "Stage_Name", "Stage_Family", "Stage_Manufacturer", "Stage_Alt_Name",
-    "Length", "Diameter", "Launch_Mass", "Dry_Mass", "Thrust", "ThrustSL",
+    "Length", "Length_Flag", "Diameter", "Diameter_Flag",
+    "Launch_Mass", "Launch_Mass_Flag", "Dry_Mass", "Dry_Mass_Flag",
+    "Thrust", "Thrust_Flag", "ThrustSL", "ThrustSL_Flag",
     "Duration", "Engine", "NEng", "Class",
 ]
 
