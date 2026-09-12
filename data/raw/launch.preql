@@ -167,17 +167,7 @@ property id.orgs string;
 property id._split_orgs <- split(orgs,'/');
 property id.first_org <- _split_orgs[1];
 
-# The launch's agency code and an organization's code are the same concept; the
-# direction matters for the refresh. Merged the other way (first_org into
-# org.code) the canonical address is org.code, which no root datasource can
-# supply on its own - organizations_raw is keyed by it - so building launch.parquet
-# from the roots has to follow the pseudonym back to first_org. That resolves when
-# launch.preql is the working namespace but not when it is imported under one
-# (`launch.`), as refresh.preql does through raw.satellite: the refresh fails with
-# "Missing source map entry for launch.org.code". Merging this way makes the
-# derivable concept canonical, so the write resolves in either namespace. The
-# published column is still org_code and joins to organizations are unchanged.
-MERGE org.code into first_org;
+MERGE first_org into org.code;
 
 property id.launch_date <- date_add('1900-01-01'::date,day,CAST((CAST(_launch_jd AS float) - 2415021) AS int));
 property id.success_flag <- CASE
@@ -276,7 +266,16 @@ datasource launch_info (
     dest,
     orb_pay,
     orgs,
-    org.code,
+    # org.code is deliberately not materialized here. It is `split(orgs,'/')[1]`
+    # via first_org, so orgs carries it, and a reader derives it the same way
+    # core.preql already does. Listing it makes the refresh ask the root
+    # datasources for org.code itself, which none of them can answer for a
+    # launch - organizations is keyed by it and cannot say which agency flew a
+    # given rocket, so the derivation is what the join needs, not a substitute
+    # for it. Resolving that through the merge works when launch.preql is the
+    # working namespace but not when it is imported under one (`launch.`), as
+    # refresh.preql does through raw.satellite, where it fails with "Missing
+    # source map entry for launch.org.code".
     _launch_code,
     ?fail_code,
     launch_date,
