@@ -1,5 +1,11 @@
-# Entrypoint for the space-refresh cloud job (see [cloud] in trilogy.toml).
-# raw.satellite imports raw.launch, which pulls in vehicle -> stage -> engine
-# plus platform, sites, organization and etl — the entire raw tree — so a
-# refresh from this one script probes every GCAT datasource.
+# The import hub for the whole raw tree: raw.satellite imports raw.launch,
+# which pulls in vehicle -> stage -> engine plus platform, sites, organization
+# and etl.
+#
+# Not what refreshes the tree. A file refresh builds only what the file itself
+# declares, and this one declares nothing, so `trilogy refresh refresh.preql`
+# probes everything and builds nothing (`--include-imports` builds it all).
+# The space-refresh cloud job is a directory refresh of data/ instead, the
+# same as `trilogy refresh data` locally. [dependencies] in trilogy.toml still
+# names the refresh by this path.
 import raw.satellite;
