@@ -69,7 +69,7 @@ def issue_body(script: str, job: str, run_id: str | None, when: datetime) -> str
     return f"""The scheduled `{job}` job (`data/{script}`) failed at {stamp}, and this issue was opened automatically by `data/on_failure.py`.
 
 {run_line}
-- Pipeline: `data/refresh.preql` imports the whole `data/raw/` tree, so a failure is one of the GCAT ingests refusing to publish (most often the upstream TSV changed shape and the `Layout` in `data/raw/ingest_*.py` no longer matches) or a downstream parquet write.
+- Pipeline: the job is a directory refresh of `data/`, which builds every datasource declared under `data/raw/`, so a failure is one of the GCAT ingests refusing to publish (most often the upstream TSV changed shape and the `Layout` in `data/raw/ingest_*.py` no longer matches) or a downstream parquet write.
 
 ## Reproducing without credentials
 
@@ -79,7 +79,7 @@ Each `data/raw/ingest_*.py` is a standalone `uv run` script that downloads one G
 uv run data/raw/ingest_stages.py > /dev/null
 ```
 
-The full refresh (`trilogy refresh data/refresh.preql`) also needs `GOOGLE_HMAC_KEY`/`GOOGLE_HMAC_SECRET` to write the parquet outputs to GCS; a fix should be verified with the ingest scripts first.
+The full refresh (`trilogy refresh data`) also needs `GOOGLE_HMAC_KEY`/`GOOGLE_HMAC_SECRET` to write the parquet outputs to GCS; a fix should be verified with the ingest scripts first.
 
 ## What a fix looks like
 

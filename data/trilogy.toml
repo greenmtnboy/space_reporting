@@ -12,9 +12,11 @@ enable_python_datasources = true
 # normally derived from what they import and write; this table declares the
 # one edge content cannot express. on_failure.preql waits for refresh.preql
 # on the same tick and runs only if it finished `failed` (`when`: completed |
-# failed | always) — otherwise it stands down as a `skipped` run. `trilogy
-# run .` applies the same rule locally, so the handler is not a cloud-only
-# behaviour. The handler itself (on_failure.py) opens a GitHub issue that the
+# failed | always) — otherwise it stands down as a `skipped` run. On the
+# platform the refresh job runs this whole directory rather than refresh.preql,
+# and a script no job runs on its own resolves to the directory job holding
+# it, so the edge still means "after the refresh". `trilogy run .` applies the
+# same rule locally, so the handler is not a cloud-only behaviour. The handler itself (on_failure.py) opens a GitHub issue that the
 # auto-fix routine picks up; see README "Failure handling".
 [dependencies]
 "on_failure.preql" = { after = ["refresh.preql"], when = "failed" }
@@ -47,9 +49,12 @@ exclude = ["*_local.preql", "*debug*.preql", "test.preql", "raw_*.json"]
 key = "refresh"
 name = "space-refresh"
 operation = "refresh"
-# refresh.preql's import closure is the entire raw tree, so refreshing from
-# this one entrypoint probes every GCAT datasource.
-entrypoint = "refresh.preql"
+# The whole directory: a directory refresh builds every managed datasource
+# declared under it, each by the file that declares it. A file refresh builds
+# only what that one file declares (pytrilogy >= 0.3.368), and refresh.preql
+# declares nothing — it imports the raw tree — so pointed at that file this
+# job would build nothing and report `up_to_date`.
+entrypoint = "."
 # A fully stale rebuild re-downloads every GCAT table; the common case is a
 # fast "already fresh" exit.
 timeout_seconds = 1800
