@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600" role="img" aria-labelledby="title desc">
+  <title id="title">United Nations flag illustration</title>
+  <desc id="desc">White polar world map and olive branches on UN blue. Simplified original illustration for the fallback data marker, not an official emblem reproduction.</desc>
+<rect width="900" height="600" fill="#009edb"/>
+<g fill="none" stroke="#fff" stroke-width="3">
+<circle cx="450" cy="275" r="42"/>
+<circle cx="450" cy="275" r="84"/>
+<circle cx="450" cy="275" r="126"/>
+<circle cx="450" cy="275" r="168"/>
+<path d="M450 275 L618.000 275.000"/>
+<path d="M450 275 L595.492 359.000"/>
+<path d="M450 275 L534.000 420.492"/>
+<path d="M450 275 L450.000 443.000"/>
+<path d="M450 275 L366.000 420.492"/>
+<path d="M450 275 L304.508 359.000"/>
+<path d="M450 275 L282.000 275.000"/>
+<path d="M450 275 L304.508 191.000"/>
+<path d="M450 275 L366.000 129.508"/>
+<path d="M450 275 L450.000 107.000"/>
+<path d="M450 275 L534.000 129.508"/>
+<path d="M450 275 L595.492 191.000"/>
+</g>
+<g fill="#fff">
+<!-- Original, simplified polar silhouettes of the continents. -->
+<path d="M421 191 L399 175 L368 182 L348 208 L330 214 L317 249 L336 272 L354 272 L365 292 L389 305 L400 327 L416 332 L410 302 L389 278 L390 250 L414 236 L432 219 Z"/>
+<path d="M410 154 L436 140 L451 152 L445 184 L428 199 L417 179 Z"/>
+<path d="M402 330 L428 338 L443 362 L438 386 L425 411 L414 428 L405 404 L403 380 L393 359 Z"/>
+<path d="M462 211 L481 194 L482 173 L506 163 L533 178 L542 202 L570 211 L598 236 L610 262 L590 279 L580 307 L559 307 L540 280 L521 286 L511 266 L487 259 L472 240 L454 234 Z"/>
+<path d="M469 263 L499 274 L514 302 L506 329 L488 356 L476 343 L470 317 L453 300 L451 278 Z"/>
+<path d="M549 335 L570 326 L592 342 L586 369 L561 375 L543 358 Z"/>
+<path d="M528 303 L545 311 L556 331 L546 337 L535 321 Z"/>
+</g>
+<g fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round">
+<path d="M464 492 C328 492 227 374 257 244"/>
+<path d="M436 492 C572 492 673 374 643 244"/>
+</g>
+<g fill="#fff">
+<g>
+<ellipse cx="243" cy="266" rx="10" ry="29" transform="rotate(-15 243 266)"/>
+<ellipse cx="271" cy="260" rx="9" ry="26" transform="rotate(50 271 260)"/>
+<ellipse cx="246" cy="304" rx="10" ry="29" transform="rotate(-30 246 304)"/>
+<ellipse cx="274" cy="298" rx="9" ry="26" transform="rotate(35 274 298)"/>
+<ellipse cx="258" cy="342" rx="10" ry="29" transform="rotate(-45 258 342)"/>
+<ellipse cx="286" cy="336" rx="9" ry="26" transform="rotate(20 286 336)"/>
+<ellipse cx="279" cy="379" rx="10" ry="29" transform="rotate(-60 279 379)"/>
+<ellipse cx="307" cy="373" rx="9" ry="26" transform="rotate(5 307 373)"/>
+<ellipse cx="309" cy="413" rx="10" ry="29" transform="rotate(-75 309 413)"/>
+<ellipse cx="337" cy="407" rx="9" ry="26" transform="rotate(-10 337 407)"/>
+<ellipse cx="346" cy="442" rx="10" ry="29" transform="rotate(-90 346 442)"/>
+<ellipse cx="374" cy="436" rx="9" ry="26" transform="rotate(-25 374 436)"/>
+<ellipse cx="388" cy="464" rx="10" ry="29" transform="rotate(-105 388 464)"/>
+<ellipse cx="416" cy="458" rx="9" ry="26" transform="rotate(-40 416 458)"/>
+</g>
+<g transform="translate(900 0) scale(-1 1)">
+<ellipse cx="243" cy="266" rx="10" ry="29" transform="rotate(-15 243 266)"/>
+<ellipse cx="271" cy="260" rx="9" ry="26" transform="rotate(50 271 260)"/>
+<ellipse cx="246" cy="304" rx="10" ry="29" transform="rotate(-30 246 304)"/>
+<ellipse cx="274" cy="298" rx="9" ry="26" transform="rotate(35 274 298)"/>
+<ellipse cx="258" cy="342" rx="10" ry="29" transform="rotate(-45 258 342)"/>
+<ellipse cx="286" cy="336" rx="9" ry="26" transform="rotate(20 286 336)"/>
+<ellipse cx="279" cy="379" rx="10" ry="29" transform="rotate(-60 279 379)"/>
+<ellipse cx="307" cy="373" rx="9" ry="26" transform="rotate(5 307 373)"/>
+<ellipse cx="309" cy="413" rx="10" ry="29" transform="rotate(-75 309 413)"/>
+<ellipse cx="337" cy="407" rx="9" ry="26" transform="rotate(-10 337 407)"/>
+<ellipse cx="346" cy="442" rx="10" ry="29" transform="rotate(-90 346 442)"/>
+<ellipse cx="374" cy="436" rx="9" ry="26" transform="rotate(-25 374 436)"/>
+<ellipse cx="388" cy="464" rx="10" ry="29" transform="rotate(-105 388 464)"/>
+<ellipse cx="416" cy="458" rx="9" ry="26" transform="rotate(-40 416 458)"/>
+</g>
+</g>
+</svg>

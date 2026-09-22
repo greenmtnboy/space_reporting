@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600" role="img" aria-labelledby="title desc">
+  <title id="title">Soviet Union flag</title>
+  <desc id="desc">Red flag with a gold outlined star and stylized hammer and sickle; shared Soviet/Russian data marker.</desc>
+<rect width="900" height="600" fill="#cc0000"/>
+<g fill="none" stroke="#ffd700" stroke-width="5"><polygon points="190.000,44.000 197.184,66.111 220.434,66.111 201.625,79.777 208.809,101.889 190.000,88.223 171.191,101.889 178.375,79.777 159.566,66.111 182.816,66.111"/></g>
+<g fill="#ffd700">
+<path d="M139 137 L163 112 L209 156 L194 172 L173 151 L126 217 L115 205 L157 138 Z"/>
+<path d="M209 108 C272 147 264 213 218 233 C187 247 158 235 140 219 L117 244 L105 232 L130 207 L142 194 C164 224 205 232 229 207 C256 178 241 133 209 108 Z"/>
+</g>
+</svg>
