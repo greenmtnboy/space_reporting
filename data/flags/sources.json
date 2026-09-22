@@ -1,0 +1,34 @@
+{
+  "united-states.svg": {
+    "source_page": "https://commons.wikimedia.org/wiki/File:Flag_of_the_United_States.svg",
+    "download_url": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Flag_of_the_United_States.svg",
+    "retrieved": "2026-09-22",
+    "copyright_status": "Public domain: PD-ineligible and PD-USGov",
+    "authors": "Dbenbenn and contributors; current colors by TheTaraStark/Jarekt",
+    "sha256": "48f0d3e4a7bf2d5c0c8d09cd975696acb2f3af601aaca80c537933ad9ec166ec"
+  },
+  "soviet-union.svg": {
+    "source_page": "https://commons.wikimedia.org/wiki/File:Flag_of_the_Soviet_Union.svg",
+    "download_url": "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg",
+    "retrieved": "2026-09-22",
+    "copyright_status": "Public domain: PD-RU-exempt (state symbol)",
+    "authors": "USSR; see Commons file history for SVG contributors",
+    "sha256": "f6741b67fcf8934c47f2482a54440ab406ae82763c9c7676b9972f476232127f"
+  },
+  "china.svg": {
+    "source_page": "https://commons.wikimedia.org/wiki/File:Flag_of_the_People%27s_Republic_of_China.svg",
+    "download_url": "https://upload.wikimedia.org/wikipedia/commons/f/fa/Flag_of_the_People%27s_Republic_of_China.svg",
+    "retrieved": "2026-09-22",
+    "copyright_status": "Public domain: PD-shape and PD-PRC-exempt",
+    "authors": "Zeng Liansong (flag design); see Commons file history for SVG contributors",
+    "sha256": "5fce7409cd290e6b3c5ecd09c0d2c400ae459e3d59c6c0539793ac0e803d0179"
+  },
+  "united-nations.svg": {
+    "source_page": "https://commons.wikimedia.org/wiki/File:Flag_of_the_United_Nations.svg",
+    "download_url": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Flag_of_the_United_Nations.svg",
+    "retrieved": "2026-09-22",
+    "copyright_status": "Public domain in the US: PD-US-no notice-UN; separate emblem-use restrictions",
+    "authors": "Denelson83, Zscout370, Madden and subsequent Commons contributors",
+    "sha256": "16f3da34689de9a342d9a05de67692a9f3b3dd8217b92b0547302f6423069b8d"
+  }
+}

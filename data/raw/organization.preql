@@ -23,10 +23,10 @@ property code.parent <- split(parents, '/')[0]; # primary parent organization
 property code._short_e_name string; 
 property code._e_name string; 
 property code.u_name string;
-property flag <- CAST(CASE WHEN state_code in ('SU', 'RU') THEN 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/soviet-union.svg'
-WHEN state_code = 'US' THEN 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/united-states.svg'
-WHEN state_code = 'CN' THEN 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/china.svg'
-ELSE 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/united-nations.svg'
+property flag <- CAST(CASE WHEN state_code in ('SU', 'RU') THEN 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/2026-09-22/soviet-union.svg'
+WHEN state_code = 'US' THEN 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/2026-09-22/united-states.svg'
+WHEN state_code = 'CN' THEN 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/2026-09-22/china.svg'
+ELSE 'https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/2026-09-22/united-nations.svg'
 END AS string::url_image); # project-owned flags; shared Soviet/Russian marker and UN fallback
 
 property code.color <- 

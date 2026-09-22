@@ -1,36 +1,39 @@
 # Flag assets
 
-Self-contained SVG assets used by `../raw/organization.preql`.
-All four use a 3:2 aspect ratio. The existing mapping is preserved: SU/RU
-share the Soviet Union marker, US and CN have their own flags, and other codes
-use the United Nations fallback. The Soviet emblem is a simplified original
-illustration. The UN flag is vendored from the Wikimedia Commons reference
-below, preserving its complete map and olive-branch geometry.
+These four SVGs are copied verbatim from Wikimedia Commons and served from our
+public GCS bucket. Source pages, authors, copyright designations, retrieval dates,
+and SHA-256 checksums are recorded in `sources.json`. There are no runtime requests
+to Wikimedia. The files retain their source proportions: US 19:10, USSR 2:1,
+China 3:2, UN 3:2. The former illustration generator has been removed.
 
-Regenerate the three original national flags with Python's standard library
-(this deliberately leaves the vendored UN asset untouched):
+`../raw/organization.preql` retains the existing mapping: SU/RU share the Soviet
+Union marker, US and CN have their own flags, and other codes use the UN fallback.
+
+## Copyright and symbol use
+
+Commons marks the US, Soviet, and Chinese source files as public domain and the
+UN file as public domain in the United States. See each source page for the exact
+grounds and jurisdictional qualifications. These copyright designations permit
+copying the artwork; they are not a blanket clearance for every use of an emblem.
+
+The [UN Flag Code, Article 6](https://www.un.org/dgacm/sites/www.un.org.dgacm/files/Documents_Protocol/flagcodeun20nov2020stsgb20204.pdf)
+places separate conditions on use by organizations and individuals, including
+no implied affiliation, no commercial advantage, and temporary display. It does
+not clearly authorize this project's permanent generic fallback use. That use
+has not been cleared by the UN. A neutral globe would avoid representing other
+countries as the UN. National symbols can also have restrictions independent of
+copyright; see the source notices. No UN affiliation or endorsement is claimed.
+
+## Publishing
+
+Upload from the repository root with an authenticated Google Cloud CLI:
 
 ```powershell
-python data/flags/generate.py
+gcloud storage cp "data/flags/*.svg" gs://trilogy_public_models/duckdb/launch_report/flags/2026-09-22/ --content-type=image/svg+xml --cache-control=public,max-age=3600
 ```
 
-Upload from the repository root using an authenticated Google Cloud CLI:
-
-```powershell
-gcloud storage cp "data/flags/*.svg" gs://trilogy_public_models/duckdb/launch_report/flags/ --content-type=image/svg+xml --cache-control=public,max-age=3600
-```
-
-The bucket supplies public read access. Public URLs start with
-`https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/`.
-No runtime Wikimedia requests, fonts, scripts, or external SVG references are required.
-
-## United Nations artwork source
-
-- [Source and attribution](https://commons.wikimedia.org/wiki/File:Flag_of_the_United_Nations.svg)
-- [Original SVG](https://upload.wikimedia.org/wikipedia/commons/2/2f/Flag_of_the_United_Nations.svg)
-- Revision: 20 July 2022, retrieved 22 September 2026.
-- Authors credited by Commons: Denelson83, Zscout370, Madden; see file history
-  for subsequent contributors.
-- Commons license designation: public domain in the US (PD-US-no notice-UN).
-- Upstream SHA-1: `3234219addecf3cf8038bc9cd0c0d07f069d719a`.
-- Stored verbatim at 1200 x 800; regeneration does not download or replace it.
+The bucket supplies public read access. URLs start with
+`https://storage.googleapis.com/trilogy_public_models/duckdb/launch_report/flags/2026-09-22/`.
+The dated prefix avoids cached copies of the earlier illustrations. For a future
+revision, review the source terms, update the manifest, publish under a new dated
+prefix, and update the URLs in `organization.preql` together.
