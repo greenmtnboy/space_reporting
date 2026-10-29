@@ -111,19 +111,12 @@ property jcat.first_manufacturer <- @first_code(composed_manufacturers); # the p
 MERGE first_owner into owner.code;
 MERGE first_manufacturer into manufacturer.code;
 
-# GCAT cites codes its own table may lack; the raw root binds them as a local
-# code merged into the dimension's key, which is how refresh copies them verbatim.
-property jcat.launch_tag string; # launch designation as GCAT cites it
-property jcat.state_code string; # owner's state org code as GCAT cites it
-MERGE launch_tag into launch.id;
-MERGE state_code into state.code;
-
 property jcat.is_decommed <- status in ['R','D','C', 'E', 'F', 'OX'];
 
 root datasource satcat_raw (
     JCAT: jcat,
     Satcat: satcat,
-    Launch_Tag: launch_tag,
+    Launch_Tag: ~launch.id,
     Piece: piece,
     Type: type,
     Name: name,
@@ -136,7 +129,7 @@ root datasource satcat_raw (
     Status: status,
     Dest: dest,
     Owner: composed_owners,
-    State: state_code,
+    State: ~state.code,
     Manufacturer: composed_manufacturers,
     Bus: bus,
     Motor: motor,

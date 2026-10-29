@@ -33,8 +33,10 @@ permissions:
 
 env:
   # 0.3.415 made completeness set containment and NULL checks full-table;
+  # 0.3.420 stopped a partial key outside the grain adding NULL-grain rows
+  # on refresh, which the raw roots' partial foreign keys rely on;
   # a floor, as in cloud-sync.yml, so a CLI fix needs no commit here.
-  TRILOGY_CLI: 'pytrilogy>=0.3.417'
+  TRILOGY_CLI: 'pytrilogy>=0.3.420'
   GCAT_CACHE_DIR: ${{ github.workspace }}/.gcat_cache
   MODEL_DIR: ${{ github.workspace }}/.model
 

@@ -102,17 +102,14 @@ property <name,stage_no,variant>.stage_impulse float;
 property <name,stage_no,variant>.stage_apogee int;
 property <name,stage_no,variant>.stage_perigee int;
 property <name,stage_no,variant>.perigee_qual string;
-# GCAT cites codes its own table may lack; the raw root binds them as a local
-# code merged into the dimension's key, which is how refresh copies them verbatim.
-property <name,stage_no,variant>.stage_name string; # stage name as GCAT cites it
-MERGE stage_name into stage.name;
 
 
 root datasource lvs_info_raw (
     LV_Name: name,
     LV_Variant: variant,
     Stage_No: stage_no,
-    Stage_Name: stage_name,
+    # partial: GCAT lists stages no vehicle uses
+    Stage_Name: ~stage.name,
     Qualifier: qualifier,
     Dummy: dummy,
     Multiplicity: multiplicity,
