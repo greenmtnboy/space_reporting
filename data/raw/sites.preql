@@ -33,7 +33,7 @@ root datasource sites_raw (
     Location: location,
     Longitude: ?longitude,
     Latitude: ?latitude,
-    Error: error,
+    Error: ?error,
     Parent: parent,
     EName: e_name,
     UName: u_name
@@ -54,7 +54,7 @@ datasource sites (
     location,
     ?longitude,
     ?latitude,
-    error,
+    ?error,
     parent,
     e_name,
     u_name,

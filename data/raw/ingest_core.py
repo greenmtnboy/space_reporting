@@ -10,7 +10,7 @@ import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import List, Sequence
+from typing import Callable, Iterable, List, Sequence, Set, Tuple
 
 import pyarrow as pa
 import pyarrow.csv as pv
@@ -228,6 +228,72 @@ def add_data_update_column(table: pa.Table, updated_at: datetime) -> pa.Table:
     )
 
     return table.append_column("data_update_date", ts_array)
+
+
+Key = Tuple[str, ...]
+
+
+def column_keys(
+    table: pa.Table,
+    columns: Sequence[str],
+    transform: Callable[[str], str] = lambda v: v,
+) -> Set[Key]:
+    """
+    The distinct keys a fact table holds in `columns`, as tuples of strings.
+    `transform` maps each value first, e.g. to take the first of a slash-joined
+    list of codes. Rows with a null or empty part are skipped: they reference
+    nothing.
+    """
+    parts = [table.column(name).to_pylist() for name in columns]
+    keys: Set[Key] = set()
+    for row in zip(*parts):
+        if any(value is None for value in row):
+            continue
+        key = tuple(transform(str(value)) for value in row)
+        if all(key):
+            keys.add(key)
+    return keys
+
+
+def add_missing_keys(
+    table: pa.Table,
+    key_columns: Sequence[str],
+    referenced: Iterable[Key],
+    label_columns: Sequence[str] = (),
+) -> pa.Table:
+    """
+    Append a placeholder row for every key the fact tables reference that this
+    dimension table lacks.
+
+    GCAT's fact files cite codes its own dimension files do not list - uncertain
+    attributions ('USAF?'), joint ones ('AFSSD/MSC'), retired vehicle variants.
+    The model binds each dimension as complete, so a query that reads one of
+    those codes through the dimension silently drops the fact rows holding it.
+    Placeholders keep the dimension a superset of every code the facts hold.
+
+    A placeholder carries GCAT's own '-' ("no value") in its string columns and
+    null in the rest; `label_columns` get the key itself, so the row still has a
+    readable name. With several key columns the label is the first.
+    """
+    present = column_keys(table, key_columns)
+    missing = sorted(set(referenced) - present)
+    if not missing:
+        return table
+
+    columns = {}
+    for field in table.schema:
+        if field.name in key_columns:
+            idx = list(key_columns).index(field.name)
+            values = [key[idx] for key in missing]
+            columns[field.name] = pa.array(values, type=pa.string()).cast(field.type)
+        elif field.name in label_columns:
+            labels = [key[0] for key in missing]
+            columns[field.name] = pa.array(labels, type=pa.string()).cast(field.type)
+        elif pa.types.is_string(field.type) or pa.types.is_large_string(field.type):
+            columns[field.name] = pa.array(["-"] * len(missing), type=field.type)
+        else:
+            columns[field.name] = pa.nulls(len(missing), type=field.type)
+    return pa.concat_tables([table, pa.table(columns, schema=table.schema)])
 
 
 def emit(table: pa.Table) -> None:

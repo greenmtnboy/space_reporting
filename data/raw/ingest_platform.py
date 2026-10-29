@@ -6,7 +6,8 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/platforms.html
 
-from ingest_core import Layout, emit, ingest_gcat_file
+from ingest_core import Layout, add_missing_keys, column_keys, emit, ingest_gcat_file
+from ingest_launch import LAUNCH_LAYOUT
 
 PLATFORMS_HEADERS = [
     "Code", "UCode", "StateCode", "Type", "Class", "TStart", "TStop",
@@ -21,4 +22,13 @@ PLATFORMS_LAYOUT = Layout(
 )
 
 if __name__ == "__main__":
-    emit(ingest_gcat_file("tsv/tables/platforms.tsv", PLATFORMS_LAYOUT))
+    platforms = ingest_gcat_file("tsv/tables/platforms.tsv", PLATFORMS_LAYOUT)
+    launch = ingest_gcat_file("tsv/launch/launch.tsv", LAUNCH_LAYOUT)
+    emit(
+        add_missing_keys(
+            platforms,
+            ["Code"],
+            column_keys(launch, ["Platform"]),
+            label_columns=["ShortName", "Name", "UName"],
+        )
+    )

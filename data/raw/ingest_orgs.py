@@ -6,7 +6,11 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/orgs.html
 
-from ingest_core import Layout, emit, ingest_gcat_file
+from ingest_core import Layout, add_missing_keys, column_keys, emit, ingest_gcat_file
+from ingest_engine import ENGINES_LAYOUT
+from ingest_launch import LAUNCH_LAYOUT
+from ingest_satcat import SATCAT_LAYOUT
+from ingest_vehicle import LV_LAYOUT
 
 ORGS_HEADERS = [
     "Code", "UCode", "StateCode", "Type", "Class", "TStart", "TStop",
@@ -18,5 +22,32 @@ ORGS_LAYOUT = Layout(
     ORGS_HEADERS, numeric_columns=["Longitude", "Latitude", "Error"]
 )
 
+
+
+def referenced_orgs() -> set:
+    """Every org code a fact table holds, as the model binds it to code."""
+    launch = ingest_gcat_file("tsv/launch/launch.tsv", LAUNCH_LAYOUT)
+    satcat = ingest_gcat_file("tsv/cat/satcat.tsv", SATCAT_LAYOUT)
+    engines = ingest_gcat_file("tsv/tables/engines.tsv", ENGINES_LAYOUT)
+    lv = ingest_gcat_file("tsv/tables/lv.tsv", LV_LAYOUT)
+    return (
+        # launch.preql binds the first of the slash-joined agencies (first_org)
+        column_keys(launch, ["Agency"], lambda v: v.split("/")[0])
+        | column_keys(satcat, ["Owner"])
+        | column_keys(satcat, ["State"])
+        | column_keys(satcat, ["Manufacturer"])
+        | column_keys(engines, ["Manufacturer"])
+        | column_keys(lv, ["LV_Manufacturer"])
+    )
+
+
 if __name__ == "__main__":
-    emit(ingest_gcat_file("tsv/tables/orgs.tsv", ORGS_LAYOUT))
+    orgs = ingest_gcat_file("tsv/tables/orgs.tsv", ORGS_LAYOUT)
+    emit(
+        add_missing_keys(
+            orgs,
+            ["Code"],
+            referenced_orgs(),
+            label_columns=["ShortName", "Name", "UName"],
+        )
+    )
