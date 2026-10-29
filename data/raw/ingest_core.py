@@ -6,11 +6,17 @@
 
 import csv
 import io
+import os
 import re
+import shutil
 import sys
+import tempfile
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable, Iterable, List, Sequence, Set, Tuple
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Sequence, Set, Tuple
 
 import pyarrow as pa
 import pyarrow.csv as pv
@@ -24,42 +30,102 @@ ENCODING = "utf-8"
 Rows = List[List[str]]
 
 
-def fetch_data_update_date() -> datetime:
+# GCAT is one person's site, and a refresh runs every ingest script as its own
+# process: the dimension ingests read the fact files too, so without a cache one
+# refresh would fetch launch.tsv five times. Every script instead goes through
+# a local cache keyed by GCAT's "Data Update" date, so each file is fetched once
+# per upstream release, and every script in a run reads the same bytes.
+CACHE_DIR = Path(
+    os.environ.get("GCAT_CACHE_DIR", Path(tempfile.gettempdir()) / "gcat_cache")
+)
+# How long one homepage read of the update date is trusted. Long enough to span
+# a whole refresh, so every script in it agrees on the date (and so on the
+# files); short enough that the next day's refresh sees a new release.
+UPDATE_DATE_TTL_SECONDS = 30 * 60
+
+
+@contextmanager
+def cache_lock(name: str) -> Iterator[None]:
     """
-    Fetch the 'Data Update' date from the GCAT homepage.
+    Serialize cache fills across the refresh's parallel scripts, so two that
+    need the same file do not both fetch it. Without fcntl (Windows) this only
+    costs a duplicate fetch; writes are atomic either way.
+    """
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CACHE_DIR / f"{name}.lock", "w") as handle:
+        try:
+            import fcntl
+        except ImportError:
+            yield
+            return
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def write_atomic(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(f"{path.name}.{os.getpid()}.partial")
+    partial.write_bytes(data)
+    os.replace(partial, path)
+
+
+def parse_data_update_date(html: str) -> datetime:
+    """
+    The 'Data Update' date on the GCAT homepage.
     Example format: "Data Update 2026 Jan 2"
     """
-    r = requests.get(GCAT_HOME_URL)
-    r.raise_for_status()
-
-    # Look for pattern like "Data Update 2026 Jan 2"
-    match = re.search(r"Data\s+Update\s+(\d{4})\s+(\w{3})\s+(\d{1,2})", r.text)
+    match = re.search(r"Data\s+Update\s+(\d{4})\s+(\w{3})\s+(\d{1,2})", html)
     if not match:
         raise RuntimeError("Could not find 'Data Update' date on GCAT homepage")
 
     year, month_abbr, day = match.groups()
-
-    # Parse the date
-    date_str = f"{year} {month_abbr} {day}"
-    dt = datetime.strptime(date_str, "%Y %b %d")
+    dt = datetime.strptime(f"{year} {month_abbr} {day}", "%Y %b %d")
     return dt.replace(tzinfo=timezone.utc)
+
+
+def fetch_data_update_date() -> datetime:
+    """GCAT's 'Data Update' date, read from the homepage at most once per TTL."""
+    cached = CACHE_DIR / "data_update_date"
+    with cache_lock("data_update_date"):
+        if cached.exists() and time.time() - cached.stat().st_mtime < (
+            UPDATE_DATE_TTL_SECONDS
+        ):
+            return datetime.fromisoformat(cached.read_text())
+        r = requests.get(GCAT_HOME_URL)
+        r.raise_for_status()
+        updated_at = parse_data_update_date(r.text)
+        write_atomic(cached, updated_at.isoformat().encode())
+        return updated_at
 
 
 def download_tsv(file_path: str) -> io.BytesIO:
     """
-    Download a TSV file from GCAT.
+    A TSV file from GCAT, fetched at most once per upstream release.
     file_path should be relative, e.g. 'tsv/cat/lcat.tsv'
     """
-    url = BASE_URL + file_path
-    r = requests.get(url, stream=True)
-    r.raise_for_status()
+    release = fetch_data_update_date().date().isoformat()
+    cached = CACHE_DIR / release / file_path
+    with cache_lock(file_path.replace("/", "_")):
+        if not cached.exists():
+            r = requests.get(BASE_URL + file_path, stream=True)
+            r.raise_for_status()
+            buf = io.BytesIO()
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    buf.write(chunk)
+            write_atomic(cached, buf.getvalue())
+            prune_old_releases(keep=release)
+        return io.BytesIO(cached.read_bytes())
 
-    buf = io.BytesIO()
-    for chunk in r.iter_content(chunk_size=1024 * 1024):
-        if chunk:
-            buf.write(chunk)
-    buf.seek(0)
-    return buf
+
+def prune_old_releases(keep: str) -> None:
+    """Drop cached files from earlier GCAT releases; nothing reads them again."""
+    for entry in CACHE_DIR.iterdir():
+        if entry.is_dir() and entry.name != keep:
+            shutil.rmtree(entry, ignore_errors=True)
 
 
 def is_blank(value: str) -> bool:
@@ -260,6 +326,7 @@ def add_missing_keys(
     key_columns: Sequence[str],
     referenced: Iterable[Key],
     label_columns: Sequence[str] = (),
+    fill: Dict[str, Any] | None = None,
 ) -> pa.Table:
     """
     Append a placeholder row for every key the fact tables reference that this
@@ -273,8 +340,11 @@ def add_missing_keys(
 
     A placeholder carries GCAT's own '-' ("no value") in its string columns and
     null in the rest; `label_columns` get the key itself, so the row still has a
-    readable name. With several key columns the label is the first.
+    readable name. With several key columns the label is the first. `fill`
+    sets a constant for a column instead, for a table whose grain is wider than
+    the key being padded.
     """
+    fill = fill or {}
     present = column_keys(table, key_columns)
     missing = sorted(set(referenced) - present)
     if not missing:
@@ -286,6 +356,10 @@ def add_missing_keys(
             idx = list(key_columns).index(field.name)
             values = [key[idx] for key in missing]
             columns[field.name] = pa.array(values, type=pa.string()).cast(field.type)
+        elif field.name in fill:
+            columns[field.name] = pa.array(
+                [fill[field.name]] * len(missing), type=field.type
+            )
         elif field.name in label_columns:
             labels = [key[0] for key in missing]
             columns[field.name] = pa.array(labels, type=pa.string()).cast(field.type)

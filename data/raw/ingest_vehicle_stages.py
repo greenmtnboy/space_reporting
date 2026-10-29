@@ -8,7 +8,8 @@
 
 import pyarrow as pa
 
-from ingest_core import Layout, emit, ingest_gcat_file
+from ingest_core import Layout, add_missing_keys, column_keys, emit, ingest_gcat_file
+from ingest_launch import LAUNCH_LAYOUT
 
 # Shape as of GCAT release 1.8.5 (2026 Aug 28): 17 columns. TimeOn, TimeOff,
 # AltOn, AltOff, VelOn and VelOff (stage ignition/cutoff time, altitude and
@@ -48,5 +49,32 @@ def dedupe_stage_positions(table: pa.Table) -> pa.Table:
     return table.filter(pa.array(keep))
 
 
+# The placeholder stage a vehicle with no stage rows gets: one stage, position
+# 1, of GCAT's own '-' ("Unknown") stage, whose engine is '-'.
+VIRTUAL_STAGE = {"Stage_No": "1", "Stage_Name": "-", "Multiplicity": 1}
+
+
+def vehicle_stages() -> pa.Table:
+    """
+    GCAT's stage composition, plus a virtual single stage for every vehicle it
+    lists none for. lvs_info binds name and variant complete, so it must hold
+    every vehicle lv_info and the launches do; a launch whose vehicle has no
+    stage rows otherwise drops out of every query that reads its stages.
+    """
+    # imported here: ingest_vehicle imports this module for LVS_LAYOUT
+    from ingest_vehicle import LV_LAYOUT
+
+    lvs = dedupe_stage_positions(ingest_gcat_file("tsv/tables/lvs.tsv", LVS_LAYOUT))
+    lv = ingest_gcat_file("tsv/tables/lv.tsv", LV_LAYOUT)
+    launch = ingest_gcat_file("tsv/launch/launch.tsv", LAUNCH_LAYOUT)
+    return add_missing_keys(
+        lvs,
+        ["LV_Name", "LV_Variant"],
+        column_keys(lv, ["LV_Name", "LV_Variant"])
+        | column_keys(launch, ["LV_Type", "Variant"]),
+        fill=VIRTUAL_STAGE,
+    )
+
+
 if __name__ == "__main__":
-    emit(dedupe_stage_positions(ingest_gcat_file("tsv/tables/lvs.tsv", LVS_LAYOUT)))
+    emit(vehicle_stages())

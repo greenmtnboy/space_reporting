@@ -111,8 +111,8 @@ root datasource lvs_info_raw (
     Dummy: dummy,
     Multiplicity: multiplicity,
     Stage_Impulse: ?stage_impulse,
-    Stage_Apogee: stage_apogee,
-    Stage_Perigee: stage_perigee,
+    Stage_Apogee: ?stage_apogee,
+    Stage_Perigee: ?stage_perigee,
     Perigee_Qual: perigee_qual
     )
 grain (name,stage_no,variant)
@@ -129,8 +129,8 @@ datasource lvs_info (
     dummy,
     multiplicity,
     ?stage_impulse,
-    stage_apogee,
-    stage_perigee,
+    ?stage_apogee,
+    ?stage_perigee,
     perigee_qual,
     # partial so refresh sources the update date from the data_update_info
     # probe, not from a sibling parquet file
