@@ -31,6 +31,7 @@ LAUNCH_LAYOUT = Layout(
         "launch_jd", "Perigee", "Apogee", "Inc", "Azimuth", "Range",
         "OrbMass", "OrbPay",
     ],
+    code_columns=["Variant", "Platform", "Launch_Site", "Agency"],
 )
 
 if __name__ == "__main__":

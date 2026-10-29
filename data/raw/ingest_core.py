@@ -153,6 +153,13 @@ def strip_numeric_qualifier(value: str) -> str:
     return trimmed if trimmed != value and is_numeric(trimmed) else value
 
 
+def strip_code_qualifier(value: str) -> str:
+    """'USAF?' -> 'USAF', 'RAYM?/GSFC' -> 'RAYM/GSFC', a bare '?' -> '-'."""
+    if "?" not in value:
+        return value
+    return value.replace("?", "").strip() or "-"
+
+
 @dataclass(frozen=True)
 class Layout:
     """
@@ -170,9 +177,14 @@ class Layout:
 
     headers: List[str]
     numeric_columns: Sequence[str] = ()
+    # Columns holding codes that point at another GCAT table. GCAT marks an
+    # uncertain attribution with '?' ('USAF?', 'RAYM?/GSFC', variant '?'); the
+    # mark is dropped so the code matches the table it points at, and a code
+    # that was only a '?' becomes '-' (no value).
+    code_columns: Sequence[str] = ()
 
     def __post_init__(self) -> None:
-        for name in self.numeric_columns:
+        for name in [*self.numeric_columns, *self.code_columns]:
             if name not in self.headers:
                 raise ValueError(
                     f"Layout constrains column '{name}', which is not one of its "
@@ -215,6 +227,7 @@ def clean_tsv_content(raw_bytes: io.BytesIO, layout: Layout) -> io.BytesIO:
     3. Converting '-' to empty string in numeric columns
     4. Stripping GCAT's inline qualifier suffixes ('1650.0?' -> '1650.0') in
        numeric columns
+    5. Stripping the '?' uncertainty mark from code columns ('USAF?' -> 'USAF')
 
     GCAT's own header line is ignored - it has proven unreliable, and column names
     come from the layout instead. Data that does not match the layout raises rather
@@ -265,6 +278,9 @@ def clean_tsv_content(raw_bytes: io.BytesIO, layout: Layout) -> io.BytesIO:
             row[col_idx] = (
                 "" if row[col_idx] == "-" else strip_numeric_qualifier(row[col_idx])
             )
+        for name in layout.code_columns:
+            idx = headers.index(name)
+            row[idx] = strip_code_qualifier(row[idx])
 
     # Write cleaned TSV to buffer
     out = io.StringIO()

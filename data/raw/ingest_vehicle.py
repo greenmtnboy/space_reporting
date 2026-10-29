@@ -26,6 +26,7 @@ LV_LAYOUT = Layout(
         "LV_Min_Stage", "LV_Max_Stage", "Length", "Diameter", "Launch_Mass",
         "LEO_Capacity", "GTO_Capacity", "TO_Thrust", "Apogee", "Range",
     ],
+    code_columns=["LV_Manufacturer"],
 )
 
 if __name__ == "__main__":

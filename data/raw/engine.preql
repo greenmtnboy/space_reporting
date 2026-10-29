@@ -79,7 +79,7 @@ file `ingest_engine.py`
 
 datasource engine (
     name,
-    manufacturer:manufacturer.code,
+    manufacturer:~manufacturer.code,
     family,
     alt_name,
     oxidizer,

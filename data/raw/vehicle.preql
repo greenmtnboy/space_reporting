@@ -67,7 +67,7 @@ file `ingest_vehicle.py`
 datasource lv_info (
     name,
     family,
-    manufacturer:manufacturer.code,
+    manufacturer:~manufacturer.code,
     variant,
     alias,
     ?min_stage,

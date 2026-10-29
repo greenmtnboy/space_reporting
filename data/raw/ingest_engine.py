@@ -19,6 +19,7 @@ ENGINES_HEADERS = [
 ENGINES_LAYOUT = Layout(
     ENGINES_HEADERS,
     numeric_columns=["Mass", "Impulse", "Thrust", "Isp", "Duration", "Chambers"],
+    code_columns=["Manufacturer"],
 )
 
 if __name__ == "__main__":
