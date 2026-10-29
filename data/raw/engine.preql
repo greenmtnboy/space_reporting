@@ -20,6 +20,9 @@ property name.date string; # date of first flight
 property name.usage string; # example of usage, includes stage number in brackets
 key group string; # general grouping of engines
 
+property name.composed_manufacturers string; # every manufacturer GCAT lists, slash-joined for a joint attribution
+property name.first_manufacturer <- @first_code(composed_manufacturers); # the primary manufacturer's org code
+MERGE first_manufacturer into manufacturer.code;
 
 auto group_hex_color <- CASE
         # Top tier (very high volume, maximal contrast)
@@ -57,7 +60,7 @@ auto group_hex_color <- CASE
 
 root datasource engines_raw (
     Name: name,
-    Manufacturer: manufacturer.code,
+    Manufacturer: composed_manufacturers,
     Family: family,
     Alt_name: alt_name,
     Oxidizer: oxidizer,
@@ -79,6 +82,7 @@ file `ingest_engine.py`
 
 datasource engine (
     name,
+    composed_manufacturers,
     manufacturer:~manufacturer.code,
     family,
     alt_name,

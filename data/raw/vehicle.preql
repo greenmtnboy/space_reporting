@@ -40,11 +40,14 @@ property full_name <- CASE
 	ELSE name
 END; # Full name of the launch vehicle, including variant if applicable.
 
+property <name,variant>.composed_manufacturers string; # every manufacturer GCAT lists, slash-joined for a joint attribution
+property <name,variant>.first_manufacturer <- @first_code(composed_manufacturers); # the primary manufacturer's org code
+MERGE first_manufacturer into manufacturer.code;
 
 root datasource lv_info_raw (
     LV_Name: name,
     LV_Family: family,
-    LV_Manufacturer: manufacturer.code,
+    LV_Manufacturer: composed_manufacturers,
     LV_Variant: variant,
     LV_Alias: alias,
     LV_Min_Stage: ?min_stage,
@@ -67,6 +70,7 @@ file `ingest_vehicle.py`
 datasource lv_info (
     name,
     family,
+    composed_manufacturers,
     manufacturer:~manufacturer.code,
     variant,
     alias,

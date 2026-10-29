@@ -104,6 +104,13 @@ auto base_category <- substring(split(type, ' ')[1],1,1); #P	Payload (for orbita
 #X	Catalog entry that has been deleted (used in auxcat etc.)
 #Z	Spurious catalog entry (was in SATCAT, perhaps in TLEs, but there was no real object)
 
+property jcat.composed_owners string; # every owner GCAT lists, slash-joined for a joint attribution
+property jcat.composed_manufacturers string; # every manufacturer GCAT lists, slash-joined for a joint attribution
+property jcat.first_owner <- @first_code(composed_owners); # the primary owner's org code
+property jcat.first_manufacturer <- @first_code(composed_manufacturers); # the primary manufacturer's org code
+MERGE first_owner into owner.code;
+MERGE first_manufacturer into manufacturer.code;
+
 property jcat.is_decommed <- status in ['R','D','C', 'E', 'F', 'OX'];
 
 root datasource satcat_raw (
@@ -121,9 +128,9 @@ root datasource satcat_raw (
     DDate: ?_status_end_date,
     Status: status,
     Dest: dest,
-    Owner: owner.code,
+    Owner: composed_owners,
     State: state.code,
-    Manufacturer: manufacturer.code,
+    Manufacturer: composed_manufacturers,
     Bus: bus,
     Motor: motor,
     Mass: mass,
@@ -162,8 +169,10 @@ datasource satcat (
     Status: status,
     Dest: dest,
     Owner: ~owner.code,
+    composed_owners: composed_owners,
     State: ~state.code,
     Manufacturer: ~manufacturer.code,
+    composed_manufacturers: composed_manufacturers,
     Bus: bus,
     Motor: motor,
     Mass: mass,

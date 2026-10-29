@@ -24,6 +24,11 @@ ORGS_LAYOUT = Layout(
 
 
 
+def first_code(codes: str) -> str:
+    """Mirrors etl.preql's first_code."""
+    return codes.split("/")[0]
+
+
 def referenced_orgs() -> set:
     """Every org code a fact table holds, as the model binds it to code."""
     launch = ingest_gcat_file("tsv/launch/launch.tsv", LAUNCH_LAYOUT)
@@ -31,13 +36,13 @@ def referenced_orgs() -> set:
     engines = ingest_gcat_file("tsv/tables/engines.tsv", ENGINES_LAYOUT)
     lv = ingest_gcat_file("tsv/tables/lv.tsv", LV_LAYOUT)
     return (
-        # launch.preql binds the first of the slash-joined agencies (first_org)
-        column_keys(launch, ["Agency"], lambda v: v.split("/")[0])
-        | column_keys(satcat, ["Owner"])
+        # the models join a slash-joined list ('AFSSD/MSC') on its first code
+        column_keys(launch, ["Agency"], first_code)
+        | column_keys(satcat, ["Owner"], first_code)
         | column_keys(satcat, ["State"])
-        | column_keys(satcat, ["Manufacturer"])
-        | column_keys(engines, ["Manufacturer"])
-        | column_keys(lv, ["LV_Manufacturer"])
+        | column_keys(satcat, ["Manufacturer"], first_code)
+        | column_keys(engines, ["Manufacturer"], first_code)
+        | column_keys(lv, ["LV_Manufacturer"], first_code)
     )
 
 
