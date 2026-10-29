@@ -14,7 +14,7 @@ import tempfile
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Sequence, Set, Tuple
 
@@ -83,7 +83,9 @@ def parse_data_update_date(html: str) -> datetime:
 
     year, month_abbr, day = match.groups()
     dt = datetime.strptime(f"{year} {month_abbr} {day}", "%Y %b %d")
-    return dt.replace(tzinfo=timezone.utc)
+    # naive UTC: the model types the update date as a datetime, and an
+    # offset-carrying value reads back as a TIMESTAMP instead
+    return dt
 
 
 def fetch_data_update_date() -> datetime:
@@ -93,7 +95,7 @@ def fetch_data_update_date() -> datetime:
         if cached.exists() and time.time() - cached.stat().st_mtime < (
             UPDATE_DATE_TTL_SECONDS
         ):
-            return datetime.fromisoformat(cached.read_text())
+            return datetime.fromisoformat(cached.read_text()).replace(tzinfo=None)
         r = requests.get(GCAT_HOME_URL)
         r.raise_for_status()
         updated_at = parse_data_update_date(r.text)
@@ -182,9 +184,12 @@ class Layout:
     # mark is dropped so the code matches the table it points at, and a code
     # that was only a '?' becomes '-' (no value).
     code_columns: Sequence[str] = ()
+    # Columns the model types as text that can still look numeric (a start
+    # year, '1965'); read as strings rather than inferred.
+    string_columns: Sequence[str] = ()
 
     def __post_init__(self) -> None:
-        for name in [*self.numeric_columns, *self.code_columns]:
+        for name in [*self.numeric_columns, *self.code_columns, *self.string_columns]:
             if name not in self.headers:
                 raise ValueError(
                     f"Layout constrains column '{name}', which is not one of its "
@@ -290,13 +295,16 @@ def clean_tsv_content(raw_bytes: io.BytesIO, layout: Layout) -> io.BytesIO:
     return io.BytesIO(out.getvalue().encode(ENCODING))
 
 
-def load_arrow_table(tsv_bytes: io.BytesIO) -> pa.Table:
+def load_arrow_table(tsv_bytes: io.BytesIO, layout: Layout) -> pa.Table:
     """Load TSV content into a PyArrow table."""
     tsv_bytes.seek(0)
     return pv.read_csv(
         tsv_bytes,
         parse_options=pv.ParseOptions(delimiter="\t"),
-        convert_options=pv.ConvertOptions(strings_can_be_null=True),
+        convert_options=pv.ConvertOptions(
+            strings_can_be_null=True,
+            column_types={name: pa.string() for name in layout.string_columns},
+        ),
     )
 
 
@@ -306,7 +314,7 @@ def add_data_update_column(table: pa.Table, updated_at: datetime) -> pa.Table:
 
     ts_array = pa.array(
         [updated_at] * n,
-        type=pa.timestamp("us", tz="UTC"),
+        type=pa.timestamp("us"),
     )
 
     return table.append_column("data_update_date", ts_array)
@@ -409,4 +417,4 @@ def ingest_gcat_file(file_path: str, layout: Layout) -> pa.Table:
         cleaned_bytes = clean_tsv_content(raw_bytes, layout)
     except ValueError as exc:
         raise ValueError(f"{BASE_URL}{file_path}: {exc}") from exc
-    return load_arrow_table(cleaned_bytes)
+    return load_arrow_table(cleaned_bytes, layout)

@@ -18,7 +18,9 @@ PLATFORMS_HEADERS = [
 # Longitude and Latitude are currently unpopulated upstream, so they constrain
 # nothing; they are declared so they still parse as numbers if GCAT fills them in.
 PLATFORMS_LAYOUT = Layout(
-    PLATFORMS_HEADERS, numeric_columns=["Longitude", "Latitude", "Error"]
+    PLATFORMS_HEADERS,
+    numeric_columns=["Longitude", "Latitude", "Error"],
+    string_columns=["TStart", "TStop"],
 )
 
 if __name__ == "__main__":

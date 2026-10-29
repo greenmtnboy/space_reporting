@@ -10,7 +10,19 @@ import sites as site;
 import organization as org;
 import organization as state;
 
-merge org.state_code into state.code;
+# partial: only some organizations are a host state
+merge org.state_code into ~state.code;
+
+# GCAT cites codes its own table may lack; the raw root binds them as a local
+# code merged into the dimension's key, which is how refresh copies them verbatim.
+property id.lv_name string; # launch vehicle name as GCAT cites it
+property id.lv_variant string; # launch vehicle variant as GCAT cites it
+property id.platform_code string; # launch platform code as GCAT cites it
+property id.site_code string; # launch site code as GCAT cites it
+MERGE lv_name into vehicle.name;
+MERGE lv_variant into vehicle.variant;
+MERGE platform_code into platform.code;
+MERGE site_code into site.key;
 
 property id._launch_jd float; # float of launch date on julian calendar
 # property <id>.launch_date string;
@@ -169,7 +181,7 @@ property id.first_org <- _split_orgs[1];
 
 MERGE first_org into org.code;
 
-property id.launch_date <- date_add('1900-01-01'::date,day,CAST((CAST(_launch_jd AS float) - 2415021) AS int));
+property id.launch_date <- date_add('1900-01-01'::date,day,CAST((CAST(_launch_jd AS float) - 2415021) AS int))::date;
 property id.success_flag <- CASE
 	WHEN _launch_code = '' THEN null
 	WHEN len(_launch_code) > 1 THEN substring(_launch_code,2,len(_launch_code) - 1)
@@ -218,18 +230,18 @@ key orbit_code <- split(category,' ')[2]; # Orbit code definitions (3-letter cod
 root datasource raw_launch_info (
     launch_tag: id,
     launch_jd: _launch_jd,
-    LV_Type: vehicle.name,
-    Variant: vehicle.variant,
+    LV_Type: lv_name,
+    Variant: lv_variant,
     Flight_ID: flight_id,
     Flight: flight,
     Mission: mission,
     FlightCode: flight_code,
-    Platform: ?platform.code,
-    Launch_Site: ?site.key,
+    Platform: ?platform_code,
+    Launch_Site: ?site_code,
     Launch_Pad: launch_pad,
     Ascent_Site: ascent_site,
     Ascent_Pad: ascent_pad,
-    Apogee: apogee,
+    Apogee: ?apogee,
     Apoflag: ?apo_flag,
     Range: ?range,
     Dest: dest,
@@ -260,7 +272,7 @@ datasource launch_info (
     launch_pad,
     ascent_site,
     ascent_pad,
-    apogee,
+    ?apogee,
     ?apo_flag,
     ?range,
     dest,

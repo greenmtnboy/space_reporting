@@ -12,6 +12,6 @@ import pyarrow as pa
 if __name__ == "__main__":
     updated_at = fetch_data_update_date()
     table = pa.table(
-        {"data_update_date": pa.array([updated_at], type=pa.timestamp("us", tz="UTC"))}
+        {"data_update_date": pa.array([updated_at], type=pa.timestamp("us"))}
     )
     emit(table)

@@ -19,7 +19,7 @@ property code.longitude float; # HQ/geographic center longitude
 property code.latitude float; # HQ/geographic center latitude
 property code.error float; # error of lat long - not fully populated
 property code.parents string; # when nonempty, provides parent(s) of the organization of which the current entry is a subset separated by /. Thus, NASA is the parent of Goddard Space Flight Center. 
-property code.parent <- split(parents, '/')[0]; # primary parent organization
+property code.parent <- split(parents, '/')[1]; # primary parent organization
 property code._short_e_name string; 
 property code._e_name string; 
 property code.u_name string;
@@ -100,8 +100,8 @@ root datasource organizations_raw (
     StateCode: state_code,
     Type: type,
     Class: class,
-    TStart: t_start,
-    TStop: t_stop,
+    TStart: _t_start,
+    TStop: _t_stop,
     ShortName: short_name,
     Name: name,
     Location: location,
@@ -109,7 +109,7 @@ root datasource organizations_raw (
     Latitude: ?latitude,
     Error: ?error,
     Parent: parents,
-    ShortEName: short_e_name,
+    ShortEName: _short_e_name,
     EName: ?_e_name,
     UName: u_name
     )
@@ -124,8 +124,8 @@ datasource organizations (
     state_code,
     type,
     class,
-    t_start,
-    t_stop,
+    ?t_start,
+    ?t_stop,
     short_name,
     name,
     location,

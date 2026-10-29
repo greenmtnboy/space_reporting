@@ -5,7 +5,6 @@ import etl;
 import organization as manufacturer;
 
 key name string; # name of engine
-property name.manufacturer string; # manufacturer of the engine
 property name.family string; # engine family, a loosely defined grouping
 property name.alt_name string; # alternative name of the engine
 key oxidizer string; # type of oxidizer used
@@ -63,7 +62,7 @@ root datasource engines_raw (
     Manufacturer: composed_manufacturers,
     Family: family,
     Alt_name: alt_name,
-    Oxidizer: oxidizer,
+    Oxidizer: ?oxidizer,
     Fuel: fuel,
     Mass: ?mass,
     Impulse: ?impulse,
@@ -86,7 +85,7 @@ datasource engine (
     manufacturer:~manufacturer.code,
     family,
     alt_name,
-    oxidizer,
+    ?oxidizer,
     fuel,
     ?mass,
     ?impulse,

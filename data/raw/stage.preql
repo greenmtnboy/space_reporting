@@ -14,6 +14,10 @@ property name.dry_mass numeric::kg;
 property name.thrust numeric::kn;
 property name.duration numeric::second;
 property name.engine_count int;
+# GCAT cites codes its own table may lack; the raw root binds them as a local
+# code merged into the dimension's key, which is how refresh copies them verbatim.
+property name.engine_name string; # engine name as GCAT cites it
+MERGE engine_name into engine.name;
 
 
 root datasource stages_raw (
@@ -27,9 +31,7 @@ root datasource stages_raw (
     Dry_Mass: ?dry_mass,
     Thrust: ?thrust,
     Duration: ?duration,
-    # not marked partial: refresh must take engine names verbatim from this root
-    # rather than driving a join from the engines table (which drops/nulls rows)
-    Engine: engine.name,
+    Engine: engine_name,
     NEng: ?engine_count
     )
 grain (name)
