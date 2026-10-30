@@ -10,7 +10,8 @@ import sites as site;
 import organization as org;
 import organization as state;
 
-merge org.state_code into state.code;
+# partial: only some organizations are a host state
+merge org.state_code into ~state.code;
 
 property id._launch_jd float; # float of launch date on julian calendar
 # property <id>.launch_date string;
@@ -169,7 +170,7 @@ property id.first_org <- _split_orgs[1];
 
 MERGE first_org into org.code;
 
-property id.launch_date <- date_add('1900-01-01'::date,day,CAST((CAST(_launch_jd AS float) - 2415021) AS int));
+property id.launch_date <- date_add('1900-01-01'::date,day,CAST((CAST(_launch_jd AS float) - 2415021) AS int))::date;
 property id.success_flag <- CASE
 	WHEN _launch_code = '' THEN null
 	WHEN len(_launch_code) > 1 THEN substring(_launch_code,2,len(_launch_code) - 1)
@@ -218,18 +219,18 @@ key orbit_code <- split(category,' ')[2]; # Orbit code definitions (3-letter cod
 root datasource raw_launch_info (
     launch_tag: id,
     launch_jd: _launch_jd,
-    LV_Type: vehicle.name,
-    Variant: vehicle.variant,
+    LV_Type: ~vehicle.name,
+    Variant: ~vehicle.variant,
     Flight_ID: flight_id,
     Flight: flight,
     Mission: mission,
     FlightCode: flight_code,
-    Platform: ?platform.code,
-    Launch_Site: ?site.key,
+    Platform: ~?platform.code,
+    Launch_Site: ~?site.key,
     Launch_Pad: launch_pad,
     Ascent_Site: ascent_site,
     Ascent_Pad: ascent_pad,
-    Apogee: apogee,
+    Apogee: ?apogee,
     Apoflag: ?apo_flag,
     Range: ?range,
     Dest: dest,
@@ -249,24 +250,24 @@ file `ingest_launch.py`
 datasource launch_info (
     id,
     _launch_jd,
-    vehicle.name,
-    vehicle.variant,
+    ~vehicle.name,
+    ~vehicle.variant,
     flight_id,
     flight,
     mission,
     flight_code,
-    ?platform.code,
-    ?site.key,
+    ~?platform.code,
+    ~?site.key,
     launch_pad,
     ascent_site,
     ascent_pad,
-    apogee,
+    ?apogee,
     ?apo_flag,
     ?range,
     dest,
     orb_pay,
     orgs,
-    org.code,
+    ~org.code,
     _launch_code,
     ?fail_code,
     launch_date,

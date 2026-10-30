@@ -1,1 +1,1 @@
-pytrilogy>=0.3.153
+pytrilogy>=0.3.420

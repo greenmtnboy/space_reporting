@@ -9,3 +9,6 @@ dist/
 
 playwright-report/
 test-results/
+# model-validate CI scratch (data/ci/localize.py target, GCAT download cache)
+.model
+.gcat_cache

@@ -1,0 +1,79 @@
+# Validate the Trilogy model in data/ against real data.
+#
+# `trilogy integration` checks every datasource's claims (grain, types,
+# nullability, and that each complete binding holds every value any other
+# source has). Pointed at the live model it would compare this branch's ingest
+# scripts with the parquets the last merged refresh published, so an ingest
+# change could not pass until it had shipped. data/ci/localize.py instead
+# copies the model to a scratch directory with every published parquet
+# pointed at a local file; `trilogy refresh` builds them there from this
+# branch's ingest, and validation then checks code and model together. Nothing
+# is written to GCS.
+#
+# GCAT is one person's site. Downloads go through ingest_core's cache, keyed
+# by GCAT's release date, and that cache is persisted here, so CI fetches each
+# file once per upstream release, not once per push.
+
+name: Model Validate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/**'
+      - '.github/workflows/model-validate.yml'
+  pull_request:
+    paths:
+      - 'data/**'
+      - '.github/workflows/model-validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # 0.3.415 made completeness set containment and NULL checks full-table;
+  # 0.3.420 stopped a partial key outside the grain adding NULL-grain rows
+  # on refresh, which the raw roots' partial foreign keys rely on;
+  # a floor, as in cloud-sync.yml, so a CLI fix needs no commit here.
+  TRILOGY_CLI: 'pytrilogy>=0.3.420'
+  GCAT_CACHE_DIR: ${{ github.workspace }}/.gcat_cache
+  MODEL_DIR: ${{ github.workspace }}/.model
+
+jobs:
+  validate:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install Trilogy CLI
+        run: uv tool install "$TRILOGY_CLI"
+
+      - name: Date key for the GCAT cache
+        id: day
+        run: echo "today=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      # Saved once per day; a restore from an older day still serves any file
+      # GCAT has not re-released, since the cache keys files by release date.
+      - name: Restore GCAT download cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.GCAT_CACHE_DIR }}
+          key: gcat-${{ steps.day.outputs.today }}
+          restore-keys: gcat-
+
+      - name: Localize the model
+        run: python data/ci/localize.py "$MODEL_DIR"
+
+      - name: Refresh published datasources locally
+        working-directory: ${{ env.MODEL_DIR }}
+        run: trilogy refresh .
+
+      - name: Validate against the local build
+        working-directory: ${{ env.MODEL_DIR }}
+        run: trilogy integration refresh.preql

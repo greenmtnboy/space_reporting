@@ -16,3 +16,8 @@ def extract_date(col)-> CASE
         )
         ELSE NULL
     END::date;
+
+# GCAT lists a joint attribution as slash-joined org codes ('AFSSD/MSC'). The
+# composed string is kept as-is; the organization a row joins to is the first
+# code. '-' (none) stays a code of its own, with its own organizations row.
+def first_code(codes) -> split(codes, '/')[1];

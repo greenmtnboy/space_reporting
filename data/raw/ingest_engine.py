@@ -6,7 +6,8 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/engines.html
 
-from ingest_core import Layout, emit, ingest_gcat_file
+from ingest_core import Layout, add_missing_keys, column_keys, emit, ingest_gcat_file
+from ingest_stages import STAGES_LAYOUT
 
 ENGINES_HEADERS = [
     "Name", "Manufacturer", "Family", "Alt_Name", "Oxidizer", "Fuel",
@@ -18,7 +19,10 @@ ENGINES_HEADERS = [
 ENGINES_LAYOUT = Layout(
     ENGINES_HEADERS,
     numeric_columns=["Mass", "Impulse", "Thrust", "Isp", "Duration", "Chambers"],
+    code_columns=["Manufacturer"],
 )
 
 if __name__ == "__main__":
-    emit(ingest_gcat_file("tsv/tables/engines.tsv", ENGINES_LAYOUT))
+    engines = ingest_gcat_file("tsv/tables/engines.tsv", ENGINES_LAYOUT)
+    stages = ingest_gcat_file("tsv/tables/stages.tsv", STAGES_LAYOUT)
+    emit(add_missing_keys(engines, ["Name"], column_keys(stages, ["Engine"])))

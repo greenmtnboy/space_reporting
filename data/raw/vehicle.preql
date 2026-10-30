@@ -40,17 +40,20 @@ property full_name <- CASE
 	ELSE name
 END; # Full name of the launch vehicle, including variant if applicable.
 
+property <name,variant>.composed_manufacturers string; # every manufacturer GCAT lists, slash-joined for a joint attribution
+property <name,variant>.first_manufacturer <- @first_code(composed_manufacturers); # the primary manufacturer's org code
+MERGE first_manufacturer into manufacturer.code;
 
 root datasource lv_info_raw (
     LV_Name: name,
     LV_Family: family,
-    LV_Manufacturer: manufacturer.code,
+    LV_Manufacturer: composed_manufacturers,
     LV_Variant: variant,
     LV_Alias: alias,
-    LV_Min_Stage: min_stage,
-    LV_Max_Stage: max_stage,
+    LV_Min_Stage: ?min_stage,
+    LV_Max_Stage: ?max_stage,
     Length: ?length,
-    Diameter: diameter,
+    Diameter: ?diameter,
     Launch_Mass: ?launch_mass,
     LEO_Capacity: ?leo_capacity,
     GTO_Capacity: ?gto_capacity,
@@ -67,13 +70,14 @@ file `ingest_vehicle.py`
 datasource lv_info (
     name,
     family,
-    manufacturer:manufacturer.code,
+    composed_manufacturers,
+    manufacturer:~manufacturer.code,
     variant,
     alias,
-    min_stage,
-    max_stage,
+    ?min_stage,
+    ?max_stage,
     ?length,
-    diameter,
+    ?diameter,
     ?launch_mass,
     ?leo_capacity,
     ?gto_capacity,
@@ -104,15 +108,14 @@ root datasource lvs_info_raw (
     LV_Name: name,
     LV_Variant: variant,
     Stage_No: stage_no,
-    # not marked partial: refresh must take stage names verbatim from this root
-    # rather than driving a join from the stages table (which drops/nulls rows)
-    Stage_Name: stage.name,
+    # partial: GCAT lists stages no vehicle uses
+    Stage_Name: ~stage.name,
     Qualifier: qualifier,
     Dummy: dummy,
     Multiplicity: multiplicity,
     Stage_Impulse: ?stage_impulse,
-    Stage_Apogee: stage_apogee,
-    Stage_Perigee: stage_perigee,
+    Stage_Apogee: ?stage_apogee,
+    Stage_Perigee: ?stage_perigee,
     Perigee_Qual: perigee_qual
     )
 grain (name,stage_no,variant)
@@ -129,8 +132,8 @@ datasource lvs_info (
     dummy,
     multiplicity,
     ?stage_impulse,
-    stage_apogee,
-    stage_perigee,
+    ?stage_apogee,
+    ?stage_perigee,
     perigee_qual,
     # partial so refresh sources the update date from the data_update_info
     # probe, not from a sibling parquet file

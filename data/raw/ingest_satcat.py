@@ -24,6 +24,7 @@ SATCAT_LAYOUT = Layout(
         "Mass", "DryMass", "TotMass", "Length", "Diameter", "Span",
         "Perigee", "Apogee", "Inc",
     ],
+    code_columns=["Owner", "State", "Manufacturer"],
 )
 
 if __name__ == "__main__":

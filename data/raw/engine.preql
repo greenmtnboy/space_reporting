@@ -5,7 +5,6 @@ import etl;
 import organization as manufacturer;
 
 key name string; # name of engine
-property name.manufacturer string; # manufacturer of the engine
 property name.family string; # engine family, a loosely defined grouping
 property name.alt_name string; # alternative name of the engine
 key oxidizer string; # type of oxidizer used
@@ -20,6 +19,9 @@ property name.date string; # date of first flight
 property name.usage string; # example of usage, includes stage number in brackets
 key group string; # general grouping of engines
 
+property name.composed_manufacturers string; # every manufacturer GCAT lists, slash-joined for a joint attribution
+property name.first_manufacturer <- @first_code(composed_manufacturers); # the primary manufacturer's org code
+MERGE first_manufacturer into manufacturer.code;
 
 auto group_hex_color <- CASE
         # Top tier (very high volume, maximal contrast)
@@ -57,10 +59,10 @@ auto group_hex_color <- CASE
 
 root datasource engines_raw (
     Name: name,
-    Manufacturer: manufacturer.code,
+    Manufacturer: composed_manufacturers,
     Family: family,
     Alt_name: alt_name,
-    Oxidizer: oxidizer,
+    Oxidizer: ?oxidizer,
     Fuel: fuel,
     Mass: ?mass,
     Impulse: ?impulse,
@@ -79,10 +81,11 @@ file `ingest_engine.py`
 
 datasource engine (
     name,
-    manufacturer:manufacturer.code,
+    composed_manufacturers,
+    manufacturer:~manufacturer.code,
     family,
     alt_name,
-    oxidizer,
+    ?oxidizer,
     fuel,
     ?mass,
     ?impulse,

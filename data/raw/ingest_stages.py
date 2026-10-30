@@ -6,7 +6,8 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/stages.html
 
-from ingest_core import Layout, emit, ingest_gcat_file
+from ingest_core import Layout, add_missing_keys, column_keys, emit, ingest_gcat_file
+from ingest_vehicle_stages import vehicle_stages
 
 # Shape as of GCAT release 1.8.8 (2026 Sep 3): 20 columns. The estimate
 # qualifier that used to ride along inside a measurement ('1650.0?') now has its
@@ -31,4 +32,10 @@ STAGES_LAYOUT = Layout(
 )
 
 if __name__ == "__main__":
-    emit(ingest_gcat_file("tsv/tables/stages.tsv", STAGES_LAYOUT))
+    stages = ingest_gcat_file("tsv/tables/stages.tsv", STAGES_LAYOUT)
+    # the padded composition, so a virtual stage's name is listed too
+    emit(
+        add_missing_keys(
+            stages, ["Stage_Name"], column_keys(vehicle_stages(), ["Stage_Name"])
+        )
+    )

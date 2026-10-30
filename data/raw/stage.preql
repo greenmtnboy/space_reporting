@@ -27,9 +27,8 @@ root datasource stages_raw (
     Dry_Mass: ?dry_mass,
     Thrust: ?thrust,
     Duration: ?duration,
-    # not marked partial: refresh must take engine names verbatim from this root
-    # rather than driving a join from the engines table (which drops/nulls rows)
-    Engine: engine.name,
+    # partial: GCAT lists engines no stage uses
+    Engine: ~engine.name,
     NEng: ?engine_count
     )
 grain (name)

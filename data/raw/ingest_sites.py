@@ -6,7 +6,8 @@
 
 # Column reference: https://planet4589.org/space/gcat/data/tables/sites.html
 
-from ingest_core import Layout, emit, ingest_gcat_file
+from ingest_core import Layout, add_missing_keys, column_keys, emit, ingest_gcat_file
+from ingest_launch import LAUNCH_LAYOUT
 
 SITES_HEADERS = [
     "Site", "Code", "UCode", "Type", "StateCode", "TStart", "TStop",
@@ -19,4 +20,13 @@ SITES_LAYOUT = Layout(
 )
 
 if __name__ == "__main__":
-    emit(ingest_gcat_file("tsv/tables/sites.tsv", SITES_LAYOUT))
+    sites = ingest_gcat_file("tsv/tables/sites.tsv", SITES_LAYOUT)
+    launch = ingest_gcat_file("tsv/launch/launch.tsv", LAUNCH_LAYOUT)
+    emit(
+        add_missing_keys(
+            sites,
+            ["Site"],
+            column_keys(launch, ["Launch_Site"]),
+            label_columns=["ShortName", "Name", "UName"],
+        )
+    )
