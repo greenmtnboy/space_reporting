@@ -14,7 +14,7 @@ import tempfile
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Sequence, Set, Tuple
 
@@ -83,9 +83,12 @@ def parse_data_update_date(html: str) -> datetime:
 
     year, month_abbr, day = match.groups()
     dt = datetime.strptime(f"{year} {month_abbr} {day}", "%Y %b %d")
-    # naive UTC: the model types the update date as a datetime, and an
-    # offset-carrying value reads back as a TIMESTAMP instead
-    return dt
+    # UTC-aware: the published parquets carry this column as TIMESTAMP WITH
+    # TIME ZONE, and `trilogy refresh` compares a file's watermark against this
+    # root's raw value. A naive value cannot be compared with an aware one, and
+    # a file's zone-awareness is its source's - rewriting the parquet does not
+    # change it - so the awareness here has to stay what the files already hold.
+    return dt.replace(tzinfo=timezone.utc)
 
 
 def fetch_data_update_date() -> datetime:
@@ -95,7 +98,7 @@ def fetch_data_update_date() -> datetime:
         if cached.exists() and time.time() - cached.stat().st_mtime < (
             UPDATE_DATE_TTL_SECONDS
         ):
-            return datetime.fromisoformat(cached.read_text()).replace(tzinfo=None)
+            return datetime.fromisoformat(cached.read_text())
         r = requests.get(GCAT_HOME_URL)
         r.raise_for_status()
         updated_at = parse_data_update_date(r.text)
@@ -314,7 +317,7 @@ def add_data_update_column(table: pa.Table, updated_at: datetime) -> pa.Table:
 
     ts_array = pa.array(
         [updated_at] * n,
-        type=pa.timestamp("us"),
+        type=pa.timestamp("us", tz="UTC"),
     )
 
     return table.append_column("data_update_date", ts_array)
