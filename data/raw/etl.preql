@@ -1,5 +1,8 @@
 # shared concepts
-property <*>.data_updated_through datetime; # date when the data was last updated
+# `timestamp`, not `datetime`: the update date is UTC-aware (see
+# ingest_core.parse_data_update_date), which duckdb stores as TIMESTAMP WITH
+# TIME ZONE - the type every published parquet already holds.
+property <*>.data_updated_through timestamp; # date when the data was last updated
 
 root datasource data_update_info (
     data_update_date: data_updated_through
