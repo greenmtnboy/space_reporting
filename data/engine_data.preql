@@ -6,7 +6,8 @@ select
     launch_date,
     id as launch_tag,
     case when vehicle.stage_no = 'F' THEN 4
-    else   vehicle.stage_no::int
+    when regexp_contains(vehicle.stage_no, '^-?[0-9]+$') then vehicle.stage_no::int
+    else null
     end as vehicle.stage_number,
     case 
     when vehicle.stage_number = 0 then 'Booster'
