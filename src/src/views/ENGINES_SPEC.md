@@ -30,7 +30,11 @@ This view visualizes rocket engine firings over time using three time-series spi
 ## Data
 - **Source**: `raw_engine_data.json`
 - **Fields**:
-  - `vehicle_stage_number` (0=Booster, 1=First, 2=Second, 3+=Upper)
+  - `vehicle_stage_number` (≤0=Booster, 1=First, 2=Second, 3+=Upper)
+    - GCAT's letter stage codes are mapped in `data/engine_data.preql` by where the hardware sits in the stack:
+      `A` (air-launch carrier aircraft / balloon, below stage 1) → 0, `C` (inert interstage adapter) → 3,
+      `F` (fairing) → 4, `P` (payload / reentry vehicle, top of stack) → 5. Any other non-numeric code becomes null
+      instead of failing the job, and the frontend treats null as 1.
   - `vehicle_stage_engine_name`
   - `vehicle_stage_engine_fuel`
   - `vehicle_stage_engine_count`

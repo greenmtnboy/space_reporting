@@ -6,11 +6,19 @@ where launch_date is not null
 select
     launch_date,
     id as launch_tag,
-    case when vehicle.stage_no = 'F' THEN 4
-    else   vehicle.stage_no::int
+    # GCAT stage codes: numeric stages count up from the pad (-1/0 strapons, 1 core),
+    # plus letter codes for non-numbered hardware, mapped onto their stack position.
+    case
+    when vehicle.stage_no = 'A' THEN 0 # air-launch carrier aircraft/balloon (L-1011, NB-52, rockoon); sits below stage 1
+    when vehicle.stage_no = 'C' THEN 3 # inert interstage adapter (Perekhodnik, BOZ, S-II interstage); upper stack
+    when vehicle.stage_no = 'F' THEN 4 # payload fairing; upper stack
+    when vehicle.stage_no = 'P' THEN 5 # payload / reentry vehicle; top of the stack
+    when regexp_contains(vehicle.stage_no, '^-?[0-9]+$') then vehicle.stage_no::int
+    # unknown future codes: don't fail the job; frontend treats null as stage 1
+    else null
     end as vehicle.stage_number,
     case 
-    when vehicle.stage_number = 0 then 'Booster'
+    when vehicle.stage_number <= 0 then 'Booster'
     when vehicle.stage_number = 1 then 'First Stage'
     when vehicle.stage_number = 2 then 'Second Stage'
     when vehicle.stage_number >= 3 then 'Upper/Kick Stage'
